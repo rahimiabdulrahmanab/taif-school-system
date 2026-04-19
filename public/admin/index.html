@@ -1,0 +1,1950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Taif High School - Management System</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+:root{--brand:#1A4A5C;--accent:#5DCAA5;--accent-glow:rgba(93,202,165,0.35);--bg:#060D18;--glass:rgba(255,255,255,0.04);--glass-mid:rgba(255,255,255,0.07);--glass-border:rgba(255,255,255,0.08);--glass-accent:rgba(93,202,165,0.2);--text:#E8EDF5;--text-mid:#8B98B0;--text-dim:#4A5568;--sidebar-w:268px;--topbar-h:66px;--radius:14px;--radius-sm:8px;--transition:.25s cubic-bezier(.4,0,.2,1);--font-head:'Syne',sans-serif;--font-body:'Manrope',sans-serif;--font-mono:'JetBrains Mono',monospace;}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:var(--font-body);background:var(--bg);color:var(--text);overflow:hidden;-webkit-font-smoothing:antialiased;}
+a{text-decoration:none;color:inherit;}
+button{cursor:pointer;border:none;background:none;font-family:inherit;color:inherit;}
+ul{list-style:none;}
+*{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.06) transparent;}
+*::-webkit-scrollbar{width:4px;}
+*::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:8px;}
+body::before{content:'';position:fixed;inset:0;z-index:0;background:radial-gradient(ellipse 80% 60% at 10% 0%,rgba(26,74,92,.55) 0%,transparent 60%),radial-gradient(ellipse 60% 50% at 90% 100%,rgba(93,202,165,.1) 0%,transparent 55%),linear-gradient(135deg,#060D18 0%,#080F1C 50%,#060A14 100%);pointer-events:none;}
+body::after{content:'';position:fixed;inset:0;z-index:0;background:radial-gradient(circle 400px at 15% 25%,rgba(93,202,165,.06) 0%,transparent 70%),radial-gradient(circle 300px at 85% 75%,rgba(26,74,92,.15) 0%,transparent 70%);pointer-events:none;animation:orb 18s ease-in-out infinite alternate;}
+@keyframes orb{0%{transform:translate(0,0);}100%{transform:translate(-30px,20px);}}
+.app{display:flex;height:100vh;position:relative;z-index:1;}
+.sidebar{width:var(--sidebar-w);height:100vh;flex-shrink:0;display:flex;flex-direction:column;position:relative;z-index:100;background:rgba(6,13,24,.8);backdrop-filter:blur(28px);border-right:1px solid var(--glass-border);overflow:hidden;}
+.sidebar::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:.5;}
+.sidebar-logo{height:var(--topbar-h);padding:0 20px;display:flex;align-items:center;gap:13px;border-bottom:1px solid var(--glass-border);flex-shrink:0;}
+.logo-badge{width:40px;height:40px;background:linear-gradient(135deg,var(--accent),#3aaa85);border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:15px;font-weight:800;color:#060D18;flex-shrink:0;box-shadow:0 0 20px var(--accent-glow),0 4px 12px rgba(0,0,0,.3);}
+.logo-text strong{display:block;font-family:var(--font-head);font-size:13.5px;font-weight:700;color:var(--text);}
+.logo-text span{display:block;font-size:10px;font-weight:500;color:var(--text-dim);text-transform:uppercase;letter-spacing:.1em;}
+.sidebar-nav{flex:1;overflow-y:auto;padding:10px 8px;}
+.nav-section{padding:16px 10px 5px;font-size:9px;font-weight:700;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.15em;font-family:var(--font-head);}
+.nav-link{display:flex;align-items:center;gap:11px;padding:10px 12px;margin:1px 0;border-radius:var(--radius-sm);font-size:13px;font-weight:500;color:var(--text-mid);transition:var(--transition);cursor:pointer;user-select:none;position:relative;white-space:nowrap;}
+.nav-link i{width:18px;text-align:center;font-size:13px;flex-shrink:0;color:var(--text-dim);transition:var(--transition);}
+.nav-link:hover{background:var(--glass-mid);color:var(--text);}
+.nav-link:hover i{color:var(--accent);}
+.nav-link.active{background:linear-gradient(135deg,rgba(93,202,165,.15),rgba(93,202,165,.06));color:var(--accent);font-weight:600;border:1px solid rgba(93,202,165,.18);}
+.nav-link.active i{color:var(--accent);}
+.nav-link.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:60%;background:var(--accent);border-radius:0 3px 3px 0;box-shadow:0 0 8px var(--accent-glow);}
+.nav-badge{margin-left:auto;background:rgba(255,255,255,.07);color:var(--text-mid);font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;font-family:var(--font-mono);}
+.nav-link.active .nav-badge{background:rgba(93,202,165,.2);color:var(--accent);}
+.sidebar-footer{padding:12px 8px;border-top:1px solid var(--glass-border);flex-shrink:0;}
+.admin-card{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-sm);background:var(--glass);border:1px solid var(--glass-border);transition:var(--transition);}
+.admin-card:hover{background:var(--glass-mid);}
+.admin-avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#3aaa85);display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:12px;font-weight:800;color:#060D18;flex-shrink:0;box-shadow:0 0 10px var(--accent-glow);}
+.admin-info{flex:1;min-width:0;}
+.admin-info strong{display:block;font-size:12px;font-weight:700;color:var(--text);}
+.admin-info span{display:block;font-size:10px;color:var(--text-dim);}
+.admin-logout{color:var(--text-dim);font-size:13px;padding:4px;border-radius:4px;transition:var(--transition);}
+.admin-logout:hover{color:#ff7875;background:rgba(255,120,117,.1);}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
+.topbar{height:var(--topbar-h);display:flex;align-items:center;padding:0 28px;gap:16px;flex-shrink:0;background:rgba(6,13,24,.65);backdrop-filter:blur(20px);border-bottom:1px solid var(--glass-border);}
+.topbar-title{flex:1;}
+.topbar-title h2{font-family:var(--font-head);font-size:18px;font-weight:700;color:var(--text);}
+.topbar-title span{font-size:11.5px;color:var(--text-mid);display:block;margin-top:1px;}
+.topbar-actions{display:flex;align-items:center;gap:8px;}
+.topbar-pill{display:flex;align-items:center;gap:7px;padding:7px 14px;background:rgba(26,74,92,.07);border:1px solid rgba(26,74,92,.12);border-radius:30px;font-size:11.5px;font-weight:500;color:var(--text-mid);font-family:var(--font-mono);}
+.topbar-pill .dot{width:6px;height:6px;background:var(--accent);border-radius:50%;box-shadow:0 0 6px var(--accent-glow);animation:pd 2s ease-in-out infinite;}
+@keyframes pd{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(.65);}}
+.tbar-btn{width:38px;height:38px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;background:rgba(26,74,92,.06);border:1px solid rgba(26,74,92,.10);color:var(--text-mid);font-size:14px;transition:var(--transition);position:relative;}
+.tbar-btn:hover{background:var(--glass-mid);color:var(--accent);border-color:var(--glass-accent);}
+.ndot{position:absolute;top:6px;right:6px;width:7px;height:7px;background:#ff7875;border-radius:50%;border:1.5px solid #060D18;box-shadow:0 0 5px rgba(255,120,117,.6);}
+.content{flex:1;overflow-y:auto;padding:28px;}
+.page{display:none;}
+.page.active{display:block;animation:pi .3s cubic-bezier(.4,0,.2,1);}
+@keyframes pi{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+.glass-card{background:var(--glass);backdrop-filter:blur(20px);border:1px solid var(--glass-border);border-radius:var(--radius);overflow:hidden;transition:var(--transition);position:relative;}
+.glass-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.03) 0%,transparent 60%);pointer-events:none;border-radius:inherit;}
+.glass-card:hover{border-color:rgba(255,255,255,.12);}
+.card-hdr{padding:18px 22px;border-bottom:1px solid rgba(26,74,92,.08);display:flex;align-items:center;justify-content:space-between;}
+.card-hdr h4{font-family:var(--font-head);font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;}
+.card-hdr h4 i{color:var(--accent);font-size:13px;}
+.card-hdr .meta{font-size:11px;color:var(--text-dim);font-family:var(--font-mono);}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:22px;}
+.stat-card{background:var(--glass);backdrop-filter:blur(20px);border:1px solid var(--glass-border);border-radius:var(--radius);padding:22px 20px;display:flex;align-items:center;gap:16px;transition:var(--transition);position:relative;overflow:hidden;}
+.stat-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.04) 0%,transparent 60%);pointer-events:none;}
+.stat-card:hover{border-color:var(--glass-accent);transform:translateY(-3px);}
+.stat-glow{position:absolute;top:-20px;right:-20px;width:80px;height:80px;border-radius:50%;filter:blur(30px);opacity:.2;}
+.stat-ico{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.si-t{background:rgba(93,202,165,.18);color:var(--accent);}
+.si-b{background:rgba(56,139,255,.18);color:#5b9ef7;}
+.si-g{background:rgba(45,139,95,.22);color:#48d085;}
+.si-r{background:rgba(255,100,100,.18);color:#ff7875;}
+.si-o{background:rgba(255,160,60,.18);color:#ffaa3d;}
+.si-p{background:rgba(160,100,255,.18);color:#b57dff;}
+.stat-info h3{font-family:var(--font-mono);font-size:30px;font-weight:600;color:var(--text);line-height:1.1;}
+.stat-info p{font-size:11.5px;color:var(--text-mid);margin-top:4px;}
+.dash-grid{display:grid;grid-template-columns:1fr 330px;gap:16px;}
+.scan-tbl{width:100%;border-collapse:collapse;}
+.scan-tbl thead tr{border-bottom:1px solid var(--glass-border);}
+.scan-tbl th{padding:11px 22px;font-size:10px;font-weight:700;color:var(--text-mid);text-transform:uppercase;letter-spacing:.1em;text-align:left;font-family:var(--font-head);background:rgba(26,74,92,.03);}
+.scan-tbl td{padding:12px 22px;font-size:13px;color:var(--text-mid);border-bottom:1px solid rgba(26,74,92,.06);vertical-align:middle;transition:var(--transition);}
+.scan-tbl tbody tr:last-child td{border-bottom:none;}
+.scan-tbl tbody tr:hover td{background:var(--glass);color:var(--text);}
+.pc{display:flex;align-items:center;gap:11px;}
+.pav{width:34px;height:34px;border-radius:50%;background:rgba(93,202,165,.15);border:1.5px solid rgba(93,202,165,.25);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--accent);font-family:var(--font-head);flex-shrink:0;}
+.pname{font-weight:600;font-size:13px;color:var(--text);font-family:var(--font-head);}
+.pcls{font-size:11px;color:var(--text-dim);margin-top:1px;}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;font-family:var(--font-head);}
+.bg-g{background:rgba(45,139,95,.18);color:#48d085;border:1px solid rgba(45,139,95,.25);}
+.bg-b{background:rgba(56,139,255,.18);color:#5b9ef7;border:1px solid rgba(56,139,255,.25);}
+.bg-t{background:rgba(93,202,165,.18);color:var(--accent);border:1px solid rgba(93,202,165,.25);}
+.bg-o{background:rgba(255,160,60,.18);color:#ffaa3d;border:1px solid rgba(255,160,60,.25);}
+.tmono{font-family:var(--font-mono);font-size:12px;color:var(--text-mid);}
+.empty{padding:48px;text-align:center;color:var(--text-dim);}
+.empty i{font-size:32px;display:block;margin-bottom:12px;opacity:.2;}
+.empty p{font-size:13px;}
+.qa{padding:14px;display:flex;flex-direction:column;gap:8px;}
+.qb{display:flex;align-items:center;gap:13px;padding:12px 14px;border-radius:var(--radius-sm);background:rgba(255,255,255,.7);border:1px solid rgba(26,74,92,.08);font-size:13px;font-weight:600;color:var(--text-mid);transition:var(--transition);cursor:pointer;text-align:left;width:100%;font-family:var(--font-body);}
+.qbi{width:36px;height:36px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.qb:hover{background:rgba(255,255,255,.95);border-color:var(--glass-border-accent);color:var(--text);transform:translateX(4px);}
+.qsub{font-size:11px;color:var(--text-dim);font-weight:400;margin-top:1px;}
+.abs-list{padding:6px 0;}
+.abs-item{display:flex;align-items:center;gap:12px;padding:10px 20px;transition:var(--transition);}
+.abs-item:hover{background:rgba(93,202,165,.08);}
+.abs-av{width:34px;height:34px;border-radius:50%;background:rgba(255,100,100,.12);border:1px solid rgba(255,100,100,.18);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#ff7875;flex-shrink:0;font-family:var(--font-head);}
+.abs-info{flex:1;min-width:0;}
+.abs-info strong{display:block;font-size:12.5px;font-weight:600;color:var(--text);}
+.abs-info span{font-size:11px;color:var(--text-dim);}
+.wa-pill{font-size:11px;font-weight:600;padding:5px 10px;border-radius:20px;border:1px solid rgba(37,211,102,.2);color:rgba(37,211,102,.6);cursor:pointer;transition:var(--transition);font-family:var(--font-head);}
+.wa-pill:hover{background:rgba(37,211,102,.1);color:#25D366;border-color:#25D366;}
+.alert-b{display:flex;align-items:center;gap:14px;padding:14px 20px;margin-bottom:20px;background:rgba(255,160,60,.12);border:1px solid rgba(255,160,60,.30);border-radius:var(--radius);}
+.alert-b i{color:#ffaa3d;font-size:18px;flex-shrink:0;}
+.alert-b p{font-size:13px;color:rgba(255,200,120,.9);flex:1;}
+.ac{color:rgba(255,160,60,.45);padding:4px 8px;border-radius:5px;transition:var(--transition);font-size:13px;}
+.ac:hover{background:rgba(255,160,60,.1);color:#ffaa3d;}
+.cs{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:65vh;text-align:center;}
+.cs-orb{width:100px;height:100px;border-radius:28px;display:flex;align-items:center;justify-content:center;font-size:38px;margin-bottom:24px;position:relative;}
+.cs-orb::after{content:'';position:absolute;inset:-8px;border-radius:36px;border:1px solid;opacity:.18;}
+.cs-t{background:rgba(93,202,165,.15);color:var(--accent);}
+.cs-t::after{border-color:var(--accent);}
+.cs-b{background:rgba(56,139,255,.1);color:#5b9ef7;}
+.cs-b::after{border-color:#5b9ef7;}
+.cs-g{background:rgba(45,139,95,.12);color:#48d085;}
+.cs-g::after{border-color:#48d085;}
+.cs-o{background:rgba(255,160,60,.1);color:#ffaa3d;}
+.cs-o::after{border-color:#ffaa3d;}
+.cs-p{background:rgba(160,100,255,.1);color:#b57dff;}
+.cs-p::after{border-color:#b57dff;}
+.cs h2{font-family:var(--font-head);font-size:24px;font-weight:800;color:var(--text);margin-bottom:10px;}
+.cs p{font-size:14px;color:var(--text-mid);max-width:320px;line-height:1.75;}
+.pp{margin-top:24px;display:inline-flex;align-items:center;gap:8px;padding:8px 18px;background:var(--glass);border:1px solid var(--glass-border);border-radius:30px;font-size:12px;font-weight:600;color:var(--text-dim);font-family:var(--font-head);}
+.fc{display:flex;flex-direction:column;gap:16px;}
+/* ===== Theme Refresh: Professional School Glass Palette ===== */
+:root{
+  --brand:#2f5f98;
+  --brand-deep:#244c7c;
+  --accent:#58b8a9;
+  --accent-soft:#87d5cf;
+  --accent-glow:rgba(88,184,169,0.22);
+  --bg:#edf4fb;
+  --bg-soft:#f7fbff;
+  --glass:rgba(255,255,255,0.52);
+  --glass-mid:rgba(255,255,255,0.72);
+  --glass-strong:rgba(255,255,255,0.86);
+  --glass-border:rgba(52,92,136,0.14);
+  --glass-accent:rgba(88,184,169,0.20);
+  --text:#18324a;
+  --text-mid:#587088;
+  --text-dim:#8aa0b5;
+  --radius-lg:22px;
+  --overlay:rgba(33,61,95,0.22);
+}
+
+html,body{
+  background:linear-gradient(180deg,#eef5fc 0%,#e8f1fb 48%,#f7fbff 100%) !important;
+  color:var(--text) !important;
+}
+
+body::before{
+  background:
+    radial-gradient(ellipse 72% 58% at 8% 0%, rgba(47,95,152,.20) 0%, transparent 62%),
+    radial-gradient(ellipse 48% 36% at 100% 8%, rgba(88,184,169,.14) 0%, transparent 55%),
+    linear-gradient(135deg,#edf4fb 0%, #e8f1fb 55%, #f7fbff 100%) !important;
+}
+body::after{
+  background:
+    radial-gradient(circle 420px at 16% 18%, rgba(47,95,152,.10) 0%, transparent 72%),
+    radial-gradient(circle 340px at 84% 72%, rgba(88,184,169,.12) 0%, transparent 70%) !important;
+}
+
+.sidebar{
+  background:
+    linear-gradient(180deg, rgba(42,82,132,.90) 0%, rgba(53,99,154,.88) 56%, rgba(68,121,176,.84) 100%) !important;
+  border-right:1px solid rgba(255,255,255,.16) !important;
+  box-shadow:10px 0 30px rgba(35,62,96,.10);
+}
+.sidebar::before{
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) !important;
+}
+.sidebar-logo{
+  border-bottom:1px solid rgba(255,255,255,.12) !important;
+}
+.logo-badge,
+.admin-avatar{
+  background:linear-gradient(135deg,var(--accent),#7ed4c8) !important;
+  color:#ffffff !important;
+  box-shadow:0 10px 24px rgba(28,73,117,.18), 0 0 18px var(--accent-glow) !important;
+}
+.logo-text strong,
+.admin-info strong{
+  color:#ffffff !important;
+}
+.logo-text span,
+.admin-info span{
+  color:rgba(239,247,255,.72) !important;
+}
+.nav-section{
+  color:rgba(236,244,252,.56) !important;
+}
+.nav-link{
+  color:rgba(244,249,255,.82) !important;
+}
+.nav-link i,
+.admin-logout{
+  color:rgba(239,247,255,.62) !important;
+}
+.nav-link:hover,
+.admin-card:hover{
+  background:rgba(255,255,255,.12) !important;
+  color:#ffffff !important;
+}
+.nav-link:hover i,
+.admin-logout:hover{
+  color:#ffffff !important;
+}
+.nav-link.active{
+  background:linear-gradient(135deg,rgba(255,255,255,.24),rgba(255,255,255,.10)) !important;
+  color:#ffffff !important;
+  border:1px solid rgba(255,255,255,.22) !important;
+  box-shadow:0 10px 24px rgba(23,50,83,.12);
+}
+.nav-link.active i,
+.nav-link.active .nav-badge{
+  color:#ffffff !important;
+}
+.nav-link.active .nav-badge,
+.nav-badge{
+  background:rgba(255,255,255,.12) !important;
+  border:1px solid rgba(255,255,255,.10);
+}
+.nav-link.active::before{
+  background:#ffffff !important;
+  box-shadow:0 0 10px rgba(255,255,255,.35) !important;
+}
+.sidebar-footer{
+  border-top:1px solid rgba(255,255,255,.12) !important;
+}
+.admin-card{
+  background:rgba(255,255,255,.08) !important;
+  border:1px solid rgba(255,255,255,.14) !important;
+}
+
+.topbar{
+  background:rgba(255,255,255,.46) !important;
+  border-bottom:1px solid var(--glass-border) !important;
+  box-shadow:0 10px 30px rgba(47,95,152,.06);
+}
+.topbar-pill,
+.tbar-btn{
+  background:rgba(255,255,255,.56) !important;
+  border:1px solid var(--glass-border) !important;
+  color:var(--text-mid) !important;
+}
+.tbar-btn:hover{
+  background:rgba(255,255,255,.88) !important;
+  border-color:var(--glass-accent) !important;
+  color:var(--brand) !important;
+}
+.ndot{
+  border-color:#ffffff !important;
+}
+
+.glass-card,
+.stat-card{
+  background:var(--glass-mid) !important;
+  border:1px solid var(--glass-border) !important;
+  box-shadow:0 18px 40px rgba(45,76,117,.08);
+}
+.glass-card::before,
+.stat-card::before{
+  background:linear-gradient(135deg,rgba(255,255,255,.38) 0%, transparent 64%) !important;
+}
+.glass-card:hover,
+.stat-card:hover{
+  border-color:rgba(88,184,169,.22) !important;
+}
+.card-hdr,
+.scan-tbl thead tr{
+  border-color:rgba(52,92,136,.10) !important;
+}
+.scan-tbl th{
+  background:rgba(47,95,152,.05) !important;
+  color:var(--text-mid) !important;
+}
+.scan-tbl td{
+  border-bottom:1px solid rgba(52,92,136,.08) !important;
+}
+.scan-tbl tbody tr:hover td{
+  background:rgba(255,255,255,.56) !important;
+}
+
+.qb{
+  background:rgba(255,255,255,.62) !important;
+  border:1px solid var(--glass-border) !important;
+  color:var(--text) !important;
+  box-shadow:0 8px 24px rgba(45,76,117,.05);
+}
+.qb:hover{
+  background:rgba(255,255,255,.92) !important;
+  border-color:var(--glass-accent) !important;
+  color:var(--brand) !important;
+}
+.qsub{
+  color:var(--text-mid) !important;
+}
+.alert-b{
+  background:rgba(255,194,102,.18) !important;
+  border:1px solid rgba(232,167,64,.30) !important;
+}
+.alert-b p{
+  color:#8b5b18 !important;
+}
+
+.cs{
+  min-height:60vh !important;
+  padding:40px 24px !important;
+  background:rgba(255,255,255,.56);
+  border:1px solid var(--glass-border);
+  border-radius:28px;
+  box-shadow:0 20px 50px rgba(45,76,117,.08);
+}
+.cs h2{
+  color:var(--brand-deep) !important;
+}
+.cs p,
+.pp{
+  color:var(--text-mid) !important;
+}
+.pp{
+  background:rgba(255,255,255,.70) !important;
+  border:1px solid var(--glass-border) !important;
+}
+
+#stu-overlay,
+#qr-modal,
+#confirm-modal,
+#alert-modal{
+  background:var(--overlay) !important;
+  backdrop-filter:blur(10px) !important;
+}
+#stu-panel,
+#qr-modal > div,
+#confirm-modal > div,
+#alert-modal > div{
+  background:var(--glass-strong) !important;
+  border:1px solid var(--glass-border) !important;
+  box-shadow:0 28px 70px rgba(45,76,117,.16) !important;
+}
+#stu-panel{
+  border-left:1px solid var(--glass-border) !important;
+}
+#stu-panel [style*="border-bottom:1px solid rgba(26,74,92,.10)"]{
+  border-bottom:1px solid rgba(52,92,136,.10) !important;
+}
+
+#pg-students input:not([type="hidden"]):not([type="file"]),
+#pg-students select,
+#stu-panel input:not([type="hidden"]):not([type="file"]),
+#stu-panel select{
+  background:rgba(255,255,255,.74) !important;
+  border:1px solid var(--glass-border) !important;
+  color:var(--text) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55);
+}
+#pg-students input::placeholder,
+#stu-panel input::placeholder{
+  color:var(--text-dim) !important;
+}
+#pg-students input[type="date"],
+#stu-panel input[type="date"]{
+  color-scheme:light !important;
+}
+#pg-students select option,
+#stu-panel select option{
+  background:#f4f8fd !important;
+  color:var(--text) !important;
+}
+#stu-photo-preview,
+#webcam-wrap,
+#qr-img{
+  background:rgba(255,255,255,.56) !important;
+  border-color:var(--glass-border) !important;
+}
+#webcam-wrap div[style*="background:var(--glass)"]{
+  background:rgba(255,255,255,.60) !important;
+}
+
+#pg-students button[onclick*="openStudentForm"],
+#stu-save-btn,
+#qr-download,
+#cm-ok{
+  background:linear-gradient(135deg,var(--brand),var(--accent)) !important;
+  color:#ffffff !important;
+  box-shadow:0 14px 30px rgba(47,95,152,.18) !important;
+}
+#pg-students button[onclick*="openStudentForm"]:hover,
+#stu-save-btn:hover,
+#qr-download:hover,
+#cm-ok:hover{
+  filter:brightness(1.02);
+  transform:translateY(-1px);
+}
+
+#stu-panel button:not(#stu-save-btn):not([onclick*="capturePhoto"]),
+#qr-modal button,
+#confirm-modal button#cm-cancel,
+#alert-modal button,
+#pg-students button[title="Edit"],
+#pg-students button[title="QR Code"],
+#pg-students button[title="Delete"]{
+  background:rgba(255,255,255,.60) !important;
+  border:1px solid var(--glass-border) !important;
+  color:var(--text-mid) !important;
+}
+#stu-panel button[onclick*="capturePhoto"]{
+  background:linear-gradient(135deg,var(--brand),var(--accent)) !important;
+  color:#ffffff !important;
+}
+
+.tmono,
+#stu-count{
+  color:var(--text-mid) !important;
+}
+.empty{
+  color:var(--text-mid) !important;
+}
+.abs-item:hover{
+  background:rgba(88,184,169,.08) !important;
+}
+
+/* ===== Teachers & Staff Theme Extension ===== */
+#pg-teachers input:not([type="hidden"]):not([type="file"]),
+#pg-teachers select,
+#teachers-panel input:not([type="hidden"]):not([type="file"]),
+#teachers-panel select,
+#pg-staff input:not([type="hidden"]):not([type="file"]),
+#pg-staff select,
+#staff-panel input:not([type="hidden"]):not([type="file"]),
+#staff-panel select{
+  background:rgba(255,255,255,.74) !important;
+  border:1px solid var(--glass-border) !important;
+  color:var(--text) !important;
+}
+#pg-teachers input::placeholder,
+#pg-staff input::placeholder,
+#teachers-panel input::placeholder,
+#staff-panel input::placeholder{ color:var(--text-dim) !important; }
+#pg-teachers select option,
+#pg-staff select option,
+#teachers-panel select option,
+#staff-panel select option{ background:#f4f8fd !important; color:var(--text) !important; }
+#teachers-panel, #staff-panel{
+  background:var(--glass-strong) !important;
+  border-left:1px solid var(--glass-border) !important;
+}
+#teachers-overlay, #staff-overlay{ background:var(--overlay) !important; backdrop-filter:blur(10px) !important; }
+#teachers-save-btn, #staff-save-btn{
+  background:linear-gradient(135deg,var(--brand),var(--accent)) !important;
+  color:#ffffff !important;
+  box-shadow:0 14px 30px rgba(47,95,152,.18) !important;
+}
+#pg-teachers button[title="Edit"],#pg-teachers button[title="QR Code"],#pg-teachers button[title="Delete"],
+#pg-staff button[title="Edit"],#pg-staff button[title="QR Code"],#pg-staff button[title="Delete"]{
+  background:rgba(255,255,255,.60) !important;
+  border:1px solid var(--glass-border) !important;
+  color:var(--text-mid) !important;
+}
+#teachers-count, #staff-count{ color:var(--text-mid) !important; }
+
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+<div class="sidebar-logo">
+<div class="logo-badge">TS</div>
+<div class="logo-text"><strong>Taif High School</strong><span>Management System</span></div>
+</div>
+<nav class="sidebar-nav">
+<div class="nav-section">Main</div>
+<div class="nav-link active" onclick="go('dashboard',this)"><i class="fas fa-th-large"></i>Dashboard</div>
+<div class="nav-section">People</div>
+<div class="nav-link" onclick="go('students',this)"><i class="fas fa-user-graduate"></i>Students<span class="nav-badge" id="b-s">0</span></div>
+<div class="nav-link" onclick="go('teachers',this)"><i class="fas fa-chalkboard-teacher"></i>Teachers<span class="nav-badge" id="b-t">0</span></div>
+<div class="nav-link" onclick="go('staff',this)"><i class="fas fa-users"></i>Staff<span class="nav-badge" id="b-st">0</span></div>
+<div class="nav-section">Academic</div>
+<div class="nav-link" onclick="go('classes',this)"><i class="fas fa-door-open"></i>Classes</div>
+<div class="nav-link" onclick="go('attendance',this)"><i class="fas fa-clipboard-check"></i>Attendance</div>
+<div class="nav-link" onclick="go('grades',this)"><i class="fas fa-graduation-cap"></i>Grades & Marks</div>
+<div class="nav-section">Finance</div>
+<div class="nav-link" onclick="go('fees',this)"><i class="fas fa-money-bill-wave"></i>Fee Collection</div>
+<div class="nav-link" onclick="go('payroll',this)"><i class="fas fa-wallet"></i>Payroll</div>
+<div class="nav-link" onclick="go('expenses',this)"><i class="fas fa-receipt"></i>Office Expenses</div>
+<div class="nav-section">System</div>
+<div class="nav-link" onclick="go('reports',this)"><i class="fas fa-chart-bar"></i>Reports</div>
+<div class="nav-link" onclick="go('whatsapp',this)"><i class="fab fa-whatsapp"></i>WhatsApp</div>
+<div class="nav-link" onclick="window.open('/gate','_blank')"><i class="fas fa-qrcode"></i>Gate Screen</div>
+<div class="nav-link" onclick="go('settings',this)"><i class="fas fa-cog"></i>Settings</div>
+</nav>
+<div class="sidebar-footer">
+<div class="admin-card">
+<div class="admin-avatar">A</div>
+<div class="admin-info"><strong>Administrator</strong><span>Full Access</span></div>
+<button class="admin-logout" title="Logout"><i class="fas fa-sign-out-alt"></i></button>
+</div>
+</div>
+</aside>
+<div class="main">
+<div class="topbar">
+<div class="topbar-title"><h2 id="ptitle">Dashboard</h2><span id="psub">Overview of today's activity</span></div>
+<div class="topbar-actions">
+<div class="topbar-pill"><span class="dot"></span><span id="clk"></span></div>
+<button class="tbar-btn" title="Notifications"><i class="fas fa-bell"></i><span class="ndot"></span></button>
+<button class="tbar-btn" onclick="load()" title="Refresh"><i class="fas fa-sync-alt"></i></button>
+</div>
+</div>
+<div class="content">
+<div class="page active" id="pg-dashboard">
+<div class="alert-b" id="abs-alert" style="display:none;">
+<i class="fas fa-exclamation-triangle"></i>
+<p><strong id="abs-cnt">0</strong> students have not scanned in yet. Review before sending WhatsApp alerts.</p>
+<button class="ac" onclick="this.closest('.alert-b').style.display='none'"><i class="fas fa-times"></i></button>
+</div>
+<div class="stats-grid">
+<div class="stat-card"><div class="stat-glow" style="background:var(--accent);"></div><div class="stat-ico si-t"><i class="fas fa-user-graduate"></i></div><div class="stat-info"><h3 id="ss">0</h3><p>Total Students</p></div></div>
+<div class="stat-card"><div class="stat-glow" style="background:#5b9ef7;"></div><div class="stat-ico si-b"><i class="fas fa-chalkboard-teacher"></i></div><div class="stat-info"><h3 id="st">0</h3><p>Teachers</p></div></div>
+<div class="stat-card"><div class="stat-glow" style="background:#48d085;"></div><div class="stat-ico si-g"><i class="fas fa-clipboard-check"></i></div><div class="stat-info"><h3 id="sp">0</h3><p>Present Today</p></div></div>
+<div class="stat-card"><div class="stat-glow" style="background:#ff7875;"></div><div class="stat-ico si-r"><i class="fas fa-user-times"></i></div><div class="stat-info"><h3 id="sa">0</h3><p>Absent Today</p></div></div>
+</div>
+<div class="dash-grid">
+<div class="glass-card">
+<div class="card-hdr"><h4><i class="fas fa-qrcode"></i>Today's Gate Scans</h4><span class="meta" id="scnt">loading...</span></div>
+<table class="scan-tbl">
+<thead><tr><th>Person</th><th>Type</th><th>Status</th><th>Time</th></tr></thead>
+<tbody id="stbody"><tr><td colspan="4"><div class="empty"><i class="fas fa-qrcode"></i><p>No scans yet today</p></div></td></tr></tbody>
+</table>
+</div>
+<div class="fc">
+<div class="glass-card">
+<div class="card-hdr"><h4><i class="fas fa-bolt"></i>Quick Actions</h4></div>
+<div class="qa">
+<button class="qb" onclick="go('students',ql('students'))"><div class="qbi si-t"><i class="fas fa-user-plus"></i></div><div>Add New Student<div class="qsub">Register with photo & QR code</div></div></button>
+<button class="qb" onclick="go('fees',ql('fees'))"><div class="qbi si-g"><i class="fas fa-money-bill"></i></div><div>Collect Fee Payment<div class="qsub">Record payment & send receipt</div></div></button>
+<button class="qb" onclick="go('attendance',ql('attendance'))"><div class="qbi si-o"><i class="fas fa-clipboard-list"></i></div><div>View Attendance<div class="qsub">Daily attendance by class</div></div></button>
+<button class="qb" onclick="window.open('/gate','_blank')"><div class="qbi si-b"><i class="fas fa-tv"></i></div><div>Open Gate Screen<div class="qsub">Launch full-screen gate display</div></div></button>
+</div>
+</div>
+<div class="glass-card">
+<div class="card-hdr"><h4><i class="fas fa-user-times" style="color:#ff7875;"></i>Absent Today</h4><span class="meta" id="albl">0 students</span></div>
+<div class="abs-list" id="alist"><div class="empty"><i class="fas fa-check-circle" style="color:#48d085;opacity:1;"></i><p>All present today!</p></div></div>
+</div>
+</div>
+</div>
+</div>
+<div class="page" id="pg-students">
+<!-- ── STUDENTS PAGE ── -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;gap:16px;flex-wrap:wrap;">
+  <div>
+    <h2 style="font-family:var(--font-head);font-size:20px;font-weight:800;color:var(--text);">Students</h2>
+    <span style="font-size:12px;color:var(--text-mid);">Manage student profiles, photos and QR codes</span>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:8px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:8px 14px;">
+      <i class="fas fa-search" style="color:var(--text-dim);font-size:13px;"></i>
+      <input id="stu-search" type="text" placeholder="Search students..." onkeyup="filterStudents()" style="background:none;border:none;outline:none;color:var(--text);font-family:var(--font-body);font-size:13px;width:180px;">
+    </div>
+    <select id="stu-class-filter" onchange="filterStudents()" style="background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:9px 14px;color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;">
+      <option value="" style="background:#0C1526;color:#E8EDF5;">All Classes</option>
+    </select>
+    <button onclick="openStudentForm()" style="display:flex;align-items:center;gap:8px;padding:9px 18px;background:var(--accent);border:none;border-radius:var(--radius-sm);color:#060D18;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;transition:var(--transition);box-shadow:0 0 16px var(--accent-glow);">
+      <i class="fas fa-plus"></i> Add Student
+    </button>
+  </div>
+</div>
+
+<!-- Student count -->
+<div style="margin-bottom:14px;font-size:12px;color:var(--text-dim);font-family:var(--font-mono);" id="stu-count">Loading...</div>
+
+<!-- Student table -->
+<div class="glass-card">
+  <div style="overflow-x:auto;">
+    <table class="scan-tbl" style="min-width:800px;">
+      <thead>
+        <tr>
+          <th>Student</th>
+          <th>Code</th>
+          <th>Class</th>
+          <th>Parent Phone</th>
+          <th>Monthly Fee</th>
+          <th>Discount</th>
+          <th style="text-align:center;">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="stu-tbody">
+        <tr><td colspan="7"><div class="empty"><i class="fas fa-user-graduate"></i><p>No students yet. Click Add Student to begin.</p></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── ADD/EDIT STUDENT PANEL ── -->
+<div id="stu-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:1000;" onclick="closeStudentForm(event)"></div>
+<div id="stu-panel" style="display:none;position:fixed;top:0;right:0;width:520px;max-width:100%;height:100vh;background:rgba(240,249,252,.97);border-left:1px solid rgba(26,74,92,.12);z-index:1001;overflow-y:auto;transform:translateX(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);backdrop-filter:blur(20px);">
+  <div style="padding:24px 28px;border-bottom:1px solid rgba(26,74,92,.10);display:flex;align-items:center;justify-content:space-between;">
+    <div>
+      <h3 style="font-family:var(--font-head);font-size:17px;font-weight:800;color:var(--text);" id="panel-title">Add New Student</h3>
+      <span style="font-size:12px;color:var(--text-mid);">Fill in the student details below</span>
+    </div>
+    <button onclick="closeStudentForm()" style="width:34px;height:34px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--text-mid);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition);">
+      <i class="fas fa-times"></i>
+    </button>
+  </div>
+
+  <div style="padding:24px 28px;">
+    <input type="hidden" id="stu-id">
+
+    <!-- Photo capture -->
+    <div style="margin-bottom:24px;text-align:center;">
+      <div id="stu-photo-preview" style="width:100px;height:100px;border-radius:50%;background:var(--glass);border:2px solid var(--glass-border);margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:36px;color:var(--text-dim);overflow:hidden;position:relative;">
+        <i class="fas fa-user"></i>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+        <button type="button" onclick="startWebcam()" style="padding:7px 14px;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;color:var(--text-mid);font-size:12px;font-family:var(--font-head);font-weight:600;cursor:pointer;transition:var(--transition);">
+          <i class="fas fa-camera"></i> Capture
+        </button>
+        <label style="padding:7px 14px;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;color:var(--text-mid);font-size:12px;font-family:var(--font-head);font-weight:600;cursor:pointer;transition:var(--transition);">
+          <i class="fas fa-upload"></i> Upload
+          <input type="file" id="stu-photo-file" accept="image/*" style="display:none;" onchange="previewUpload(this)">
+        </label>
+      </div>
+      <!-- Webcam modal -->
+      <div id="webcam-wrap" style="display:none;margin-top:14px;border-radius:var(--radius);overflow:hidden;border:1px solid var(--glass-border);">
+        <video id="webcam-video" autoplay playsinline style="width:100%;display:block;background:#000;"></video>
+        <div style="padding:10px;background:var(--glass);display:flex;gap:8px;justify-content:center;">
+          <button type="button" onclick="capturePhoto()" style="padding:8px 20px;background:var(--accent);border:none;border-radius:20px;color:#060D18;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;">Capture</button>
+          <button type="button" onclick="stopWebcam()" style="padding:8px 16px;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;color:var(--text-mid);font-size:12px;cursor:pointer;">Cancel</button>
+        </div>
+      </div>
+      <canvas id="webcam-canvas" style="display:none;"></canvas>
+      <input type="hidden" id="stu-photo-data">
+    </div>
+
+    <div style="display:grid;gap:14px;">
+      <!-- Name -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">First Name *</label>
+          <input id="sf-fname" type="text" required style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;transition:var(--transition);" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="Ahmad">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Last Name *</label>
+          <input id="sf-lname" type="text" required style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;transition:var(--transition);" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="Rahimi">
+        </div>
+      </div>
+
+      <!-- DOB + Gender -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Date of Birth</label>
+          <input id="sf-dob" type="date" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;transition:var(--transition);color-scheme:dark;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Gender</label>
+          <select id="sf-gender" style="width:100%;padding:10px 13px;background:rgba(255,255,255,.85);border:1px solid rgba(26,74,92,.12);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;transition:var(--transition);">
+            <option value="" style="background:#0C1526;color:#E8EDF5;">Select</option>
+            <option value="Male" style="background:#0C1526;color:#E8EDF5;">Male</option>
+            <option value="Female" style="background:#0C1526;color:#E8EDF5;">Female</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Class -->
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Class</label>
+        <select id="sf-class" style="width:100%;padding:10px 13px;background:rgba(255,255,255,.85);border:1px solid rgba(26,74,92,.12);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;transition:var(--transition);">
+          <option value="" style="background:#0C1526;color:#E8EDF5;">No class assigned</option>
+        </select>
+      </div>
+
+      <!-- Divider -->
+      <div style="border-top:1px solid var(--glass-border);padding-top:14px;margin-top:4px;">
+        <span style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.1em;">Parent Info</span>
+      </div>
+
+      <!-- Parent name + phone -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Parent Name</label>
+          <input id="sf-pname" type="text" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;transition:var(--transition);" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="Mohammad">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">WhatsApp Number</label>
+          <input id="sf-pphone" type="tel" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;transition:var(--transition);" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="+93 7xx xxx xxx">
+        </div>
+      </div>
+
+      <!-- Address -->
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Address</label>
+        <input id="sf-addr" type="text" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;transition:var(--transition);" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="District, City">
+      </div>
+
+      <!-- Fee divider -->
+      <div style="border-top:1px solid var(--glass-border);padding-top:14px;margin-top:4px;">
+        <span style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.1em;">Fee & Discount</span>
+      </div>
+
+      <!-- Monthly fee -->
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Monthly Fee (AFN)</label>
+        <input id="sf-fee" type="number" min="0" step="1" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;transition:var(--transition);" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="0">
+      </div>
+
+      <!-- Discount type + value -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Discount Type</label>
+          <select id="sf-dtype" onchange="toggleDiscount()" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;">
+            <option value="none" style="background:#0C1526;color:#E8EDF5;">No Discount</option>
+            <option value="fixed" style="background:#0C1526;color:#E8EDF5;">Fixed Amount (AFN)</option>
+            <option value="percent" style="background:#0C1526;color:#E8EDF5;">Percentage (%)</option>
+          </select>
+        </div>
+        <div id="dval-wrap" style="display:none;">
+          <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;" id="dval-label">Amount (AFN)</label>
+          <input id="sf-dvalue" type="number" min="0" step="1" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;transition:var(--transition);" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="0">
+        </div>
+      </div>
+
+      <!-- Discount note -->
+      <div id="dnote-wrap" style="display:none;">
+        <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Discount Reason (note)</label>
+        <input id="sf-dnote" type="text" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;transition:var(--transition);" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="e.g. Scholarship, Staff child...">
+      </div>
+
+      <!-- Submit -->
+      <div style="display:flex;gap:10px;margin-top:8px;">
+        <button type="button" onclick="saveStudent()" id="stu-save-btn" style="flex:1;padding:12px;background:linear-gradient(135deg,var(--accent),#3aaa85);border:none;border-radius:var(--radius-sm);color:#060D18;font-family:var(--font-head);font-size:14px;font-weight:800;cursor:pointer;transition:var(--transition);box-shadow:0 0 20px var(--accent-glow);">
+          <i class="fas fa-save"></i> Save Student
+        </button>
+        <button type="button" onclick="closeStudentForm()" style="padding:12px 18px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text-mid);font-family:var(--font-head);font-size:13px;cursor:pointer;">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── QR MODAL ── -->
+<div id="qr-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);z-index:2000;display:none;align-items:center;justify-content:center;">
+  <div style="background:rgba(240,249,252,.98);border:1px solid rgba(26,74,92,.12);border-radius:var(--radius-lg);padding:32px;text-align:center;max-width:340px;width:90%;position:relative;">
+    <button onclick="closeQR()" style="position:absolute;top:14px;right:14px;width:30px;height:30px;border-radius:6px;background:var(--glass);border:1px solid var(--glass-border);color:var(--text-mid);cursor:pointer;font-size:13px;">
+      <i class="fas fa-times"></i>
+    </button>
+    <h3 style="font-family:var(--font-head);font-size:16px;font-weight:800;color:var(--text);margin-bottom:4px;" id="qr-name">Student QR</h3>
+    <p style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:18px;" id="qr-code">—</p>
+    <img id="qr-img" src="" style="width:200px;height:200px;border-radius:var(--radius-sm);border:1px solid var(--glass-border);margin-bottom:18px;display:block;margin-left:auto;margin-right:auto;">
+    <div style="display:flex;gap:10px;justify-content:center;">
+      <a id="qr-download" download="qr.png" style="padding:9px 18px;background:var(--accent);border-radius:20px;color:#060D18;font-family:var(--font-head);font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;">
+        <i class="fas fa-download"></i> Download PNG
+      </a>
+      <button onclick="printQR()" style="padding:9px 18px;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;color:var(--text-mid);font-size:12px;font-family:var(--font-head);font-weight:600;cursor:pointer;">
+        <i class="fas fa-print"></i> Print
+      </button>
+    </div>
+  </div>
+</div>
+
+</div>
+<div class="page" id="pg-teachers">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;gap:16px;flex-wrap:wrap;">
+  <div>
+    <h2 style="font-family:var(--font-head);font-size:20px;font-weight:800;color:var(--text);">Teachers</h2>
+    <span style="font-size:12px;color:var(--text-mid);">Manage teacher profiles, salaries and QR codes</span>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:8px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:8px 14px;">
+      <i class="fas fa-search" style="color:var(--text-dim);font-size:13px;"></i>
+      <input id="teachers-search" type="text" placeholder="Search teachers..." onkeyup="filterTeachers()" style="background:none;border:none;outline:none;color:var(--text);font-family:var(--font-body);font-size:13px;width:180px;">
+    </div>
+    <button onclick="openTeacherForm()" style="display:flex;align-items:center;gap:8px;padding:9px 18px;background:var(--accent);border:none;border-radius:var(--radius-sm);color:#060D18;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;transition:var(--transition);box-shadow:0 0 16px var(--accent-glow);">
+      <i class="fas fa-plus"></i> Add Teacher
+    </button>
+  </div>
+</div>
+<div style="margin-bottom:14px;font-size:12px;color:var(--text-dim);font-family:var(--font-mono);" id="teachers-count">Loading...</div>
+<div class="glass-card">
+  <div style="overflow-x:auto;">
+    <table class="scan-tbl" style="min-width:700px;">
+      <thead><tr><th>Teacher</th><th>Code</th><th>Subject</th><th>Phone</th><th>Monthly Salary</th><th style="text-align:center;">Actions</th></tr></thead>
+      <tbody id="teachers-tbody"><tr><td colspan="6"><div class="empty"><i class="fas fa-users"></i><p>No teachers yet.</p></div></td></tr></tbody>
+    </table>
+  </div>
+</div>
+<div id="teachers-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:1000;" onclick="closeTeacherForm(event)"></div>
+<div id="teachers-panel" style="display:none;position:fixed;top:0;right:0;width:500px;max-width:100%;height:100vh;background:rgba(240,249,252,.97);border-left:1px solid rgba(26,74,92,.12);z-index:1001;overflow-y:auto;transform:translateX(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);backdrop-filter:blur(20px);">
+  <div style="padding:24px 28px;border-bottom:1px solid rgba(26,74,92,.10);display:flex;align-items:center;justify-content:space-between;">
+    <div>
+      <h3 style="font-family:var(--font-head);font-size:17px;font-weight:800;color:var(--text);" id="teachers-panel-title">Add Teacher</h3>
+      <span style="font-size:12px;color:var(--text-mid);">Fill in the details below</span>
+    </div>
+    <button onclick="closeTeacherForm()" style="width:34px;height:34px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--text-mid);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;"><i class="fas fa-times"></i></button>
+  </div>
+  <div style="padding:24px 28px;display:grid;gap:14px;">
+    <input type="hidden" id="teachers-edit-id">
+    <div style="text-align:center;margin-bottom:8px;">
+      <div id="teachers-photo-preview" style="width:90px;height:90px;border-radius:50%;background:var(--glass);border:2px solid var(--glass-border);margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:32px;color:var(--text-dim);overflow:hidden;"><i class="fas fa-user"></i></div>
+      <div style="display:flex;gap:8px;justify-content:center;">
+        <button type="button" onclick="teachersStartWebcam()" style="padding:6px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;color:var(--text-mid);font-size:12px;font-family:var(--font-head);font-weight:600;cursor:pointer;"><i class="fas fa-camera"></i> Capture</button>
+        <label style="padding:6px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;color:var(--text-mid);font-size:12px;font-family:var(--font-head);font-weight:600;cursor:pointer;"><i class="fas fa-upload"></i> Upload<input type="file" id="teachers-photo-file" accept="image/*" style="display:none;" onchange="teachersPreviewUpload(this)"></label>
+      </div>
+      <div id="teachers-webcam-wrap" style="display:none;margin-top:12px;border-radius:var(--radius);overflow:hidden;border:1px solid var(--glass-border);">
+        <video id="teachers-webcam-video" autoplay playsinline style="width:100%;display:block;background:#000;"></video>
+        <div style="padding:8px;background:var(--glass);display:flex;gap:8px;justify-content:center;">
+          <button type="button" onclick="teachersCapturePhoto()" style="padding:7px 18px;background:var(--accent);border:none;border-radius:20px;color:#060D18;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;">Capture</button>
+          <button type="button" onclick="teachersStopWebcam()" style="padding:7px 14px;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;color:var(--text-mid);font-size:12px;cursor:pointer;">Cancel</button>
+        </div>
+      </div>
+      <canvas id="teachers-webcam-canvas" style="display:none;"></canvas>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">First Name *</label><input id="teachers-fname" type="text" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="First name"></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Last Name *</label><input id="teachers-lname" type="text" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="Last name"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Date of Birth</label><input id="teachers-dob" type="date" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;color-scheme:light;"></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Gender</label><select id="teachers-gender" style="width:100%;padding:10px 13px;background:rgba(255,255,255,.85);border:1px solid rgba(26,74,92,.12);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;"><option value="" style="background:#f4f8fd;color:#18324a;">Select</option><option value="Male" style="background:#f4f8fd;color:#18324a;">Male</option><option value="Female" style="background:#f4f8fd;color:#18324a;">Female</option></select></div>
+    </div>
+    <div><label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Subject</label><input id="teachers-subject" type="text" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="e.g. Mathematics"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Phone / WhatsApp</label><input id="teachers-phone" type="tel" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="+93 7xx xxx xxx"></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Join Date</label><input id="teachers-joindate" type="date" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;color-scheme:light;"></div>
+    </div>
+    <div><label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Address</label><input id="teachers-addr" type="text" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="District, City"></div>
+    <div style="border-top:1px solid var(--glass-border);padding-top:14px;"><span style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.1em;">Salary</span></div>
+    <div><label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Monthly Salary (AFN)</label><input id="teachers-salary" type="number" min="0" step="1" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="0"></div>
+    <div style="display:flex;gap:10px;margin-top:4px;">
+      <button type="button" onclick="saveTeacher()" id="teachers-save-btn" style="flex:1;padding:12px;background:linear-gradient(135deg,var(--accent),#3aaa85);border:none;border-radius:var(--radius-sm);color:#060D18;font-family:var(--font-head);font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 0 20px var(--accent-glow);"><i class="fas fa-save"></i> Save</button>
+      <button type="button" onclick="closeTeacherForm()" style="padding:12px 18px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text-mid);font-family:var(--font-head);font-size:13px;cursor:pointer;">Cancel</button>
+    </div>
+  </div>
+</div>
+</div>
+<div class="page" id="pg-staff">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;gap:16px;flex-wrap:wrap;">
+  <div>
+    <h2 style="font-family:var(--font-head);font-size:20px;font-weight:800;color:var(--text);">Staff</h2>
+    <span style="font-size:12px;color:var(--text-mid);">Manage non-teaching staff profiles and salaries</span>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:8px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:8px 14px;">
+      <i class="fas fa-search" style="color:var(--text-dim);font-size:13px;"></i>
+      <input id="staff-search" type="text" placeholder="Search staff..." onkeyup="filterStaff()" style="background:none;border:none;outline:none;color:var(--text);font-family:var(--font-body);font-size:13px;width:180px;">
+    </div>
+    <button onclick="openStaffForm()" style="display:flex;align-items:center;gap:8px;padding:9px 18px;background:var(--accent);border:none;border-radius:var(--radius-sm);color:#060D18;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;transition:var(--transition);box-shadow:0 0 16px var(--accent-glow);">
+      <i class="fas fa-plus"></i> Add Staff
+    </button>
+  </div>
+</div>
+<div style="margin-bottom:14px;font-size:12px;color:var(--text-dim);font-family:var(--font-mono);" id="staff-count">Loading...</div>
+<div class="glass-card">
+  <div style="overflow-x:auto;">
+    <table class="scan-tbl" style="min-width:700px;">
+      <thead><tr><th>Staff</th><th>Code</th><th>Role</th><th>Phone</th><th>Monthly Salary</th><th style="text-align:center;">Actions</th></tr></thead>
+      <tbody id="staff-tbody"><tr><td colspan="6"><div class="empty"><i class="fas fa-users"></i><p>No staff yet.</p></div></td></tr></tbody>
+    </table>
+  </div>
+</div>
+<div id="staff-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:1000;" onclick="closeStaffForm(event)"></div>
+<div id="staff-panel" style="display:none;position:fixed;top:0;right:0;width:500px;max-width:100%;height:100vh;background:rgba(240,249,252,.97);border-left:1px solid rgba(26,74,92,.12);z-index:1001;overflow-y:auto;transform:translateX(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);backdrop-filter:blur(20px);">
+  <div style="padding:24px 28px;border-bottom:1px solid rgba(26,74,92,.10);display:flex;align-items:center;justify-content:space-between;">
+    <div>
+      <h3 style="font-family:var(--font-head);font-size:17px;font-weight:800;color:var(--text);" id="staff-panel-title">Add Staff</h3>
+      <span style="font-size:12px;color:var(--text-mid);">Fill in the details below</span>
+    </div>
+    <button onclick="closeStaffForm()" style="width:34px;height:34px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--text-mid);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;"><i class="fas fa-times"></i></button>
+  </div>
+  <div style="padding:24px 28px;display:grid;gap:14px;">
+    <input type="hidden" id="staff-edit-id">
+    <div style="text-align:center;margin-bottom:8px;">
+      <div id="staff-photo-preview" style="width:90px;height:90px;border-radius:50%;background:var(--glass);border:2px solid var(--glass-border);margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:32px;color:var(--text-dim);overflow:hidden;"><i class="fas fa-user"></i></div>
+      <div style="display:flex;gap:8px;justify-content:center;">
+        <button type="button" onclick="staffStartWebcam()" style="padding:6px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;color:var(--text-mid);font-size:12px;font-family:var(--font-head);font-weight:600;cursor:pointer;"><i class="fas fa-camera"></i> Capture</button>
+        <label style="padding:6px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;color:var(--text-mid);font-size:12px;font-family:var(--font-head);font-weight:600;cursor:pointer;"><i class="fas fa-upload"></i> Upload<input type="file" id="staff-photo-file" accept="image/*" style="display:none;" onchange="staffPreviewUpload(this)"></label>
+      </div>
+      <div id="staff-webcam-wrap" style="display:none;margin-top:12px;border-radius:var(--radius);overflow:hidden;border:1px solid var(--glass-border);">
+        <video id="staff-webcam-video" autoplay playsinline style="width:100%;display:block;background:#000;"></video>
+        <div style="padding:8px;background:var(--glass);display:flex;gap:8px;justify-content:center;">
+          <button type="button" onclick="staffCapturePhoto()" style="padding:7px 18px;background:var(--accent);border:none;border-radius:20px;color:#060D18;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;">Capture</button>
+          <button type="button" onclick="staffStopWebcam()" style="padding:7px 14px;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;color:var(--text-mid);font-size:12px;cursor:pointer;">Cancel</button>
+        </div>
+      </div>
+      <canvas id="staff-webcam-canvas" style="display:none;"></canvas>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">First Name *</label><input id="staff-fname" type="text" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="First name"></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Last Name *</label><input id="staff-lname" type="text" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="Last name"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Date of Birth</label><input id="staff-dob" type="date" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;color-scheme:light;"></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Gender</label><select id="staff-gender" style="width:100%;padding:10px 13px;background:rgba(255,255,255,.85);border:1px solid rgba(26,74,92,.12);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;"><option value="" style="background:#f4f8fd;color:#18324a;">Select</option><option value="Male" style="background:#f4f8fd;color:#18324a;">Male</option><option value="Female" style="background:#f4f8fd;color:#18324a;">Female</option></select></div>
+    </div>
+    <div><label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Role</label><input id="staff-role" type="text" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="e.g. Guard, Cleaner, Admin"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Phone / WhatsApp</label><input id="staff-phone" type="tel" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="+93 7xx xxx xxx"></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Join Date</label><input id="staff-joindate" type="date" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;color-scheme:light;"></div>
+    </div>
+    <div><label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Address</label><input id="staff-addr" type="text" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="District, City"></div>
+    <div style="border-top:1px solid var(--glass-border);padding-top:14px;"><span style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.1em;">Salary</span></div>
+    <div><label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Monthly Salary (AFN)</label><input id="staff-salary" type="number" min="0" step="1" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="0"></div>
+    <div style="display:flex;gap:10px;margin-top:4px;">
+      <button type="button" onclick="saveStaff()" id="staff-save-btn" style="flex:1;padding:12px;background:linear-gradient(135deg,var(--accent),#3aaa85);border:none;border-radius:var(--radius-sm);color:#060D18;font-family:var(--font-head);font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 0 20px var(--accent-glow);"><i class="fas fa-save"></i> Save</button>
+      <button type="button" onclick="closeStaffForm()" style="padding:12px 18px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text-mid);font-family:var(--font-head);font-size:13px;cursor:pointer;">Cancel</button>
+    </div>
+  </div>
+</div>
+</div>
+<div class="page" id="pg-classes">
+
+<!-- Header -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;gap:16px;flex-wrap:wrap;">
+  <div>
+    <h2 style="font-family:var(--font-head);font-size:20px;font-weight:800;color:var(--text);">Classes</h2>
+    <span style="font-size:12px;color:var(--text-mid);">Create class sections and assign students</span>
+  </div>
+  <button onclick="openClassForm()" style="display:flex;align-items:center;gap:8px;padding:9px 18px;background:var(--accent);border:none;border-radius:var(--radius-sm);color:#060D18;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;transition:var(--transition);box-shadow:0 0 16px var(--accent-glow);">
+    <i class="fas fa-plus"></i> Add Class
+  </button>
+</div>
+
+<div style="margin-bottom:14px;font-size:12px;color:var(--text-dim);font-family:var(--font-mono);" id="cls-count">Loading...</div>
+
+<!-- Classes grid -->
+<div id="cls-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;">
+  <div class="glass-card" style="padding:40px;text-align:center;grid-column:1/-1;">
+    <div class="empty"><i class="fas fa-door-open"></i><p>No classes yet. Click Add Class to begin.</p></div>
+  </div>
+</div>
+
+<!-- Students drawer (shows students in a class) -->
+<div id="cls-students-drawer" style="display:none;margin-top:20px;">
+  <div class="glass-card">
+    <div class="card-hdr">
+      <h4><i class="fas fa-users"></i><span id="cls-drawer-title">Class Students</span></h4>
+      <button onclick="closeDrawer()" style="padding:5px 12px;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;color:var(--text-mid);font-size:12px;font-family:var(--font-head);cursor:pointer;">Close</button>
+    </div>
+    <div style="padding:16px 20px;border-bottom:1px solid var(--glass-border);display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <select id="cls-assign-student" style="flex:1;min-width:200px;padding:9px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;">
+        <option value="">Select student to add...</option>
+      </select>
+      <button onclick="assignStudent()" style="padding:9px 18px;background:var(--accent);border:none;border-radius:var(--radius-sm);color:#060D18;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;">
+        <i class="fas fa-plus"></i> Add to Class
+      </button>
+    </div>
+    <div id="cls-students-list" style="padding:8px 0;"></div>
+  </div>
+</div>
+
+<!-- Add/Edit Class Panel -->
+<div id="cls-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:1000;" onclick="closeClassForm(event)"></div>
+<div id="cls-panel" style="display:none;position:fixed;top:0;right:0;width:460px;max-width:100%;height:100vh;background:rgba(240,249,252,.97);border-left:1px solid rgba(26,74,92,.12);z-index:1001;overflow-y:auto;transform:translateX(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);backdrop-filter:blur(20px);">
+  <div style="padding:24px 28px;border-bottom:1px solid rgba(26,74,92,.10);display:flex;align-items:center;justify-content:space-between;">
+    <div>
+      <h3 style="font-family:var(--font-head);font-size:17px;font-weight:800;color:var(--text);" id="cls-panel-title">Add New Class</h3>
+      <span style="font-size:12px;color:var(--text-mid);">Fill in the class details below</span>
+    </div>
+    <button onclick="closeClassForm()" style="width:34px;height:34px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--text-mid);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+      <i class="fas fa-times"></i>
+    </button>
+  </div>
+  <div style="padding:24px 28px;display:grid;gap:14px;">
+    <input type="hidden" id="cls-edit-id">
+
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Class Name *</label>
+      <input id="cls-name" type="text" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="e.g. Grade 7A, Class 9B, Section A">
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Grade Level</label>
+        <select id="cls-grade" style="width:100%;padding:10px 13px;background:rgba(255,255,255,.85);border:1px solid rgba(26,74,92,.12);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;">
+          <option value="" style="background:#f4f8fd;color:#18324a;">Select grade</option>
+          <option value="1" style="background:#f4f8fd;color:#18324a;">Grade 1</option>
+          <option value="2" style="background:#f4f8fd;color:#18324a;">Grade 2</option>
+          <option value="3" style="background:#f4f8fd;color:#18324a;">Grade 3</option>
+          <option value="4" style="background:#f4f8fd;color:#18324a;">Grade 4</option>
+          <option value="5" style="background:#f4f8fd;color:#18324a;">Grade 5</option>
+          <option value="6" style="background:#f4f8fd;color:#18324a;">Grade 6</option>
+          <option value="7" style="background:#f4f8fd;color:#18324a;">Grade 7</option>
+          <option value="8" style="background:#f4f8fd;color:#18324a;">Grade 8</option>
+          <option value="9" style="background:#f4f8fd;color:#18324a;">Grade 9</option>
+          <option value="10" style="background:#f4f8fd;color:#18324a;">Grade 10</option>
+          <option value="11" style="background:#f4f8fd;color:#18324a;">Grade 11</option>
+          <option value="12" style="background:#f4f8fd;color:#18324a;">Grade 12</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Section</label>
+        <input id="cls-section" type="text" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="e.g. A, B, Morning">
+      </div>
+    </div>
+
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Homeroom Teacher</label>
+      <select id="cls-teacher" style="width:100%;padding:10px 13px;background:rgba(255,255,255,.85);border:1px solid rgba(26,74,92,.12);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;">
+        <option value="" style="background:#f4f8fd;color:#18324a;">No teacher assigned</option>
+      </select>
+    </div>
+
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Description / Notes</label>
+      <input id="cls-desc" type="text" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="Optional notes about this class">
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:4px;">
+      <button type="button" onclick="saveClass()" id="cls-save-btn" style="flex:1;padding:12px;background:linear-gradient(135deg,var(--accent),#3aaa85);border:none;border-radius:var(--radius-sm);color:#060D18;font-family:var(--font-head);font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 0 20px var(--accent-glow);">
+        <i class="fas fa-save"></i> Save Class
+      </button>
+      <button type="button" onclick="closeClassForm()" style="padding:12px 18px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text-mid);font-family:var(--font-head);font-size:13px;cursor:pointer;">
+        Cancel
+      </button>
+    </div>
+  </div>
+</div>
+
+</div>
+<div class="page" id="pg-attendance"><div class="cs"><div class="cs-orb cs-t"><i class="fas fa-clipboard-check"></i></div><h2>Attendance</h2><p>View daily and monthly attendance by class or individual, send WhatsApp alerts.</p><div class="pp">🔨 Coming in Part 6</div></div></div>
+<div class="page" id="pg-grades"><div class="cs"><div class="cs-orb cs-b"><i class="fas fa-graduation-cap"></i></div><h2>Grades & Marks</h2><p>Set subjects per class, enter midterm and final marks, generate transcripts.</p><div class="pp">🔨 Coming in Part 10</div></div></div>
+<div class="page" id="pg-fees"><div class="cs"><div class="cs-orb cs-g"><i class="fas fa-money-bill-wave"></i></div><h2>Fee Collection</h2><p>Record payments, apply discounts, print receipts and send WhatsApp confirmations.</p><div class="pp">🔨 Coming in Part 7</div></div></div>
+<div class="page" id="pg-payroll"><div class="cs"><div class="cs-orb cs-o"><i class="fas fa-wallet"></i></div><h2>Payroll</h2><p>Monthly salary calculation, mid-month advances, deductions and payslip generation.</p><div class="pp">🔨 Coming in Part 9</div></div></div>
+<div class="page" id="pg-expenses"><div class="cs"><div class="cs-orb cs-p"><i class="fas fa-receipt"></i></div><h2>Office Expenses</h2><p>Log school expenses by category, track monthly spending from general fund.</p><div class="pp">🔨 Coming in Part 11</div></div></div>
+<div class="page" id="pg-reports"><div class="cs"><div class="cs-orb cs-b"><i class="fas fa-chart-bar"></i></div><h2>Reports</h2><p>Generate and print all 11 report types — attendance, payroll, transcripts and more.</p><div class="pp">🔨 Coming in Part 12</div></div></div>
+<div class="page" id="pg-whatsapp"><div class="cs"><div class="cs-orb cs-g"><i class="fab fa-whatsapp"></i></div><h2>WhatsApp Notifications</h2><p>Connect your phone and send fee receipts, absence alerts and messages to parents.</p><div class="pp">🔨 Coming in Part 8</div></div></div>
+<div class="page" id="pg-settings"><div class="cs"><div class="cs-orb cs-o"><i class="fas fa-cog"></i></div><h2>Settings</h2><p>School info, academic year, absence alert time and system configuration.</p><div class="pp">🔨 Coming in Part 13</div></div></div>
+</div>
+</div>
+
+<!-- ══ CUSTOM CONFIRM MODAL ══ -->
+<div id="confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(8px);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:rgba(240,249,252,.98);border:1px solid rgba(26,74,92,.12);border-radius:var(--radius-lg);padding:32px 28px;max-width:380px;width:90%;position:relative;box-shadow:0 24px 60px rgba(0,0,0,.5);">
+    <div id="cm-icon" style="width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 18px;"></div>
+    <h3 id="cm-title" style="font-family:var(--font-head);font-size:17px;font-weight:800;color:var(--text);text-align:center;margin-bottom:8px;"></h3>
+    <p id="cm-message" style="font-size:13px;color:var(--text-mid);text-align:center;line-height:1.7;margin-bottom:24px;"></p>
+    <div style="display:flex;gap:10px;">
+      <button id="cm-cancel" onclick="closeConfirm()" style="flex:1;padding:11px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text-mid);font-family:var(--font-head);font-size:13px;font-weight:600;cursor:pointer;transition:var(--transition);">Cancel</button>
+      <button id="cm-ok" style="flex:1;padding:11px;border:none;border-radius:var(--radius-sm);font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;transition:var(--transition);"></button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CUSTOM ALERT MODAL ══ -->
+<div id="alert-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(8px);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:rgba(240,249,252,.98);border:1px solid rgba(26,74,92,.12);border-radius:var(--radius-lg);padding:32px 28px;max-width:360px;width:90%;position:relative;box-shadow:0 24px 60px rgba(0,0,0,.5);">
+    <div id="am-icon" style="width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 18px;"></div>
+    <h3 id="am-title" style="font-family:var(--font-head);font-size:16px;font-weight:800;color:var(--text);text-align:center;margin-bottom:8px;"></h3>
+    <p id="am-message" style="font-size:13px;color:var(--text-mid);text-align:center;line-height:1.7;margin-bottom:24px;"></p>
+    <button onclick="closeAlert()" style="width:100%;padding:11px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;transition:var(--transition);">OK</button>
+  </div>
+</div>
+
+</div>
+<script>
+const PI={dashboard:{t:'Dashboard',s:"Overview of today's activity"},students:{t:'Students',s:'Manage student profiles and QR codes'},teachers:{t:'Teachers',s:'Manage teacher profiles and payroll'},staff:{t:'Staff',s:'Manage non-teaching staff'},classes:{t:'Classes',s:'Manage class sections and assignments'},attendance:{t:'Attendance',s:'Daily and monthly attendance records'},grades:{t:'Grades & Marks',s:'Enter marks and generate transcripts'},fees:{t:'Fee Collection',s:'Record payments and send receipts'},payroll:{t:'Payroll',s:'Monthly salary and advance management'},expenses:{t:'Office Expenses',s:'Track school operational expenses'},reports:{t:'Reports',s:'Generate and print all reports'},whatsapp:{t:'WhatsApp',s:'Send notifications to parents'},settings:{t:'Settings',s:'System and school configuration'}};
+function ql(id){return document.querySelector('.nav-link[onclick*="'+id+'"]');}
+function go(id,el){
+document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+document.querySelectorAll('.nav-link').forEach(l=>l.classList.remove('active'));
+const pg=document.getElementById('pg-'+id);if(pg)pg.classList.add('active');
+if(el)el.classList.add('active');
+const i=PI[id]||{t:id,s:''};
+document.getElementById('ptitle').textContent=i.t;
+document.getElementById('psub').textContent=i.s;
+}
+function tick(){
+const n=new Date();
+document.getElementById('clk').textContent=n.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});
+}
+tick();setInterval(tick,30000);
+async function load(){
+try{
+const r=await fetch('/api/dashboard/stats');const d=await r.json();
+document.getElementById('ss').textContent=d.students??0;
+document.getElementById('st').textContent=d.teachers??0;
+document.getElementById('sp').textContent=d.present??0;
+document.getElementById('sa').textContent=d.absent??0;
+document.getElementById('b-s').textContent=d.students??0;
+document.getElementById('b-t').textContent=d.teachers??0;
+document.getElementById('b-st').textContent=d.staff??0;
+if(d.absent>0){document.getElementById('abs-alert').style.display='flex';document.getElementById('abs-cnt').textContent=d.absent;document.getElementById('albl').textContent=d.absent+' students';}
+}catch(e){['ss','st','sp','sa'].forEach(id=>document.getElementById(id).textContent='0');}
+try{
+const r2=await fetch('/api/dashboard/scans');const sc=await r2.json();
+document.getElementById('scnt').textContent=sc.length+' scans today';
+const tb=document.getElementById('stbody');
+if(!sc.length){tb.innerHTML='<tr><td colspan="4"><div class="empty"><i class="fas fa-qrcode"></i><p>No scans yet today</p></div></td></tr>';return;}
+tb.innerHTML=sc.map(s=>{
+const ini=(s.first_name[0]+s.last_name[0]).toUpperCase();
+const typ=s.person_type==='student'?'<span class="badge bg-t">Student</span>':s.person_type==='teacher'?'<span class="badge bg-b">Teacher</span>':'<span class="badge bg-o">Staff</span>';
+const tm=new Date(s.scan_time).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true});
+return '<tr><td><div class="pc"><div class="pav">'+ini+'</div><div><div class="pname">'+s.first_name+' '+s.last_name+'</div><div class="pcls">'+(s.class_name||s.role||'—')+'</div></div></div></td><td>'+typ+'</td><td><span class="badge bg-g"><i class="fas fa-check" style="font-size:9px;"></i> Present</span></td><td><span class="tmono">'+tm+'</span></td></tr>';
+}).join('');
+}catch(e){document.getElementById('scnt').textContent='0 scans today';}
+}
+load();
+
+// ═══════════════════════════════════════════════════
+//  STUDENT MANAGEMENT JS
+// ═══════════════════════════════════════════════════
+let allStudents  = [];
+let editingStudId = null;
+let webcamStream  = null;
+let capturedBlob  = null;
+
+// Load students when page is shown
+const origNav = window.go;
+window.go = function(id, el) {
+  origNav(id, el);
+  if (id === 'students') loadStudents();
+};
+
+async function loadStudents() {
+  try {
+    const [stuRes, clsRes] = await Promise.all([
+      fetch('/api/students'),
+      fetch('/api/classes'),
+    ]);
+    allStudents = await stuRes.json();
+    const classes = await clsRes.json();
+
+    // Populate class filter + form select
+    const cf  = document.getElementById('stu-class-filter');
+    const sf  = document.getElementById('sf-class');
+    cf.innerHTML  = '<option value="">All Classes</option>';
+    sf.innerHTML  = '<option value="">No class assigned</option>';
+    classes.forEach(c => {
+      cf.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+      sf.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+    });
+
+    renderStudents(allStudents);
+  } catch(e) {
+    console.error('Failed to load students:', e);
+  }
+}
+
+function filterStudents() {
+  const q   = document.getElementById('stu-search').value.toLowerCase();
+  const cls = document.getElementById('stu-class-filter').value;
+  let list  = allStudents;
+  if (q)   list = list.filter(s => (s.first_name+' '+s.last_name+s.student_code+s.parent_phone).toLowerCase().includes(q));
+  if (cls) list = list.filter(s => String(s.class_id) === cls);
+  renderStudents(list);
+}
+
+function renderStudents(list) {
+  document.getElementById('stu-count').textContent = list.length + ' student' + (list.length !== 1 ? 's' : '') + ' found';
+  const tb = document.getElementById('stu-tbody');
+  if (!list.length) {
+    tb.innerHTML = '<tr><td colspan="7"><div class="empty"><i class="fas fa-user-graduate"></i><p>No students found.</p></div></td></tr>';
+    return;
+  }
+  tb.innerHTML = list.map(s => {
+    const initials = (s.first_name[0]+(s.last_name[0]||'')).toUpperCase();
+    const photoHtml = s.photo
+      ? `<img src="/uploads/students/${s.photo}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:1.5px solid var(--glass-border);">`
+      : `<div style="width:36px;height:36px;border-radius:50%;background:var(--glass-mid);border:1.5px solid var(--glass-border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--accent);font-family:var(--font-head);">${initials}</div>`;
+    let discHtml = '<span style="color:var(--text-dim);font-size:11px;">None</span>';
+    if (s.discount_type === 'fixed')   discHtml = `<span class="badge bg-t">${s.discount_value} AFN off</span>`;
+    if (s.discount_type === 'percent') discHtml = `<span class="badge bg-b">${s.discount_value}% off</span>`;
+    return `<tr>
+      <td><div class="pc">${photoHtml}<div>
+        <div class="pname">${s.first_name} ${s.last_name}</div>
+        <div class="pcls">${s.address || '—'}</div>
+      </div></div></td>
+      <td><span class="tmono" style="font-size:11px;">${s.student_code}</span></td>
+      <td>${s.class_name ? `<span class="badge bg-t">${s.class_name}</span>` : '<span style="color:var(--text-dim);font-size:11px;">—</span>'}</td>
+      <td><span style="font-family:var(--font-mono);font-size:12px;">${s.parent_phone || '—'}</span></td>
+      <td><span style="font-family:var(--font-mono);font-size:12px;">${Number(s.monthly_fee).toLocaleString()} AFN</span></td>
+      <td>${discHtml}</td>
+      <td style="text-align:center;">
+        <div style="display:flex;gap:6px;justify-content:center;">
+          <button onclick="openStudentForm(${s.id})" title="Edit" style="width:30px;height:30px;border-radius:6px;background:var(--glass);border:1px solid var(--glass-border);color:var(--text-mid);cursor:pointer;transition:var(--transition);font-size:12px;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--glass-border)';this.style.color='var(--text-mid)'"><i class="fas fa-edit"></i></button>
+          <button onclick="showQR(${s.id})" title="QR Code" style="width:30px;height:30px;border-radius:6px;background:var(--glass);border:1px solid var(--glass-border);color:var(--text-mid);cursor:pointer;transition:var(--transition);font-size:12px;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--glass-border)';this.style.color='var(--text-mid)'"><i class="fas fa-qrcode"></i></button>
+          <button onclick="deleteStudent(${s.id},this)" data-name="${s.first_name} ${s.last_name}" title="Delete" style="width:30px;height:30px;border-radius:6px;background:var(--glass);border:1px solid var(--glass-border);color:var(--text-mid);cursor:pointer;transition:var(--transition);font-size:12px;" onmouseover="this.style.borderColor='#ff7875';this.style.color='#ff7875'" onmouseout="this.style.borderColor='var(--glass-border)';this.style.color='var(--text-mid)'"><i class="fas fa-trash"></i></button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function openStudentForm(id) {
+  editingStudId = id || null;
+  document.getElementById('panel-title').textContent = id ? 'Edit Student' : 'Add New Student';
+  clearStudentForm();
+  if (id) {
+    const s = allStudents.find(x => x.id === id);
+    if (!s) return;
+    document.getElementById('sf-fname').value  = s.first_name || '';
+    document.getElementById('sf-lname').value  = s.last_name  || '';
+    document.getElementById('sf-dob').value    = s.date_of_birth ? s.date_of_birth.split('T')[0] : '';
+    document.getElementById('sf-gender').value = s.gender     || '';
+    document.getElementById('sf-class').value  = s.class_id   || '';
+    document.getElementById('sf-pname').value  = s.parent_name || '';
+    document.getElementById('sf-pphone').value = s.parent_phone || '';
+    document.getElementById('sf-addr').value   = s.address    || '';
+    document.getElementById('sf-fee').value    = s.monthly_fee || 0;
+    document.getElementById('sf-dtype').value  = s.discount_type || 'none';
+    document.getElementById('sf-dvalue').value = s.discount_value || 0;
+    document.getElementById('sf-dnote').value  = s.discount_note || '';
+    toggleDiscount();
+    if (s.photo) {
+      const prev = document.getElementById('stu-photo-preview');
+      prev.innerHTML = `<img src="/uploads/students/${s.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+    }
+  }
+  document.getElementById('stu-overlay').style.display = 'block';
+  document.getElementById('stu-panel').style.display   = 'block';
+  setTimeout(() => { document.getElementById('stu-panel').style.transform = 'translateX(0)'; }, 10);
+}
+
+function closeStudentForm(e) {
+  if (e && e.target !== document.getElementById('stu-overlay')) return;
+  stopWebcam();
+  document.getElementById('stu-panel').style.transform = 'translateX(100%)';
+  setTimeout(() => {
+    document.getElementById('stu-panel').style.display   = 'none';
+    document.getElementById('stu-overlay').style.display = 'none';
+  }, 350);
+}
+
+function clearStudentForm() {
+  ['sf-fname','sf-lname','sf-dob','sf-pname','sf-pphone','sf-addr'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('sf-gender').value = '';
+  document.getElementById('sf-class').value  = '';
+  document.getElementById('sf-fee').value    = '';
+  document.getElementById('sf-dtype').value  = 'none';
+  document.getElementById('sf-dvalue').value = '';
+  document.getElementById('sf-dnote').value  = '';
+  document.getElementById('stu-photo-data').value = '';
+  document.getElementById('stu-photo-preview').innerHTML = '<i class="fas fa-user"></i>';
+  capturedBlob = null;
+  toggleDiscount();
+}
+
+function toggleDiscount() {
+  const t = document.getElementById('sf-dtype').value;
+  document.getElementById('dval-wrap').style.display  = t !== 'none' ? 'block' : 'none';
+  document.getElementById('dnote-wrap').style.display = t !== 'none' ? 'block' : 'none';
+  document.getElementById('dval-label').textContent   = t === 'percent' ? 'Percentage (%)' : 'Amount (AFN)';
+}
+
+async function saveStudent() {
+  const fname = document.getElementById('sf-fname').value.trim();
+  const lname = document.getElementById('sf-lname').value.trim();
+  if (!fname || !lname) {
+    showAlert({ title: 'Missing Information', message: 'First name and last name are required.', type: 'warning' });
+    return;
+  }
+
+  const btn = document.getElementById('stu-save-btn');
+  btn.textContent = 'Saving...';
+  btn.disabled = true;
+
+  const fd = new FormData();
+  fd.append('first_name',     fname);
+  fd.append('last_name',      lname);
+  fd.append('date_of_birth',  document.getElementById('sf-dob').value);
+  fd.append('gender',         document.getElementById('sf-gender').value);
+  fd.append('class_id',       document.getElementById('sf-class').value);
+  fd.append('parent_name',    document.getElementById('sf-pname').value);
+  fd.append('parent_phone',   document.getElementById('sf-pphone').value);
+  fd.append('address',        document.getElementById('sf-addr').value);
+  fd.append('monthly_fee',    document.getElementById('sf-fee').value || 0);
+  fd.append('discount_type',  document.getElementById('sf-dtype').value);
+  fd.append('discount_value', document.getElementById('sf-dvalue').value || 0);
+  fd.append('discount_note',  document.getElementById('sf-dnote').value);
+
+  // Photo: captured blob or file input
+  if (capturedBlob) {
+    fd.append('photo', capturedBlob, 'webcam.jpg');
+  } else {
+    const fileInput = document.getElementById('stu-photo-file');
+    if (fileInput.files[0]) fd.append('photo', fileInput.files[0]);
+  }
+
+  try {
+    const url    = editingStudId ? `/api/students/${editingStudId}` : '/api/students';
+    const method = editingStudId ? 'PUT' : 'POST';
+    const res    = await fetch(url, { method, body: fd });
+    const data   = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Save failed');
+
+    closeStudentForm();
+    await loadStudents();
+  } catch(e) {
+    showAlert({ title: 'Save Failed', message: e.message, type: 'error' });
+  } finally {
+    btn.innerHTML = '<i class="fas fa-save"></i> Save Student';
+    btn.disabled = false;
+  }
+}
+
+async function deleteStudent(id, btnOrName) {
+  const name = typeof btnOrName === 'string' ? btnOrName : btnOrName.getAttribute('data-name');
+  showConfirm({
+    title:       'Delete Student',
+    message:     `Are you sure you want to delete "${name}"? This action cannot be undone and will remove all their records.`,
+    confirmText: 'Yes, Delete',
+    type:        'danger',
+    onConfirm:   async () => {
+      try {
+        const res = await fetch(`/api/students/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Delete failed');
+        await loadStudents();
+        showAlert({ title: 'Deleted', message: `${name} has been removed successfully.`, type: 'success' });
+      } catch(e) {
+        showAlert({ title: 'Error', message: e.message, type: 'error' });
+      }
+    }
+  });
+}
+
+// ── Webcam ──────────────────────────────────────────────
+async function startWebcam() {
+  try {
+    webcamStream = await navigator.mediaDevices.getUserMedia({ video: true });
+    document.getElementById('webcam-video').srcObject = webcamStream;
+    document.getElementById('webcam-wrap').style.display = 'block';
+  } catch(e) { showAlert({ title: 'Camera Error', message: 'Cannot access camera: ' + e.message, type: 'error' }); }
+}
+
+function capturePhoto() {
+  const video  = document.getElementById('webcam-video');
+  const canvas = document.getElementById('webcam-canvas');
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  canvas.toBlob(blob => {
+    capturedBlob = blob;
+    const url  = URL.createObjectURL(blob);
+    const prev = document.getElementById('stu-photo-preview');
+    prev.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+    stopWebcam();
+  }, 'image/jpeg', 0.85);
+}
+
+function stopWebcam() {
+  if (webcamStream) { webcamStream.getTracks().forEach(t => t.stop()); webcamStream = null; }
+  document.getElementById('webcam-wrap').style.display = 'none';
+}
+
+function previewUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const url  = URL.createObjectURL(file);
+  const prev = document.getElementById('stu-photo-preview');
+  prev.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+  capturedBlob = null;
+}
+
+// ── QR Code ─────────────────────────────────────────────
+async function showQR(id) {
+  try {
+    const res  = await fetch(`/api/students/${id}/qr`);
+    const data = await res.json();
+    document.getElementById('qr-name').textContent = data.name;
+    document.getElementById('qr-code').textContent = data.student_code;
+    document.getElementById('qr-img').src          = data.qr;
+    document.getElementById('qr-download').href    = data.qr;
+    document.getElementById('qr-download').download = `${data.student_code}-QR.png`;
+    document.getElementById('qr-modal').style.display = 'flex';
+  } catch(e) { showAlert({ title: 'QR Error', message: 'Failed to load QR: ' + e.message, type: 'error' }); }
+}
+
+function closeQR() { document.getElementById('qr-modal').style.display = 'none'; }
+
+function printQR() {
+  const img  = document.getElementById('qr-img').src;
+  const name = document.getElementById('qr-name').textContent;
+  const code = document.getElementById('qr-code').textContent;
+  const w = window.open('', '_blank');
+  w.document.write(`<html><body style="text-align:center;font-family:sans-serif;padding:40px;">
+    <img src="${img}" style="width:200px;height:200px;display:block;margin:0 auto 16px;">
+    <strong style="display:block;font-size:18px;">${name}</strong>
+    <span style="font-size:13px;color:#666;">${code}</span>
+  </body></html>`);
+  w.document.close();
+  w.print();
+}
+
+
+// ══ CUSTOM MODAL SYSTEM ══════════════════════════════
+let confirmCallback = null;
+
+function showConfirm({ title, message, confirmText = 'Confirm', type = 'danger', onConfirm }) {
+  confirmCallback = onConfirm;
+  document.getElementById('cm-title').textContent   = title;
+  document.getElementById('cm-message').textContent = message;
+  document.getElementById('cm-ok').textContent      = confirmText;
+
+  const icon = document.getElementById('cm-icon');
+  const btn  = document.getElementById('cm-ok');
+
+  if (type === 'danger') {
+    icon.style.background = 'rgba(255,100,100,.15)';
+    icon.style.color      = '#ff7875';
+    icon.innerHTML        = '<i class="fas fa-trash-alt"></i>';
+    btn.style.background  = '#c53030';
+    btn.style.color       = '#fff';
+  } else if (type === 'warning') {
+    icon.style.background = 'rgba(255,160,60,.15)';
+    icon.style.color      = '#ffaa3d';
+    icon.innerHTML        = '<i class="fas fa-exclamation-triangle"></i>';
+    btn.style.background  = '#d97706';
+    btn.style.color       = '#fff';
+  } else {
+    icon.style.background = 'rgba(93,202,165,.15)';
+    icon.style.color      = 'var(--accent)';
+    icon.innerHTML        = '<i class="fas fa-check-circle"></i>';
+    btn.style.background  = 'var(--accent)';
+    btn.style.color       = '#060D18';
+  }
+
+  document.getElementById('cm-ok').onclick = () => { const cb = confirmCallback; closeConfirm(); if (cb) cb(); };
+  const modal = document.getElementById('confirm-modal');
+  modal.style.display = 'flex';
+  requestAnimationFrame(() => modal.querySelector('div').style.transform = 'scale(1)');
+}
+
+function closeConfirm() {
+  document.getElementById('confirm-modal').style.display = 'none';
+  confirmCallback = null;
+}
+
+function showAlert({ title, message, type = 'error' }) {
+  const icon = document.getElementById('am-icon');
+  document.getElementById('am-title').textContent   = title;
+  document.getElementById('am-message').textContent = message;
+
+  if (type === 'error') {
+    icon.style.background = 'rgba(255,100,100,.15)';
+    icon.style.color      = '#ff7875';
+    icon.innerHTML        = '<i class="fas fa-times-circle"></i>';
+  } else if (type === 'success') {
+    icon.style.background = 'rgba(93,202,165,.15)';
+    icon.style.color      = 'var(--accent)';
+    icon.innerHTML        = '<i class="fas fa-check-circle"></i>';
+  } else {
+    icon.style.background = 'rgba(255,160,60,.15)';
+    icon.style.color      = '#ffaa3d';
+    icon.innerHTML        = '<i class="fas fa-exclamation-triangle"></i>';
+  }
+
+  document.getElementById('alert-modal').style.display = 'flex';
+}
+
+function closeAlert() {
+  document.getElementById('alert-modal').style.display = 'none';
+}
+
+
+// ═══════════════════════════════════════════════════
+//  TEACHERS & STAFF SHARED JS FACTORY
+// ═══════════════════════════════════════════════════
+function makePeopleModule(cfg) {
+  const { pid, apiPath, codeField, extraField, qrField } = cfg;
+  let all = [], editId = null, stream = null, blob = null;
+
+  // Hook into nav
+  const prev = window.go;
+  window.go = function(id, el) {
+    prev(id, el);
+    if (id === pid) module.load();
+  };
+
+  const module = {
+    load: async function() {
+      try {
+        const r = await fetch(`/api/${apiPath}`);
+        all = await r.json();
+        module.render(all);
+      } catch(e) { console.error(e); }
+    },
+    filter: function() {
+      const q = document.getElementById(`${pid}-search`).value.toLowerCase();
+      module.render(q ? all.filter(p => (p.first_name+' '+p.last_name+(p[extraField]||'')).toLowerCase().includes(q)) : all);
+    },
+    render: function(list) {
+      document.getElementById(`${pid}-count`).textContent = list.length + ' found';
+      document.getElementById(`b-${pid[0]}`).textContent = all.length;
+      const tb = document.getElementById(`${pid}-tbody`);
+      if (!list.length) { tb.innerHTML = `<tr><td colspan="6"><div class="empty"><i class="fas fa-users"></i><p>No ${pid} yet.</p></div></td></tr>`; return; }
+      tb.innerHTML = list.map(p => {
+        const ini = (p.first_name[0]+(p.last_name[0]||'')).toUpperCase();
+        const photo = p.photo
+          ? `<img src="/uploads/${apiPath}/${p.photo}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:1.5px solid var(--glass-border);">`
+          : `<div style="width:36px;height:36px;border-radius:50%;background:var(--glass-mid);border:1.5px solid var(--glass-border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--accent);font-family:var(--font-head);">${ini}</div>`;
+        return `<tr>
+          <td><div class="pc">${photo}<div><div class="pname">${p.first_name} ${p.last_name}</div><div class="pcls">${p.address||'—'}</div></div></div></td>
+          <td><span class="tmono" style="font-size:11px;">${p[codeField]}</span></td>
+          <td><span class="badge bg-b">${p[extraField]||'—'}</span></td>
+          <td><span style="font-family:var(--font-mono);font-size:12px;">${p.phone||'—'}</span></td>
+          <td><span style="font-family:var(--font-mono);font-size:12px;">${Number(p.monthly_salary).toLocaleString()} AFN</span></td>
+          <td style="text-align:center;"><div style="display:flex;gap:6px;justify-content:center;">
+            <button onclick="${pid}Module.openForm(${p.id})" title="Edit" style="width:30px;height:30px;border-radius:6px;background:var(--glass);border:1px solid var(--glass-border);color:var(--text-mid);cursor:pointer;font-size:12px;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--glass-border)';this.style.color='var(--text-mid)'"><i class="fas fa-edit"></i></button>
+            <button onclick="${pid}Module.showQR(${p.id})" title="QR Code" style="width:30px;height:30px;border-radius:6px;background:var(--glass);border:1px solid var(--glass-border);color:var(--text-mid);cursor:pointer;font-size:12px;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--glass-border)';this.style.color='var(--text-mid)'"><i class="fas fa-qrcode"></i></button>
+            <button onclick="${pid}Module.del(${p.id},this)" data-name="${p.first_name} ${p.last_name}" title="Delete" style="width:30px;height:30px;border-radius:6px;background:var(--glass);border:1px solid var(--glass-border);color:var(--text-mid);cursor:pointer;font-size:12px;" onmouseover="this.style.borderColor='#ff7875';this.style.color='#ff7875'" onmouseout="this.style.borderColor='var(--glass-border)';this.style.color='var(--text-mid)'"><i class="fas fa-trash"></i></button>
+          </div></td>
+        </tr>`;
+      }).join('');
+    },
+    openForm: function(id) {
+      editId = id || null;
+      document.getElementById(`${pid}-panel-title`).textContent = id ? `Edit` : `Add`;
+      module.clearForm();
+      if (id) {
+        const p = all.find(x => x.id === id);
+        if (!p) return;
+        document.getElementById(`${pid}-fname`).value   = p.first_name || '';
+        document.getElementById(`${pid}-lname`).value   = p.last_name  || '';
+        document.getElementById(`${pid}-dob`).value     = p.date_of_birth ? p.date_of_birth.split('T')[0] : '';
+        document.getElementById(`${pid}-gender`).value  = p.gender    || '';
+        document.getElementById(`${pid}-${extraField}`).value = p[extraField] || '';
+        document.getElementById(`${pid}-phone`).value   = p.phone     || '';
+        document.getElementById(`${pid}-addr`).value    = p.address   || '';
+        document.getElementById(`${pid}-salary`).value  = p.monthly_salary || 0;
+        document.getElementById(`${pid}-joindate`).value = p.join_date ? p.join_date.split('T')[0] : '';
+        if (p.photo) document.getElementById(`${pid}-photo-preview`).innerHTML =
+          `<img src="/uploads/${apiPath}/${p.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+      }
+      document.getElementById(`${pid}-overlay`).style.display = 'block';
+      document.getElementById(`${pid}-panel`).style.display   = 'block';
+      setTimeout(() => document.getElementById(`${pid}-panel`).style.transform = 'translateX(0)', 10);
+    },
+    closeForm: function(e) {
+      if (e && e.target !== document.getElementById(`${pid}-overlay`)) return;
+      module.stopCam();
+      document.getElementById(`${pid}-panel`).style.transform = 'translateX(100%)';
+      setTimeout(() => {
+        document.getElementById(`${pid}-panel`).style.display   = 'none';
+        document.getElementById(`${pid}-overlay`).style.display = 'none';
+      }, 350);
+    },
+    clearForm: function() {
+      [`${pid}-fname`,`${pid}-lname`,`${pid}-dob`,`${pid}-phone`,`${pid}-addr`,`${pid}-${extraField}`,`${pid}-joindate`].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+      document.getElementById(`${pid}-gender`).value = '';
+      document.getElementById(`${pid}-salary`).value = '';
+      document.getElementById(`${pid}-photo-preview`).innerHTML = '<i class="fas fa-user"></i>';
+      blob = null;
+    },
+    save: async function() {
+      const fname = document.getElementById(`${pid}-fname`).value.trim();
+      const lname = document.getElementById(`${pid}-lname`).value.trim();
+      if (!fname || !lname) { showAlert({title:'Missing Info',message:'First and last name are required.',type:'warning'}); return; }
+      const btn = document.getElementById(`${pid}-save-btn`);
+      btn.textContent = 'Saving...'; btn.disabled = true;
+      const fd = new FormData();
+      fd.append('first_name',     fname);
+      fd.append('last_name',      lname);
+      fd.append('date_of_birth',  document.getElementById(`${pid}-dob`).value);
+      fd.append('gender',         document.getElementById(`${pid}-gender`).value);
+      fd.append(extraField,       document.getElementById(`${pid}-${extraField}`).value);
+      fd.append('phone',          document.getElementById(`${pid}-phone`).value);
+      fd.append('address',        document.getElementById(`${pid}-addr`).value);
+      fd.append('monthly_salary', document.getElementById(`${pid}-salary`).value || 0);
+      fd.append('join_date',      document.getElementById(`${pid}-joindate`).value);
+      if (blob) fd.append('photo', blob, 'webcam.jpg');
+      else { const fi = document.getElementById(`${pid}-photo-file`); if (fi && fi.files[0]) fd.append('photo', fi.files[0]); }
+      try {
+        const url    = editId ? `/api/${apiPath}/${editId}` : `/api/${apiPath}`;
+        const method = editId ? 'PUT' : 'POST';
+        const res    = await fetch(url, { method, body: fd });
+        const data   = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Save failed');
+        module.closeForm();
+        await module.load();
+      } catch(e) { showAlert({title:'Save Failed',message:e.message,type:'error'}); }
+      finally { btn.innerHTML = '<i class="fas fa-save"></i> Save'; btn.disabled = false; }
+    },
+    del: function(id, btn) {
+      const name = btn.getAttribute('data-name');
+      const self = module;
+      showConfirm({
+        title: 'Delete', message: `Delete "${name}"? This cannot be undone.`,
+        confirmText: 'Yes, Delete', type: 'danger',
+        onConfirm: async () => {
+          try {
+            const res = await fetch('/api/' + apiPath + '/' + id, { method:'DELETE' });
+            if (!res.ok) throw new Error('Delete failed');
+            await self.load();
+            showAlert({title:'Deleted',message:name+' removed.',type:'success'});
+          } catch(e) { showAlert({title:'Error',message:e.message,type:'error'}); }
+        }
+      });
+    },
+    showQR: async function(id) {
+      try {
+        const res  = await fetch(`/api/${apiPath}/${id}/qr`);
+        const data = await res.json();
+        document.getElementById('qr-name').textContent = data.name;
+        document.getElementById('qr-code').textContent = data[qrField] || data.teacher_code || data.staff_code;
+        document.getElementById('qr-img').src          = data.qr;
+        document.getElementById('qr-download').href    = data.qr;
+        document.getElementById('qr-download').download = `${data.name}-QR.png`;
+        document.getElementById('qr-modal').style.display = 'flex';
+      } catch(e) { showAlert({title:'QR Error',message:e.message,type:'error'}); }
+    },
+    startCam: async function() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        document.getElementById(`${pid}-webcam-video`).srcObject = stream;
+        document.getElementById(`${pid}-webcam-wrap`).style.display = 'block';
+      } catch(e) { showAlert({title:'Camera Error',message:e.message,type:'error'}); }
+    },
+    capturePhoto: function() {
+      const v = document.getElementById(`${pid}-webcam-video`);
+      const c = document.getElementById(`${pid}-webcam-canvas`);
+      c.width = v.videoWidth; c.height = v.videoHeight;
+      c.getContext('2d').drawImage(v, 0, 0);
+      c.toBlob(b => {
+        blob = b;
+        document.getElementById(`${pid}-photo-preview`).innerHTML =
+          `<img src="${URL.createObjectURL(b)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+        module.stopCam();
+      }, 'image/jpeg', 0.85);
+    },
+    stopCam: function() {
+      if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+      document.getElementById(`${pid}-webcam-wrap`).style.display = 'none';
+    },
+    previewUpload: function(input) {
+      if (!input.files[0]) return;
+      blob = null;
+      document.getElementById(`${pid}-photo-preview`).innerHTML =
+        `<img src="${URL.createObjectURL(input.files[0])}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+    },
+  };
+  return module;
+}
+
+// ── Create modules ─────────────────────────────────────────────
+const teachersModule = makePeopleModule({ pid:'teachers', apiPath:'teachers', codeField:'teacher_code', extraField:'subject',  qrField:'teacher_code' });
+const staffModule    = makePeopleModule({ pid:'staff',    apiPath:'staff',    codeField:'staff_code',   extraField:'role',     qrField:'staff_code'   });
+
+// ── Wire up global functions expected by HTML ──────────────────
+window.teachersModule = teachersModule;
+window.staffModule    = staffModule;
+
+function loadTeachers()    { teachersModule.load(); }
+function filterTeachers()  { teachersModule.filter(); }
+function renderTeachers(l) { teachersModule.render(l); }
+function openTeacherForm(id)   { teachersModule.openForm(id); }
+function closeTeacherForm(e)   { teachersModule.closeForm(e); }
+function clearTeacherForm()    { teachersModule.clearForm(); }
+function saveTeacher()         { teachersModule.save(); }
+function deleteTeacher(id,btn) { teachersModule.del(id,btn); }
+function teacherQR(id)         { teachersModule.showQR(id); }
+function teachersStartWebcam() { teachersModule.startCam(); }
+function teachersCapturePhoto(){ teachersModule.capturePhoto(); }
+function teachersStopWebcam()  { teachersModule.stopCam(); }
+function teachersPreviewUpload(i){ teachersModule.previewUpload(i); }
+
+function loadStaff()       { staffModule.load(); }
+function filterStaff()     { staffModule.filter(); }
+function renderStaff(l)    { staffModule.render(l); }
+function openStaffForm(id)  { staffModule.openForm(id); }
+function closeStaffForm(e)  { staffModule.closeForm(e); }
+function clearStaffForm()   { staffModule.clearForm(); }
+function saveStaff()        { staffModule.save(); }
+function deleteStaff(id,btn){ staffModule.del(id,btn); }
+function staffQR(id)        { staffModule.showQR(id); }
+function staffStartWebcam() { staffModule.startCam(); }
+function staffCapturePhoto(){ staffModule.capturePhoto(); }
+function staffStopWebcam()  { staffModule.stopCam(); }
+function staffPreviewUpload(i){ staffModule.previewUpload(i); }
+
+
+// ═══════════════════════════════════════════════════
+//  CLASSES JS
+// ═══════════════════════════════════════════════════
+let allClasses = [];
+let activeClassId = null;
+let unassignedStudents = [];
+
+const origGoForClasses = window.go;
+window.go = function(id, el) {
+  origGoForClasses(id, el);
+  if (id === 'classes') loadClasses();
+};
+
+async function loadClasses() {
+  try {
+    const [clsRes, tchRes, stuRes] = await Promise.all([
+      fetch('/api/classes'),
+      fetch('/api/teachers'),
+      fetch('/api/students'),
+    ]);
+    allClasses = await clsRes.json();
+    const teachers = await tchRes.json();
+    const students = await stuRes.json();
+
+    // Populate teacher dropdown in form
+    const tSel = document.getElementById('cls-teacher');
+    tSel.innerHTML = '<option value="" style="background:#f4f8fd;color:#18324a;">No teacher assigned</option>';
+    teachers.forEach(t => {
+      tSel.innerHTML += `<option value="${t.id}" style="background:#f4f8fd;color:#18324a;">${t.first_name} ${t.last_name}${t.subject ? ' — ' + t.subject : ''}</option>`;
+    });
+
+    // Unassigned students for adding to class
+    unassignedStudents = students;
+
+    renderClasses(allClasses);
+  } catch(e) { console.error(e); }
+}
+
+function renderClasses(list) {
+  document.getElementById('cls-count').textContent = list.length + ' class' + (list.length !== 1 ? 'es' : '') + ' total';
+  const grid = document.getElementById('cls-grid');
+
+  if (!list.length) {
+    grid.innerHTML = `<div class="glass-card" style="padding:40px;text-align:center;grid-column:1/-1;">
+      <div class="empty"><i class="fas fa-door-open"></i><p>No classes yet. Click Add Class to begin.</p></div>
+    </div>`;
+    return;
+  }
+
+  const colors = ['var(--accent)','#5b9ef7','#48d085','#ffaa3d','#b57dff','#ff7875'];
+  grid.innerHTML = list.map((c, i) => {
+    const color = colors[i % colors.length];
+    const initial = c.name ? c.name.charAt(0).toUpperCase() : '?';
+    return `<div class="glass-card" style="padding:0;overflow:hidden;transition:var(--transition);" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
+      <!-- Color bar -->
+      <div style="height:4px;background:${color};"></div>
+      <div style="padding:20px;">
+        <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:14px;">
+          <div style="width:48px;height:48px;border-radius:12px;background:${color}22;border:1.5px solid ${color}44;display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:18px;font-weight:800;color:${color};flex-shrink:0;">${initial}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-family:var(--font-head);font-size:15px;font-weight:800;color:var(--text);margin-bottom:2px;">${c.name}</div>
+            <div style="font-size:11px;color:var(--text-dim);">${c.grade_level ? 'Grade ' + c.grade_level : ''}${c.section ? ' · Section ' + c.section : ''}</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-bottom:14px;">
+          <div style="flex:1;padding:10px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);text-align:center;">
+            <div style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--text);">${parseInt(c.student_count)||0}</div>
+            <div style="font-size:10px;color:var(--text-dim);margin-top:2px;">Students</div>
+          </div>
+          <div style="flex:1;padding:10px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);text-align:center;overflow:hidden;">
+            <div style="font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.teacher_name || '—'}</div>
+            <div style="font-size:10px;color:var(--text-dim);margin-top:2px;">Teacher</div>
+          </div>
+        </div>
+
+        ${c.description ? `<div style="font-size:11px;color:var(--text-dim);margin-bottom:12px;padding:8px 10px;background:var(--glass);border-radius:6px;">${c.description}</div>` : ''}
+
+        <div style="display:flex;gap:6px;">
+          <button onclick="openStudentsDrawer(${c.id},'${c.name}')" style="flex:1;padding:8px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text-mid);font-size:12px;font-family:var(--font-head);font-weight:600;cursor:pointer;transition:var(--transition);" onmouseover="this.style.borderColor='${color}';this.style.color='${color}'" onmouseout="this.style.borderColor='var(--glass-border)';this.style.color='var(--text-mid)'">
+            <i class="fas fa-users"></i> Students
+          </button>
+          <button onclick="openClassForm(${c.id})" style="width:34px;height:34px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text-mid);cursor:pointer;transition:var(--transition);font-size:12px;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--glass-border)';this.style.color='var(--text-mid)'">
+            <i class="fas fa-edit"></i>
+          </button>
+          <button onclick="deleteClass(${c.id},this)" data-name="${c.name}" style="width:34px;height:34px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text-mid);cursor:pointer;transition:var(--transition);font-size:12px;" onmouseover="this.style.borderColor='#ff7875';this.style.color='#ff7875'" onmouseout="this.style.borderColor='var(--glass-border)';this.style.color='var(--text-mid)'">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openClassForm(id) {
+  document.getElementById('cls-edit-id').value = id || '';
+  document.getElementById('cls-panel-title').textContent = id ? 'Edit Class' : 'Add New Class';
+
+  if (id) {
+    const c = allClasses.find(x => x.id === id);
+    if (!c) return;
+    document.getElementById('cls-name').value    = c.name || '';
+    document.getElementById('cls-grade').value   = c.grade_level || '';
+    document.getElementById('cls-section').value = c.section || '';
+    document.getElementById('cls-teacher').value = c.teacher_id || '';
+    document.getElementById('cls-desc').value    = c.description || '';
+  } else {
+    ['cls-name','cls-section','cls-desc'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('cls-grade').value   = '';
+    document.getElementById('cls-teacher').value = '';
+  }
+
+  document.getElementById('cls-overlay').style.display = 'block';
+  document.getElementById('cls-panel').style.display   = 'block';
+  setTimeout(() => document.getElementById('cls-panel').style.transform = 'translateX(0)', 10);
+}
+
+function closeClassForm(e) {
+  if (e && e.target !== document.getElementById('cls-overlay')) return;
+  document.getElementById('cls-panel').style.transform = 'translateX(100%)';
+  setTimeout(() => {
+    document.getElementById('cls-panel').style.display   = 'none';
+    document.getElementById('cls-overlay').style.display = 'none';
+  }, 350);
+}
+
+async function saveClass() {
+  const name = document.getElementById('cls-name').value.trim();
+  if (!name) { showAlert({ title:'Missing Info', message:'Class name is required.', type:'warning' }); return; }
+
+  const btn = document.getElementById('cls-save-btn');
+  btn.textContent = 'Saving...'; btn.disabled = true;
+
+  const id = document.getElementById('cls-edit-id').value;
+  const body = {
+    name,
+    grade_level:  document.getElementById('cls-grade').value,
+    section:      document.getElementById('cls-section').value,
+    teacher_id:   document.getElementById('cls-teacher').value || null,
+    description:  document.getElementById('cls-desc').value,
+  };
+
+  try {
+    const res  = await fetch(id ? `/api/classes/${id}` : '/api/classes', {
+      method:  id ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Save failed');
+    closeClassForm();
+    await loadClasses();
+    // Refresh student class dropdowns
+    if (typeof loadStudents === 'function') await loadStudents();
+  } catch(e) { showAlert({ title:'Save Failed', message:e.message, type:'error' }); }
+  finally { btn.innerHTML = '<i class="fas fa-save"></i> Save Class'; btn.disabled = false; }
+}
+
+async function deleteClass(id, btn) {
+  const name = btn.getAttribute('data-name');
+  showConfirm({
+    title: 'Delete Class',
+    message: `Delete "${name}"? Students in this class will be unassigned but not deleted.`,
+    confirmText: 'Yes, Delete',
+    type: 'danger',
+    onConfirm: async () => {
+      try {
+        const res = await fetch(`/api/classes/${id}`, { method:'DELETE' });
+        if (!res.ok) throw new Error('Delete failed');
+        closeDrawer();
+        await loadClasses();
+        showAlert({ title:'Deleted', message:`${name} removed.`, type:'success' });
+      } catch(e) { showAlert({ title:'Error', message:e.message, type:'error' }); }
+    }
+  });
+}
+
+// ── Students drawer ───────────────────────────────────────────
+async function openStudentsDrawer(classId, className) {
+  activeClassId = classId;
+  document.getElementById('cls-drawer-title').textContent = className + ' — Students';
+  document.getElementById('cls-students-drawer').style.display = 'block';
+  document.getElementById('cls-students-drawer').scrollIntoView({ behavior:'smooth' });
+  await refreshDrawer(classId);
+}
+
+async function refreshDrawer(classId) {
+  try {
+    const res  = await fetch(`/api/classes/${classId}`);
+    const data = await res.json();
+    const enrolled = data.students || [];
+    const enrolledIds = enrolled.map(s => s.id);
+
+    // Students list
+    const list = document.getElementById('cls-students-list');
+    if (!enrolled.length) {
+      list.innerHTML = `<div class="empty"><i class="fas fa-users"></i><p>No students in this class yet.</p></div>`;
+    } else {
+      list.innerHTML = enrolled.map(s => {
+        const ini = (s.first_name[0] + (s.last_name[0]||'')).toUpperCase();
+        const photo = s.photo
+          ? `<img src="/uploads/students/${s.photo}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:1.5px solid var(--glass-border);">`
+          : `<div style="width:36px;height:36px;border-radius:50%;background:var(--glass-mid);border:1.5px solid var(--glass-border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--accent);font-family:var(--font-head);">${ini}</div>`;
+        return `<div style="display:flex;align-items:center;gap:12px;padding:10px 20px;border-bottom:1px solid var(--glass-border);transition:var(--transition);" onmouseover="this.style.background='var(--glass)'" onmouseout="this.style.background='transparent'">
+          ${photo}
+          <div style="flex:1;">
+            <div style="font-weight:600;font-size:13px;color:var(--text);font-family:var(--font-head);">${s.first_name} ${s.last_name}</div>
+            <div style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);">${s.student_code}</div>
+          </div>
+          <button onclick="removeFromClass(${s.id})" style="padding:5px 12px;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;color:var(--text-dim);font-size:11px;font-family:var(--font-head);cursor:pointer;transition:var(--transition);" onmouseover="this.style.borderColor='#ff7875';this.style.color='#ff7875'" onmouseout="this.style.borderColor='var(--glass-border)';this.style.color='var(--text-dim)'">
+            <i class="fas fa-times"></i> Remove
+          </button>
+        </div>`;
+      }).join('');
+    }
+
+    // Assign dropdown — only show unassigned students
+    const sel = document.getElementById('cls-assign-student');
+    const available = unassignedStudents.filter(s => !enrolledIds.includes(s.id));
+    sel.innerHTML = '<option value="">Select student to add...</option>';
+    available.forEach(s => {
+      sel.innerHTML += `<option value="${s.id}">${s.first_name} ${s.last_name} — ${s.student_code}</option>`;
+    });
+  } catch(e) { console.error(e); }
+}
+
+async function assignStudent() {
+  const studentId = document.getElementById('cls-assign-student').value;
+  if (!studentId) { showAlert({ title:'Select Student', message:'Please select a student to add.', type:'warning' }); return; }
+  try {
+    const res = await fetch('/api/classes/' + activeClassId + '/assign-student', {
+      method: 'PUT',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({ student_id: parseInt(studentId) }),
+    });
+    if (!res.ok) throw new Error('Failed to assign');
+    await loadClasses();
+    await refreshDrawer(activeClassId);
+  } catch(e) { showAlert({ title:'Error', message:e.message, type:'error' }); }
+}
+
+async function removeFromClass(studentId) {
+  try {
+    const res = await fetch('/api/classes/' + activeClassId + '/remove-student/' + studentId, { method:'PUT' });
+    if (!res.ok) throw new Error('Failed to remove');
+    await loadClasses();
+    await refreshDrawer(activeClassId);
+  } catch(e) { showAlert({ title:'Error', message:e.message, type:'error' }); }
+}
+
+function closeDrawer() {
+  document.getElementById('cls-students-drawer').style.display = 'none';
+  activeClassId = null;
+}
+
+// Keyboard close
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeConfirm(); closeAlert(); closeQR(); }
+});
+
+</script>
+</body>
+</html>
