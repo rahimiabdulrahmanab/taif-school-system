@@ -1134,7 +1134,145 @@ body::after{
 
 </div>
 <div class="page" id="pg-grades"><div class="cs"><div class="cs-orb cs-b"><i class="fas fa-graduation-cap"></i></div><h2>Grades & Marks</h2><p>Set subjects per class, enter midterm and final marks, generate transcripts.</p><div class="pp">🔨 Coming in Part 10</div></div></div>
-<div class="page" id="pg-fees"><div class="cs"><div class="cs-orb cs-g"><i class="fas fa-money-bill-wave"></i></div><h2>Fee Collection</h2><p>Record payments, apply discounts, print receipts and send WhatsApp confirmations.</p><div class="pp">🔨 Coming in Part 7</div></div></div>
+<div class="page" id="pg-fees">
+
+<!-- Header -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;gap:16px;flex-wrap:wrap;">
+  <div>
+    <h2 style="font-family:var(--font-head);font-size:20px;font-weight:800;color:var(--text);">Fee Collection</h2>
+    <span style="font-size:12px;color:var(--text-mid);">Record payments and track outstanding balances</span>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:8px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:8px 14px;">
+      <i class="fas fa-search" style="color:var(--text-dim);font-size:13px;"></i>
+      <input id="fee-search" type="text" placeholder="Search student..." oninput="feeSearchStudent()" style="background:none;border:none;outline:none;color:var(--text);font-family:var(--font-body);font-size:13px;width:200px;">
+    </div>
+    <select id="fee-class-filter" onchange="loadFeeList()" style="padding:9px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;">
+      <option value="">All Classes</option>
+    </select>
+  </div>
+</div>
+
+<!-- Search results dropdown -->
+<div id="fee-search-results" style="display:none;background:var(--glass-mid);border:1px solid var(--glass-border);border-radius:var(--radius-sm);margin-bottom:16px;max-height:200px;overflow-y:auto;"></div>
+
+<!-- Summary stats -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:22px;">
+  <div class="glass-card" style="padding:20px;display:flex;align-items:center;gap:14px;">
+    <div class="stat-ico si-g"><i class="fas fa-money-bill-wave"></i></div>
+    <div><h3 style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--text);" id="fee-collected">0 AFN</h3><p style="font-size:12px;color:var(--text-mid);">Collected This Month</p></div>
+  </div>
+  <div class="glass-card" style="padding:20px;display:flex;align-items:center;gap:14px;">
+    <div class="stat-ico si-r"><i class="fas fa-exclamation-circle"></i></div>
+    <div><h3 style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--text);" id="fee-outstanding">0</h3><p style="font-size:12px;color:var(--text-mid);">Outstanding Students</p></div>
+  </div>
+  <div class="glass-card" style="padding:20px;display:flex;align-items:center;gap:14px;">
+    <div class="stat-ico si-b"><i class="fas fa-users"></i></div>
+    <div><h3 style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--text);" id="fee-paid-count">0</h3><p style="font-size:12px;color:var(--text-mid);">Paid This Month</p></div>
+  </div>
+</div>
+
+<!-- Student fee list -->
+<div class="glass-card">
+  <div class="card-hdr">
+    <h4><i class="fas fa-list"></i>Students — Fee Status</h4>
+    <span class="meta" id="fee-list-meta">Loading...</span>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="scan-tbl" style="min-width:700px;">
+      <thead><tr><th>Student</th><th>Class</th><th>Monthly Fee</th><th>This Month</th><th>Outstanding</th><th style="text-align:center;">Action</th></tr></thead>
+      <tbody id="fee-tbody">
+        <tr><td colspan="6"><div class="empty"><i class="fas fa-money-bill-wave"></i><p>Loading...</p></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Payment Panel -->
+<div id="fee-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:1000;" onclick="closeFeePanel(event)"></div>
+<div id="fee-panel" style="display:none;position:fixed;top:0;right:0;width:500px;max-width:100%;height:100vh;background:rgba(240,249,252,.97);border-left:1px solid rgba(26,74,92,.12);z-index:1001;overflow-y:auto;transform:translateX(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);backdrop-filter:blur(20px);">
+
+  <div style="padding:24px 28px;border-bottom:1px solid rgba(26,74,92,.10);display:flex;align-items:center;justify-content:space-between;">
+    <div>
+      <h3 style="font-family:var(--font-head);font-size:17px;font-weight:800;color:var(--text);" id="fee-panel-title">Collect Fee</h3>
+      <span style="font-size:12px;color:var(--text-mid);" id="fee-panel-sub">Student fee details</span>
+    </div>
+    <button onclick="closeFeePanel()" style="width:34px;height:34px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--text-mid);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+      <i class="fas fa-times"></i>
+    </button>
+  </div>
+
+  <div style="padding:24px 28px;">
+    <input type="hidden" id="fee-student-id">
+
+    <!-- Student info -->
+    <div id="fee-student-info" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);margin-bottom:20px;">
+      <div id="fee-student-avatar" style="width:52px;height:52px;border-radius:50%;background:var(--glass-mid);border:2px solid var(--glass-border);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:var(--accent);font-family:var(--font-head);flex-shrink:0;overflow:hidden;"></div>
+      <div>
+        <div style="font-family:var(--font-head);font-size:15px;font-weight:800;color:var(--text);" id="fee-student-name">—</div>
+        <div style="font-size:12px;color:var(--text-mid);margin-top:2px;" id="fee-student-class">—</div>
+        <div style="font-size:12px;color:var(--accent);font-family:var(--font-mono);margin-top:2px;" id="fee-student-code">—</div>
+      </div>
+      <div style="margin-left:auto;text-align:right;">
+        <div style="font-family:var(--font-mono);font-size:18px;font-weight:700;color:var(--text);" id="fee-effective-amount">0 AFN</div>
+        <div style="font-size:11px;color:var(--text-dim);">Per Month</div>
+      </div>
+    </div>
+
+    <!-- Outstanding months -->
+    <div style="margin-bottom:20px;">
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:8px;">Outstanding Months (select to pay)</label>
+      <div id="outstanding-months" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+    </div>
+
+    <!-- Amount -->
+    <div style="margin-bottom:14px;">
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Amount (AFN)</label>
+      <input id="fee-amount" type="number" min="0" step="1" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:16px;font-weight:700;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="0">
+    </div>
+
+    <!-- Payment method -->
+    <div style="margin-bottom:14px;">
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Payment Method</label>
+      <div style="display:flex;gap:8px;">
+        <button onclick="setPayMethod('cash',this)" class="pay-method-btn active" style="flex:1;padding:10px;background:var(--accent);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:#060D18;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;transition:var(--transition);">
+          <i class="fas fa-money-bill"></i> Cash
+        </button>
+        <button onclick="setPayMethod('bank',this)" class="pay-method-btn" style="flex:1;padding:10px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text-mid);font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;transition:var(--transition);">
+          <i class="fas fa-university"></i> Bank
+        </button>
+        <button onclick="setPayMethod('online',this)" class="pay-method-btn" style="flex:1;padding:10px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text-mid);font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;transition:var(--transition);">
+          <i class="fas fa-mobile-alt"></i> Online
+        </button>
+      </div>
+      <input type="hidden" id="fee-method" value="cash">
+    </div>
+
+    <!-- Notes -->
+    <div style="margin-bottom:20px;">
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Notes (optional)</label>
+      <input id="fee-notes" type="text" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="e.g. Partial payment, brother paid...">
+    </div>
+
+    <!-- Buttons -->
+    <div style="display:flex;gap:10px;margin-bottom:24px;">
+      <button onclick="recordPayment()" id="fee-save-btn" style="flex:1;padding:13px;background:linear-gradient(135deg,var(--accent),#3aaa85);border:none;border-radius:var(--radius-sm);color:#060D18;font-family:var(--font-head);font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 0 20px var(--accent-glow);">
+        <i class="fas fa-check"></i> Record Payment
+      </button>
+      <button onclick="printReceipt()" style="padding:13px 16px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text-mid);font-family:var(--font-head);font-size:13px;cursor:pointer;">
+        <i class="fas fa-print"></i>
+      </button>
+    </div>
+
+    <!-- Payment history -->
+    <div style="border-top:1px solid var(--glass-border);padding-top:18px;">
+      <div style="font-size:12px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;">Payment History</div>
+      <div id="fee-history" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+  </div>
+</div>
+
+</div>
 <div class="page" id="pg-payroll"><div class="cs"><div class="cs-orb cs-o"><i class="fas fa-wallet"></i></div><h2>Payroll</h2><p>Monthly salary calculation, mid-month advances, deductions and payslip generation.</p><div class="pp">🔨 Coming in Part 9</div></div></div>
 <div class="page" id="pg-expenses"><div class="cs"><div class="cs-orb cs-p"><i class="fas fa-receipt"></i></div><h2>Office Expenses</h2><p>Log school expenses by category, track monthly spending from general fund.</p><div class="pp">🔨 Coming in Part 11</div></div></div>
 <div class="page" id="pg-reports"><div class="cs"><div class="cs-orb cs-b"><i class="fas fa-chart-bar"></i></div><h2>Reports</h2><p>Generate and print all 11 report types — attendance, payroll, transcripts and more.</p><div class="pp">🔨 Coming in Part 12</div></div></div>
@@ -2393,6 +2531,327 @@ async function loadAttendance() {
     }
 
   } catch(e) { console.error('loadAttendance error:', e); }
+}
+
+
+// ═══════════════════════════════════════════════════
+//  FEE COLLECTION JS
+// ═══════════════════════════════════════════════════
+let allStudentsFee = [];
+let selectedMonths = [];
+let feeStudentData = null;
+const MONTHS = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const origGoFee = window.go;
+window.go = function(id, el) {
+  origGoFee(id, el);
+  if (id === 'fees') initFees();
+};
+
+async function initFees() {
+  try {
+    const [stuRes, clsRes] = await Promise.all([
+      fetch('/api/students'),
+      fetch('/api/classes'),
+    ]);
+    allStudentsFee = await stuRes.json();
+    const classes  = await clsRes.json();
+
+    const sel = document.getElementById('fee-class-filter');
+    sel.innerHTML = '<option value="">All Classes</option>';
+    classes.forEach(c => sel.innerHTML += `<option value="${c.id}">${c.name}</option>`);
+
+    loadFeeList();
+    loadFeeSummary();
+  } catch(e) { console.error(e); }
+}
+
+async function loadFeeSummary() {
+  try {
+    const now = new Date();
+    const res = await fetch(`/api/fees/summary/monthly?year=${now.getFullYear()}`);
+    const data = await res.json();
+    const thisMonth = data.find(d => parseInt(d.month) === now.getMonth()+1);
+    document.getElementById('fee-collected').textContent = thisMonth
+      ? Number(thisMonth.total_amount).toLocaleString() + ' AFN' : '0 AFN';
+    document.getElementById('fee-paid-count').textContent = thisMonth ? thisMonth.payment_count : '0';
+  } catch(e) {}
+}
+
+async function loadFeeList() {
+  const classId = document.getElementById('fee-class-filter').value;
+  let list = allStudentsFee;
+  if (classId) list = list.filter(s => String(s.class_id) === classId);
+
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const year  = now.getFullYear();
+
+  // Load this month's payments
+  const res = await fetch(`/api/fees?month=${month}&year=${year}`);
+  const payments = await res.json();
+  const paidIds = new Set(payments.map(p => p.student_id));
+
+  const outstanding = list.filter(s => !paidIds.has(s.id));
+  document.getElementById('fee-outstanding').textContent = outstanding.length;
+  document.getElementById('fee-list-meta').textContent   = list.length + ' students';
+
+  const tb = document.getElementById('fee-tbody');
+  if (!list.length) {
+    tb.innerHTML = '<tr><td colspan="6"><div class="empty"><i class="fas fa-users"></i><p>No students found.</p></div></td></tr>';
+    return;
+  }
+
+  tb.innerHTML = list.map(s => {
+    const ini = (s.first_name[0]+(s.last_name[0]||'')).toUpperCase();
+    const photo = s.photo
+      ? `<img src="/uploads/students/${s.photo}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:1.5px solid var(--glass-border);">`
+      : `<div style="width:34px;height:34px;border-radius:50%;background:var(--glass-mid);border:1.5px solid var(--glass-border);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--accent);font-family:var(--font-head);">${ini}</div>`;
+    const isPaid = paidIds.has(s.id);
+    const payment = payments.find(p => p.student_id === s.id);
+
+    let fee = parseFloat(s.monthly_fee) || 0;
+    if (s.discount_type === 'fixed')   fee = Math.max(0, fee - parseFloat(s.discount_value));
+    if (s.discount_type === 'percent') fee = fee * (1 - parseFloat(s.discount_value)/100);
+
+    const statusBadge = isPaid
+      ? `<span class="badge bg-g"><i class="fas fa-check" style="font-size:9px;"></i> Paid</span>`
+      : `<span class="badge bg-o"><i class="fas fa-clock" style="font-size:9px;"></i> Unpaid</span>`;
+
+    return `<tr>
+      <td><div class="pc">${photo}<div>
+        <div class="pname">${s.first_name} ${s.last_name}</div>
+        <div class="pcls">${s.student_code}</div>
+      </div></div></td>
+      <td>${s.class_name ? `<span class="badge bg-t">${s.class_name}</span>` : '—'}</td>
+      <td><span style="font-family:var(--font-mono);font-size:12px;">${fee.toLocaleString()} AFN</span></td>
+      <td>${statusBadge}</td>
+      <td>${!isPaid ? `<span style="font-size:12px;color:#ff7875;font-weight:600;">1 month</span>` : '<span style="font-size:12px;color:var(--text-dim);">—</span>'}</td>
+      <td style="text-align:center;">
+        <button onclick="openFeePanel(${s.id})" style="padding:6px 14px;background:var(--accent);border:none;border-radius:20px;color:#060D18;font-family:var(--font-head);font-size:12px;font-weight:700;cursor:pointer;">
+          <i class="fas fa-plus"></i> Pay
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function feeSearchStudent() {
+  const q = document.getElementById('fee-search').value.toLowerCase();
+  const res = document.getElementById('fee-search-results');
+  if (!q) { res.style.display = 'none'; return; }
+  const matches = allStudentsFee.filter(s =>
+    (s.first_name+' '+s.last_name+s.student_code).toLowerCase().includes(q)
+  ).slice(0, 6);
+  if (!matches.length) { res.style.display = 'none'; return; }
+  res.style.display = 'block';
+  res.innerHTML = matches.map(s => `
+    <div onclick="openFeePanel(${s.id});document.getElementById('fee-search').value='';document.getElementById('fee-search-results').style.display='none';"
+      style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--glass-border);transition:var(--transition);"
+      onmouseover="this.style.background='var(--glass)'" onmouseout="this.style.background='transparent'">
+      <div style="font-family:var(--font-head);font-weight:700;color:var(--text);">${s.first_name} ${s.last_name}</div>
+      <div style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);">${s.student_code}</div>
+      ${s.class_name ? `<span class="badge bg-t" style="margin-left:auto;">${s.class_name}</span>` : ''}
+    </div>`).join('');
+}
+
+async function openFeePanel(studentId) {
+  try {
+    const res  = await fetch(`/api/fees/student/${studentId}`);
+    feeStudentData = await res.json();
+    const { student, effective_fee, payments, outstanding } = feeStudentData;
+
+    document.getElementById('fee-student-id').value   = studentId;
+    document.getElementById('fee-panel-title').textContent = 'Collect Fee';
+    document.getElementById('fee-panel-sub').textContent   = student.first_name + ' ' + student.last_name;
+    document.getElementById('fee-student-name').textContent  = student.first_name + ' ' + student.last_name;
+    document.getElementById('fee-student-class').textContent = student.class_name || '—';
+    document.getElementById('fee-student-code').textContent  = student.student_code;
+    document.getElementById('fee-effective-amount').textContent = Math.round(effective_fee).toLocaleString() + ' AFN';
+    document.getElementById('fee-amount').value = Math.round(effective_fee);
+
+    // Avatar
+    const av = document.getElementById('fee-student-avatar');
+    const ini = (student.first_name[0]+(student.last_name[0]||'')).toUpperCase();
+    av.innerHTML = student.photo
+      ? `<img src="/uploads/students/${student.photo}" style="width:100%;height:100%;object-fit:cover;">`
+      : ini;
+
+    // Outstanding months
+    selectedMonths = [];
+    const om = document.getElementById('outstanding-months');
+    if (!outstanding.length) {
+      om.innerHTML = '<span style="font-size:13px;color:#48d085;"><i class="fas fa-check-circle"></i> All months paid!</span>';
+    } else {
+      om.innerHTML = outstanding.map(m => {
+        const key = `${m.year}-${m.month}`;
+        return `<button onclick="toggleMonth('${key}',${m.month},${m.year},this)" data-key="${key}"
+          style="padding:7px 14px;background:var(--glass);border:1.5px solid var(--glass-border);border-radius:20px;color:var(--text-mid);font-family:var(--font-head);font-size:12px;font-weight:600;cursor:pointer;transition:var(--transition);">
+          ${MONTHS[m.month]} ${m.year}
+        </button>`;
+      }).join('');
+      // Auto-select current month
+      const now = new Date();
+      const curKey = `${now.getFullYear()}-${now.getMonth()+1}`;
+      const curBtn = om.querySelector(`[data-key="${curKey}"]`);
+      if (curBtn) toggleMonth(curKey, now.getMonth()+1, now.getFullYear(), curBtn);
+    }
+
+    // Payment history
+    const hist = document.getElementById('fee-history');
+    if (!payments.length) {
+      hist.innerHTML = '<div style="font-size:13px;color:var(--text-dim);">No payments recorded yet.</div>';
+    } else {
+      hist.innerHTML = payments.slice(0,10).map(p => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);">
+          <div>
+            <div style="font-weight:600;font-size:13px;color:var(--text);">${MONTHS[p.payment_month]} ${p.payment_year}</div>
+            <div style="font-size:11px;color:var(--text-dim);">${p.payment_method} · ${new Date(p.payment_date).toLocaleDateString()}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-family:var(--font-mono);font-weight:700;color:var(--text);">${Number(p.amount).toLocaleString()} AFN</span>
+            <button onclick="deleteFeePayment(${p.id})" style="width:26px;height:26px;border-radius:6px;background:var(--glass);border:1px solid var(--glass-border);color:var(--text-dim);cursor:pointer;font-size:11px;" onmouseover="this.style.color='#ff7875'" onmouseout="this.style.color='var(--text-dim)'"><i class="fas fa-trash"></i></button>
+          </div>
+        </div>`).join('');
+    }
+
+    document.getElementById('fee-overlay').style.display = 'block';
+    document.getElementById('fee-panel').style.display   = 'block';
+    setTimeout(() => document.getElementById('fee-panel').style.transform = 'translateX(0)', 10);
+  } catch(e) { showAlert({ title:'Error', message:e.message, type:'error' }); }
+}
+
+function toggleMonth(key, month, year, btn) {
+  const idx = selectedMonths.findIndex(m => m.key === key);
+  if (idx > -1) {
+    selectedMonths.splice(idx, 1);
+    btn.style.background   = 'var(--glass)';
+    btn.style.borderColor  = 'var(--glass-border)';
+    btn.style.color        = 'var(--text-mid)';
+  } else {
+    selectedMonths.push({ key, month, year });
+    btn.style.background   = 'var(--accent)';
+    btn.style.borderColor  = 'var(--accent)';
+    btn.style.color        = '#060D18';
+  }
+  // Update amount
+  if (feeStudentData && selectedMonths.length > 0) {
+    document.getElementById('fee-amount').value = Math.round(feeStudentData.effective_fee * selectedMonths.length);
+  }
+}
+
+function setPayMethod(method, btn) {
+  document.getElementById('fee-method').value = method;
+  document.querySelectorAll('.pay-method-btn').forEach(b => {
+    b.style.background = 'var(--glass)';
+    b.style.color      = 'var(--text-mid)';
+  });
+  btn.style.background = 'var(--accent)';
+  btn.style.color      = '#060D18';
+}
+
+function closeFeePanel(e) {
+  if (e && e.target !== document.getElementById('fee-overlay')) return;
+  document.getElementById('fee-panel').style.transform = 'translateX(100%)';
+  setTimeout(() => {
+    document.getElementById('fee-panel').style.display   = 'none';
+    document.getElementById('fee-overlay').style.display = 'none';
+  }, 350);
+}
+
+async function recordPayment() {
+  const studentId = document.getElementById('fee-student-id').value;
+  const amount    = document.getElementById('fee-amount').value;
+  const method    = document.getElementById('fee-method').value;
+  const notes     = document.getElementById('fee-notes').value;
+
+  if (!amount || parseFloat(amount) <= 0) {
+    showAlert({ title:'Invalid Amount', message:'Please enter a valid amount.', type:'warning' }); return;
+  }
+
+  const now = new Date();
+  const months = selectedMonths.length > 0
+    ? selectedMonths.map(m => ({ month: m.month, year: m.year }))
+    : [{ month: now.getMonth()+1, year: now.getFullYear() }];
+
+  const btn = document.getElementById('fee-save-btn');
+  btn.textContent = 'Saving...'; btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/fees', {
+      method:  'POST',
+      headers: { 'Content-Type':'application/json' },
+      body:    JSON.stringify({
+        student_id: parseInt(studentId),
+        amount:     parseFloat(amount),
+        payment_method: method,
+        notes,
+        months_paid: months,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed');
+
+    showAlert({ title:'Payment Recorded', message:`Payment of ${Number(amount).toLocaleString()} AFN recorded successfully.`, type:'success' });
+    closeFeePanel();
+    loadFeeList();
+    loadFeeSummary();
+  } catch(e) { showAlert({ title:'Error', message:e.message, type:'error' }); }
+  finally { btn.innerHTML = '<i class="fas fa-check"></i> Record Payment'; btn.disabled = false; }
+}
+
+async function deleteFeePayment(id) {
+  showConfirm({
+    title: 'Delete Payment', message: 'Delete this payment record? This cannot be undone.',
+    confirmText: 'Yes, Delete', type: 'danger',
+    onConfirm: async () => {
+      try {
+        await fetch(`/api/fees/${id}`, { method:'DELETE' });
+        const sid = document.getElementById('fee-student-id').value;
+        openFeePanel(parseInt(sid));
+        loadFeeList();
+      } catch(e) { showAlert({ title:'Error', message:e.message, type:'error' }); }
+    }
+  });
+}
+
+function printReceipt() {
+  const name   = document.getElementById('fee-student-name').textContent;
+  const code   = document.getElementById('fee-student-code').textContent;
+  const cls    = document.getElementById('fee-student-class').textContent;
+  const amount = document.getElementById('fee-amount').value;
+  const method = document.getElementById('fee-method').value;
+  const months = selectedMonths.map(m => MONTHS[m.month] + ' ' + m.year).join(', ') || 'Current Month';
+  const date   = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html><head><title>Fee Receipt</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 40px; max-width: 400px; margin: 0 auto; }
+    .header { text-align: center; border-bottom: 2px solid #1A4A5C; padding-bottom: 16px; margin-bottom: 20px; }
+    .school { font-size: 20px; font-weight: bold; color: #1A4A5C; }
+    .receipt-title { font-size: 14px; color: #666; margin-top: 4px; }
+    .row { display: flex; justify-content: space-between; margin: 8px 0; font-size: 14px; }
+    .label { color: #666; }
+    .value { font-weight: 600; }
+    .total { border-top: 2px solid #1A4A5C; margin-top: 16px; padding-top: 12px; font-size: 18px; font-weight: bold; color: #1A4A5C; display: flex; justify-content: space-between; }
+    .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #999; }
+  </style></head><body>
+  <div class="header">
+    <div class="school">Taif High School</div>
+    <div class="receipt-title">Fee Payment Receipt</div>
+  </div>
+  <div class="row"><span class="label">Student:</span><span class="value">${name}</span></div>
+  <div class="row"><span class="label">Student Code:</span><span class="value">${code}</span></div>
+  <div class="row"><span class="label">Class:</span><span class="value">${cls}</span></div>
+  <div class="row"><span class="label">Month(s):</span><span class="value">${months}</span></div>
+  <div class="row"><span class="label">Payment Method:</span><span class="value">${method}</span></div>
+  <div class="row"><span class="label">Date:</span><span class="value">${date}</span></div>
+  <div class="total"><span>Total Paid:</span><span>${Number(amount).toLocaleString()} AFN</span></div>
+  <div class="footer">Thank you — Taif High School Management System</div>
+  </body></html>`);
+  w.document.close();
+  w.print();
 }
 
 // Keyboard close

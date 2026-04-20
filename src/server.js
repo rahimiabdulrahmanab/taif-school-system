@@ -111,6 +111,10 @@ app.use('/api/classes', classRoutes);
 const attendanceRoutes = require('./routes/attendance');
 app.use('/api/attendance', attendanceRoutes);
 
+// Fee routes
+const feeRoutes = require('./routes/fees');
+app.use('/api/fees', feeRoutes);
+
 // Root redirect
 app.get('/', (req, res) => res.redirect('/admin'));
 
