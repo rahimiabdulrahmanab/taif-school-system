@@ -1133,7 +1133,115 @@ body::after{
 </div>
 
 </div>
-<div class="page" id="pg-grades"><div class="cs"><div class="cs-orb cs-b"><i class="fas fa-graduation-cap"></i></div><h2>Grades & Marks</h2><p>Set subjects per class, enter midterm and final marks, generate transcripts.</p><div class="pp">🔨 Coming in Part 10</div></div></div>
+<div class="page" id="pg-grades">
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;gap:16px;flex-wrap:wrap;">
+  <div>
+    <h2 style="font-family:var(--font-head);font-size:20px;font-weight:800;color:var(--text);">Grades & Marks</h2>
+    <span style="font-size:12px;color:var(--text-mid);">Enter marks and generate transcripts</span>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <select id="gr-class" onchange="loadGradeClass()" style="padding:9px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;">
+      <option value="">Select Class...</option>
+    </select>
+    <select id="gr-subject" onchange="loadMarksTable()" style="padding:9px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;display:none;">
+      <option value="">Select Subject...</option>
+    </select>
+    <button onclick="openSubjectManager()" id="gr-manage-btn" style="display:none;padding:9px 16px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text-mid);font-family:var(--font-head);font-size:13px;font-weight:600;cursor:pointer;">
+      <i class="fas fa-cog"></i> Subjects
+    </button>
+  </div>
+</div>
+
+<!-- Idle state -->
+<div id="gr-idle" class="glass-card" style="padding:48px;text-align:center;">
+  <div class="empty"><i class="fas fa-graduation-cap"></i><p>Select a class to start entering marks.</p></div>
+</div>
+
+<!-- Marks table -->
+<div id="gr-marks-wrap" style="display:none;">
+  <div class="glass-card">
+    <div class="card-hdr">
+      <h4><i class="fas fa-table"></i><span id="gr-table-title">Marks</span></h4>
+      <div style="display:flex;gap:8px;">
+        <span class="meta" id="gr-pass-info"></span>
+        <button onclick="saveAllMarks()" id="gr-save-all-btn" style="padding:6px 14px;background:var(--accent);border:none;border-radius:20px;color:#060D18;font-family:var(--font-head);font-size:12px;font-weight:700;cursor:pointer;">
+          <i class="fas fa-save"></i> Save All
+        </button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="scan-tbl" style="min-width:650px;">
+        <thead>
+          <tr>
+            <th>Student</th>
+            <th id="gr-mid-header">Midterm (40)</th>
+            <th id="gr-fin-header">Final (60)</th>
+            <th>Total</th>
+            <th>Grade</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tbody id="gr-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Subject Manager Panel -->
+<div id="subj-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:1000;" onclick="closeSubjectManager(event)"></div>
+<div id="subj-panel" style="display:none;position:fixed;top:0;right:0;width:460px;max-width:100%;height:100vh;background:rgba(240,249,252,.97);border-left:1px solid rgba(26,74,92,.12);z-index:1001;overflow-y:auto;transform:translateX(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);backdrop-filter:blur(20px);">
+  <div style="padding:24px 28px;border-bottom:1px solid rgba(26,74,92,.10);display:flex;align-items:center;justify-content:space-between;">
+    <div>
+      <h3 style="font-family:var(--font-head);font-size:17px;font-weight:800;color:var(--text);">Manage Subjects</h3>
+      <span style="font-size:12px;color:var(--text-mid);" id="subj-class-name">—</span>
+    </div>
+    <button onclick="closeSubjectManager()" style="width:34px;height:34px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--text-mid);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;"><i class="fas fa-times"></i></button>
+  </div>
+  <div style="padding:24px 28px;">
+    <!-- Add subject form -->
+    <div style="background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:16px;margin-bottom:20px;">
+      <div style="font-size:12px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;">Add Subject</div>
+      <div style="display:grid;gap:10px;">
+        <input id="subj-name" type="text" placeholder="Subject name (e.g. Mathematics)" style="width:100%;padding:9px 13px;background:var(--glass-mid);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+        <select id="subj-teacher" style="width:100%;padding:9px 13px;background:rgba(255,255,255,.85);border:1px solid rgba(26,74,92,.12);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;">
+          <option value="">Select teacher (optional)</option>
+        </select>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div>
+            <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:4px;">Midterm Max</label>
+            <input id="subj-max-mid" type="number" value="40" min="1" max="100" style="width:100%;padding:8px 12px;background:var(--glass-mid);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;">
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:4px;">Final Max</label>
+            <input id="subj-max-fin" type="number" value="60" min="1" max="100" style="width:100%;padding:8px 12px;background:var(--glass-mid);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;">
+          </div>
+        </div>
+        <button onclick="addSubject()" style="padding:10px;background:var(--accent);border:none;border-radius:var(--radius-sm);color:#060D18;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;">
+          <i class="fas fa-plus"></i> Add Subject
+        </button>
+      </div>
+    </div>
+    <!-- Subject list -->
+    <div id="subj-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+  </div>
+</div>
+
+<!-- Transcript Modal -->
+<div id="transcript-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);z-index:2000;align-items:center;justify-content:center;">
+  <div style="background:rgba(240,249,252,.98);border:1px solid rgba(26,74,92,.12);border-radius:var(--radius-lg);padding:0;max-width:600px;width:95%;max-height:90vh;overflow-y:auto;position:relative;">
+    <div style="padding:20px 24px;border-bottom:1px solid rgba(26,74,92,.10);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:rgba(240,249,252,.98);z-index:1;">
+      <h3 style="font-family:var(--font-head);font-size:16px;font-weight:800;color:var(--text);">Student Transcript</h3>
+      <div style="display:flex;gap:8px;">
+        <button onclick="printTranscript()" style="padding:7px 14px;background:var(--accent);border:none;border-radius:20px;color:#060D18;font-family:var(--font-head);font-size:12px;font-weight:700;cursor:pointer;"><i class="fas fa-print"></i> Print</button>
+        <button onclick="document.getElementById('transcript-modal').style.display='none'" style="padding:7px 14px;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;color:var(--text-mid);font-size:12px;font-family:var(--font-head);cursor:pointer;">Close</button>
+      </div>
+    </div>
+    <div id="transcript-content" style="padding:24px;"></div>
+  </div>
+</div>
+
+</div>
 <div class="page" id="pg-fees">
 
 <!-- Header -->
@@ -3179,6 +3287,430 @@ async function sendWAMessage() {
     btn.innerHTML = '<i class="fab fa-whatsapp"></i> Send Message';
     btn.disabled  = false;
   }
+}
+
+
+// ═══════════════════════════════════════════════════
+//  GRADES & MARKS JS
+// ═══════════════════════════════════════════════════
+let gradeClasses   = [];
+let gradeSubjects  = [];
+let gradeStudents  = [];
+let gradeSubject   = null;
+let gradeTeachers  = [];
+let pendingMarks   = {}; // {studentId: {midterm, final}}
+
+const origGoGr = window.go;
+window.go = function(id, el) {
+  origGoGr(id, el);
+  if (id === 'grades') initGrades();
+};
+
+async function initGrades() {
+  try {
+    const [clsRes, tchRes] = await Promise.all([
+      fetch('/api/classes'),
+      fetch('/api/teachers'),
+    ]);
+    gradeClasses  = await clsRes.json();
+    gradeTeachers = await tchRes.json();
+
+    const sel = document.getElementById('gr-class');
+    sel.innerHTML = '<option value="">Select Class...</option>';
+    gradeClasses.forEach(c => sel.innerHTML += `<option value="${c.id}">${c.name}</option>`);
+  } catch(e) { console.error(e); }
+}
+
+async function loadGradeClass() {
+  const classId = document.getElementById('gr-class').value;
+  if (!classId) {
+    document.getElementById('gr-idle').style.display = 'block';
+    document.getElementById('gr-marks-wrap').style.display = 'none';
+    document.getElementById('gr-subject').style.display = 'none';
+    document.getElementById('gr-manage-btn').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('gr-manage-btn').style.display = 'block';
+
+  try {
+    const res = await fetch('/api/grades/subjects/' + classId);
+    gradeSubjects = await res.json();
+
+    const subSel = document.getElementById('gr-subject');
+    subSel.style.display = 'block';
+    subSel.innerHTML = '<option value="">Select Subject...</option>';
+    gradeSubjects.forEach(s => subSel.innerHTML += `<option value="${s.id}">${s.name}</option>`);
+
+    document.getElementById('gr-idle').style.display = 'block';
+    document.getElementById('gr-marks-wrap').style.display = 'none';
+  } catch(e) { console.error(e); }
+}
+
+async function loadMarksTable() {
+  const classId   = document.getElementById('gr-class').value;
+  const subjectId = document.getElementById('gr-subject').value;
+  if (!classId || !subjectId) return;
+
+  try {
+    const res  = await fetch(`/api/grades/marks?class_id=${classId}&subject_id=${subjectId}`);
+    const data = await res.json();
+    if (!res.ok) { console.error('Marks API error:', data.error); showAlert({title:'Error',message:data.error||'Failed to load marks',type:'error'}); return; }
+    gradeStudents = data.students || [];
+    gradeSubject  = data.subject  || {};
+    pendingMarks  = {};
+
+    document.getElementById('gr-idle').style.display      = 'none';
+    document.getElementById('gr-marks-wrap').style.display = 'block';
+    document.getElementById('gr-table-title').textContent  = gradeSubject?.name || 'Marks';
+    document.getElementById('gr-mid-header').textContent   = `Midterm (${gradeSubject?.max_midterm || 40})`;
+    document.getElementById('gr-fin-header').textContent   = `Final (${gradeSubject?.max_final || 60})`;
+    document.getElementById('gr-pass-info').textContent    = `Pass: ${40} | Max: ${(gradeSubject?.max_midterm||40)+(gradeSubject?.max_final||60)}`;
+
+    renderMarksTable();
+  } catch(e) { console.error(e); }
+}
+
+function renderMarksTable() {
+  const tb = document.getElementById('gr-tbody');
+  if (!gradeStudents.length) {
+    tb.innerHTML = '<tr><td colspan="6"><div class="empty"><i class="fas fa-users"></i><p>No students in this class.</p></div></td></tr>';
+    return;
+  }
+
+  const maxMid = gradeSubject?.max_midterm || 40;
+  const maxFin = gradeSubject?.max_final   || 60;
+
+  tb.innerHTML = gradeStudents.map(s => {
+    const ini = (s.first_name[0]+(s.last_name[0]||'')).toUpperCase();
+    const photo = s.photo
+      ? `<img src="/uploads/students/${s.photo}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:1.5px solid var(--glass-border);">`
+      : `<div style="width:32px;height:32px;border-radius:50%;background:var(--glass-mid);border:1.5px solid var(--glass-border);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--accent);font-family:var(--font-head);">${ini}</div>`;
+
+    const midVal = pendingMarks[s.id]?.midterm ?? (s.midterm_score !== null ? s.midterm_score : '');
+    const finVal = pendingMarks[s.id]?.final   ?? (s.final_score   !== null ? s.final_score   : '');
+    const mid    = parseFloat(midVal);
+    const fin    = parseFloat(finVal);
+    const total  = (!isNaN(mid) && !isNaN(fin)) ? mid + fin : null;
+    const pct    = total !== null ? Math.round((total/(maxMid+maxFin))*100) : null;
+    const passed = total !== null ? total >= 40 : null;
+    const grade  = total !== null ? calcGrade(pct) : '—';
+
+    const resultBadge = passed === null ? '—'
+      : passed
+      ? '<span class="badge bg-g">Pass</span>'
+      : '<span class="badge bg-r" style="background:rgba(255,100,100,.18);color:#ff7875;border:1px solid rgba(255,100,100,.25);">Fail</span>';
+
+    return `<tr>
+      <td><div class="pc">${photo}<div>
+        <div class="pname">${s.first_name} ${s.last_name}</div>
+        <div class="pcls">${s.student_code}</div>
+        <button onclick="showTranscript(${s.id})" style="font-size:10px;color:var(--accent);background:none;border:none;cursor:pointer;padding:0;font-family:var(--font-head);">📄 Transcript</button>
+      </div></div></td>
+      <td><input type="number" min="0" max="${maxMid}" step="0.5" value="${midVal}"
+        onchange="pendingMarks[${s.id}]=pendingMarks[${s.id}]||{};pendingMarks[${s.id}].midterm=parseFloat(this.value);updateRow(${s.id})"
+        style="width:80px;padding:7px 10px;background:var(--glass);border:1px solid var(--glass-border);border-radius:6px;color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;text-align:center;"
+        onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+        <span style="font-size:11px;color:var(--text-dim);">/${maxMid}</span>
+      </td>
+      <td><input type="number" min="0" max="${maxFin}" step="0.5" value="${finVal}"
+        onchange="pendingMarks[${s.id}]=pendingMarks[${s.id}]||{};pendingMarks[${s.id}].final=parseFloat(this.value);updateRow(${s.id})"
+        style="width:80px;padding:7px 10px;background:var(--glass);border:1px solid var(--glass-border);border-radius:6px;color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;text-align:center;"
+        onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+        <span style="font-size:11px;color:var(--text-dim);">/${maxFin}</span>
+      </td>
+      <td><span id="total-${s.id}" style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--text);">${total !== null ? total : '—'}</span></td>
+      <td><span id="grade-${s.id}" style="font-family:var(--font-head);font-size:14px;font-weight:700;color:var(--accent);">${grade}</span></td>
+      <td><span id="result-${s.id}">${resultBadge}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function updateRow(studentId) {
+  const s      = gradeStudents.find(x => x.id === studentId);
+  const pending = pendingMarks[studentId] || {};
+  const maxMid = gradeSubject?.max_midterm || 40;
+  const maxFin = gradeSubject?.max_final   || 60;
+
+  const mid = pending.midterm !== undefined ? pending.midterm : s.midterm_score;
+  const fin = pending.final   !== undefined ? pending.final   : s.final_score;
+
+  if (mid !== null && fin !== null && !isNaN(mid) && !isNaN(fin)) {
+    const total = mid + fin;
+    const pct   = Math.round((total/(maxMid+maxFin))*100);
+    const grade = calcGrade(pct);
+    const passed = total >= 40;
+    document.getElementById(`total-${studentId}`).textContent = total;
+    document.getElementById(`grade-${studentId}`).textContent = grade;
+    document.getElementById(`result-${studentId}`).innerHTML  = passed
+      ? '<span class="badge bg-g">Pass</span>'
+      : '<span class="badge bg-r" style="background:rgba(255,100,100,.18);color:#ff7875;border:1px solid rgba(255,100,100,.25);">Fail</span>';
+  }
+}
+
+function calcGrade(pct) {
+  if (pct >= 90) return 'A+';
+  if (pct >= 80) return 'A';
+  if (pct >= 70) return 'B';
+  if (pct >= 60) return 'C';
+  if (pct >= 50) return 'D';
+  return 'F';
+}
+
+async function saveAllMarks() {
+  const subjectId = document.getElementById('gr-subject').value;
+  if (!subjectId) return;
+
+  const btn = document.getElementById('gr-save-all-btn');
+  btn.textContent = 'Saving...'; btn.disabled = true;
+
+  const saves = [];
+  for (const [studentId, marks] of Object.entries(pendingMarks)) {
+    if (marks.midterm !== undefined && !isNaN(marks.midterm)) {
+      saves.push(fetch('/api/grades/marks', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ student_id: parseInt(studentId), subject_id: parseInt(subjectId), exam_type:'midterm', score: marks.midterm }),
+      }));
+    }
+    if (marks.final !== undefined && !isNaN(marks.final)) {
+      saves.push(fetch('/api/grades/marks', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ student_id: parseInt(studentId), subject_id: parseInt(subjectId), exam_type:'final', score: marks.final }),
+      }));
+    }
+  }
+
+  try {
+    await Promise.all(saves);
+    pendingMarks = {};
+    await loadMarksTable();
+    showAlert({title:'Saved',message:'All marks saved successfully.',type:'success'});
+  } catch(e) {
+    showAlert({title:'Error',message:e.message,type:'error'});
+  } finally {
+    btn.innerHTML = '<i class="fas fa-save"></i> Save All';
+    btn.disabled  = false;
+  }
+}
+
+// ── Subject Manager ───────────────────────────────────────────
+function openSubjectManager() {
+  const classId = document.getElementById('gr-class').value;
+  if (!classId) return;
+  const cls = gradeClasses.find(c => c.id === parseInt(classId));
+  document.getElementById('subj-class-name').textContent = cls?.name || '—';
+
+  // Populate teacher select
+  const tSel = document.getElementById('subj-teacher');
+  tSel.innerHTML = '<option value="">Select teacher (optional)</option>';
+  gradeTeachers.forEach(t => tSel.innerHTML += `<option value="${t.id}">${t.first_name} ${t.last_name}${t.subject ? ' — '+t.subject : ''}</option>`);
+
+  renderSubjectList();
+  document.getElementById('subj-overlay').style.display = 'block';
+  document.getElementById('subj-panel').style.display   = 'block';
+  setTimeout(() => document.getElementById('subj-panel').style.transform = 'translateX(0)', 10);
+}
+
+function closeSubjectManager(e) {
+  if (e && e.target !== document.getElementById('subj-overlay')) return;
+  document.getElementById('subj-panel').style.transform = 'translateX(100%)';
+  setTimeout(() => {
+    document.getElementById('subj-panel').style.display   = 'none';
+    document.getElementById('subj-overlay').style.display = 'none';
+  }, 350);
+  loadGradeClass(); // Refresh subjects dropdown
+}
+
+function renderSubjectList() {
+  const list = document.getElementById('subj-list');
+  if (!gradeSubjects.length) {
+    list.innerHTML = '<div style="font-size:13px;color:var(--text-dim);text-align:center;padding:16px;">No subjects yet. Add one above.</div>';
+    return;
+  }
+  list.innerHTML = gradeSubjects.map(s => `
+    <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);">
+      <div style="flex:1;">
+        <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--text);">${s.name}</div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:2px;">${s.teacher_name||'No teacher'} · Mid ${s.max_midterm} + Final ${s.max_final}</div>
+      </div>
+      <button onclick="deleteSubject(${s.id},'${s.name}')" style="width:28px;height:28px;border-radius:6px;background:var(--glass);border:1px solid var(--glass-border);color:var(--text-dim);cursor:pointer;font-size:11px;" onmouseover="this.style.color='#ff7875'" onmouseout="this.style.color='var(--text-dim)'"><i class="fas fa-trash"></i></button>
+    </div>
+  `).join('');
+}
+
+async function addSubject() {
+  const classId = document.getElementById('gr-class').value;
+  const name    = document.getElementById('subj-name').value.trim();
+  const teacher = document.getElementById('subj-teacher').value;
+  const maxMid  = document.getElementById('subj-max-mid').value;
+  const maxFin  = document.getElementById('subj-max-fin').value;
+
+  if (!name) { showAlert({title:'Missing',message:'Subject name is required.',type:'warning'}); return; }
+
+  try {
+    const res = await fetch('/api/grades/subjects', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ class_id:parseInt(classId), name, teacher_id:teacher||null, max_midterm:parseInt(maxMid), max_final:parseInt(maxFin) }),
+    });
+    if (!res.ok) { const d=await res.json(); throw new Error(d.error); }
+    document.getElementById('subj-name').value = '';
+    const r = await fetch('/api/grades/subjects/' + classId);
+    gradeSubjects = await r.json();
+    renderSubjectList();
+  } catch(e) { showAlert({title:'Error',message:e.message,type:'error'}); }
+}
+
+async function deleteSubject(id, name) {
+  showConfirm({
+    title:'Delete Subject', message:`Delete "${name}"? All marks for this subject will also be deleted.`,
+    confirmText:'Yes, Delete', type:'danger',
+    onConfirm: async () => {
+      try {
+        await fetch('/api/grades/subjects/'+id, {method:'DELETE'});
+        const classId = document.getElementById('gr-class').value;
+        const r = await fetch('/api/grades/subjects/'+classId);
+        gradeSubjects = await r.json();
+        renderSubjectList();
+      } catch(e) { showAlert({title:'Error',message:e.message,type:'error'}); }
+    }
+  });
+}
+
+// ── Transcript ────────────────────────────────────────────────
+let transcriptData = null;
+
+async function showTranscript(studentId) {
+  try {
+    const res  = await fetch('/api/grades/transcript/' + studentId);
+    transcriptData = await res.json();
+    renderTranscriptModal('both');
+    document.getElementById('transcript-modal').style.display = 'flex';
+  } catch(e) { showAlert({title:'Error',message:e.message,type:'error'}); }
+}
+
+function renderTranscriptModal(mode) {
+  const { student, subjects } = transcriptData;
+  const content = document.getElementById('transcript-content');
+
+  // Header with mode switcher
+  const header = `
+    <div style="text-align:center;margin-bottom:16px;padding-bottom:16px;border-bottom:2px solid rgba(26,74,92,.1);">
+      <div style="font-family:var(--font-head);font-size:20px;font-weight:800;color:var(--text);">Taif High School</div>
+      <div style="font-size:13px;color:var(--text-mid);margin-top:4px;">${mode==='midterm'?'Midterm Transcript':'Final Year Transcript'}</div>
+    </div>
+    <div style="display:flex;gap:4px;margin-bottom:16px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:4px;width:fit-content;">
+      <button onclick="renderTranscriptModal('midterm')" style="padding:7px 16px;border:none;border-radius:6px;font-family:var(--font-head);font-size:12px;font-weight:700;cursor:pointer;background:${mode==='midterm'?'var(--accent)':'transparent'};color:${mode==='midterm'?'#060D18':'var(--text-mid)'};">Midterm</button>
+      <button onclick="renderTranscriptModal('final')" style="padding:7px 16px;border:none;border-radius:6px;font-family:var(--font-head);font-size:12px;font-weight:700;cursor:pointer;background:${mode==='final'?'var(--accent)':'transparent'};color:${mode==='final'?'#060D18':'var(--text-mid)'};">Final Year</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;font-size:13px;">
+      <div><span style="color:var(--text-dim);">Student:</span> <strong>${student.first_name} ${student.last_name}</strong></div>
+      <div><span style="color:var(--text-dim);">Code:</span> <strong>${student.student_code}</strong></div>
+      <div><span style="color:var(--text-dim);">Class:</span> <strong>${student.class_name||'—'}</strong></div>
+      <div><span style="color:var(--text-dim);">Year:</span> <strong>2026</strong></div>
+    </div>`;
+
+  let tableRows = '';
+  let totalMid = 0, totalFin = 0, totalScore = 0, subjectCount = 0;
+  let allPassed = true;
+
+  if (mode === 'midterm') {
+    // Midterm only — show midterm score/40, pass >= 16
+    tableRows = subjects.map(s => {
+      const mid    = s.midterm_score;
+      const passed = mid !== null ? mid >= 16 : null;
+      if (mid !== null) { totalMid += mid; subjectCount++; }
+      else allPassed = false;
+      if (passed === false) allPassed = false;
+      return `<tr style="border-bottom:1px solid rgba(26,74,92,.06);">
+        <td style="padding:10px 12px;font-weight:600;color:var(--text);">${s.subject_name}</td>
+        <td style="padding:10px 12px;text-align:center;font-family:monospace;font-size:14px;font-weight:700;">${mid !== null ? mid : '—'} / ${s.max_midterm}</td>
+        <td style="padding:10px 12px;text-align:center;">${passed===null?'—':passed?'<span style="color:#48d085;font-weight:700;">Pass</span>':'<span style="color:#ff7875;font-weight:700;">Fail</span>'}</td>
+      </tr>`;
+    }).join('');
+
+    const tableHtml = `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px;">
+      <thead><tr style="background:rgba(26,74,92,.06);">
+        <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--text-mid);text-transform:uppercase;">Subject</th>
+        <th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;color:var(--text-mid);text-transform:uppercase;">Midterm Score (/ 40)</th>
+        <th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;color:var(--text-mid);text-transform:uppercase;">Result</th>
+      </tr></thead>
+      <tbody>${tableRows}</tbody>
+      <tfoot><tr style="background:rgba(26,74,92,.04);font-weight:800;">
+        <td style="padding:10px 12px;color:var(--text);">Total</td>
+        <td style="padding:10px 12px;text-align:center;font-family:monospace;font-weight:800;">${totalMid} / ${subjects.reduce((s,x)=>s+(x.max_midterm||40),0)}</td>
+        <td style="padding:10px 12px;text-align:center;color:${allPassed&&subjectCount>0?'#48d085':'#ff7875'};font-weight:800;">${subjectCount>0?(allPassed?'PASS':'FAIL'):'—'}</td>
+      </tr></tfoot>
+    </table>`;
+
+    content.innerHTML = header + tableHtml +
+      `<div style="font-size:11px;color:var(--text-dim);padding:10px;background:var(--glass);border-radius:var(--radius-sm);">Pass mark: 16/40 per subject</div>`;
+
+  } else {
+    // Final — show midterm + final + total, pass >= 50
+    tableRows = subjects.map(s => {
+      const mid    = s.midterm_score;
+      const fin    = s.final_score;
+      const total  = (mid !== null && fin !== null) ? mid + fin : null;
+      const maxTot = s.max_midterm + s.max_final;
+      const passed = total !== null ? total >= 50 : null;
+      const grade  = total !== null ? calcGradeFE(total, maxTot) : '—';
+      if (total !== null) { totalMid += mid; totalFin += fin; totalScore += total; subjectCount++; }
+      if (passed === false) allPassed = false;
+      return `<tr style="border-bottom:1px solid rgba(26,74,92,.06);">
+        <td style="padding:10px 12px;font-weight:600;color:var(--text);">${s.subject_name}</td>
+        <td style="padding:10px 12px;text-align:center;font-family:monospace;">${mid!==null?mid:'—'} / ${s.max_midterm}</td>
+        <td style="padding:10px 12px;text-align:center;font-family:monospace;">${fin!==null?fin:'—'} / ${s.max_final}</td>
+        <td style="padding:10px 12px;text-align:center;font-family:monospace;font-weight:700;">${total!==null?total+'/'+maxTot:'—'}</td>
+        <td style="padding:10px 12px;text-align:center;font-weight:800;color:var(--accent);">${grade}</td>
+        <td style="padding:10px 12px;text-align:center;">${passed===null?'—':passed?'<span style="color:#48d085;font-weight:700;">Pass</span>':'<span style="color:#ff7875;font-weight:700;">Fail</span>'}</td>
+      </tr>`;
+    }).join('');
+
+    const tableHtml = `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px;">
+      <thead><tr style="background:rgba(26,74,92,.06);">
+        <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--text-mid);text-transform:uppercase;">Subject</th>
+        <th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;color:var(--text-mid);text-transform:uppercase;">Midterm /40</th>
+        <th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;color:var(--text-mid);text-transform:uppercase;">Final /60</th>
+        <th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;color:var(--text-mid);text-transform:uppercase;">Total /100</th>
+        <th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;color:var(--text-mid);text-transform:uppercase;">Grade</th>
+        <th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;color:var(--text-mid);text-transform:uppercase;">Result</th>
+      </tr></thead>
+      <tbody>${tableRows}</tbody>
+      <tfoot><tr style="background:rgba(26,74,92,.04);font-weight:800;">
+        <td style="padding:10px 12px;color:var(--text);">Total</td>
+        <td style="padding:10px 12px;text-align:center;font-family:monospace;">${totalMid}</td>
+        <td style="padding:10px 12px;text-align:center;font-family:monospace;">${totalFin}</td>
+        <td style="padding:10px 12px;text-align:center;font-family:monospace;font-weight:700;">${totalScore} / ${subjectCount*100}</td>
+        <td style="padding:10px 12px;text-align:center;color:var(--accent);font-weight:800;">${subjectCount>0?calcGradeFE(totalScore,subjectCount*100):'—'}</td>
+        <td style="padding:10px 12px;text-align:center;color:${allPassed?'#48d085':'#ff7875'};font-weight:800;">${subjectCount>0?(allPassed?'PASS':'FAIL'):'—'}</td>
+      </tr></tfoot>
+    </table>`;
+
+    content.innerHTML = header + tableHtml +
+      `<div style="font-size:11px;color:var(--text-dim);padding:10px;background:var(--glass);border-radius:var(--radius-sm);">Pass mark: 50/100 per subject (Midterm + Final)</div>`;
+  }
+}
+
+function calcGradeFE(score, max) {
+  const pct = (score / max) * 100;
+  if (pct >= 90) return 'A+';
+  if (pct >= 80) return 'A';
+  if (pct >= 70) return 'B+';
+  if (pct >= 60) return 'B';
+  if (pct >= 50) return 'C';
+  return 'F';
+}
+
+function printTranscript() {
+  const content = document.getElementById('transcript-content').innerHTML;
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html><head><title>Transcript</title>
+  <style>body{font-family:Arial,sans-serif;padding:30px;max-width:700px;margin:0 auto;}
+  table{width:100%;border-collapse:collapse;}th,td{padding:8px 10px;border-bottom:1px solid #eee;font-size:13px;}
+  th{background:#f5f5f5;font-weight:700;}button{display:none;}
+  @media print{body{padding:0;}}</style></head>
+  <body>${content}</body></html>`);
+  w.document.close(); w.print();
 }
 
 // Keyboard close

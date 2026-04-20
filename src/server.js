@@ -135,3 +135,6 @@ app.listen(PORT, () => {
 });
 
 module.exports = app;
+// Grades routes
+const gradesRoutes = require('./routes/grades');
+app.use('/api/grades', gradesRoutes);
