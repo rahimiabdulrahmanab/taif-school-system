@@ -115,6 +115,10 @@ app.use('/api/attendance', attendanceRoutes);
 const feeRoutes = require('./routes/fees');
 app.use('/api/fees', feeRoutes);
 
+// WhatsApp routes
+const waRoutes = require('./routes/whatsapp');
+app.use('/api/whatsapp', waRoutes);
+
 // Root redirect
 app.get('/', (req, res) => res.redirect('/admin'));
 
