@@ -1382,7 +1382,111 @@ body::after{
 
 </div>
 <div class="page" id="pg-payroll"><div class="cs"><div class="cs-orb cs-o"><i class="fas fa-wallet"></i></div><h2>Payroll</h2><p>Monthly salary calculation, mid-month advances, deductions and payslip generation.</p><div class="pp">🔨 Coming in Part 9</div></div></div>
-<div class="page" id="pg-expenses"><div class="cs"><div class="cs-orb cs-p"><i class="fas fa-receipt"></i></div><h2>Office Expenses</h2><p>Log school expenses by category, track monthly spending from general fund.</p><div class="pp">🔨 Coming in Part 11</div></div></div>
+<div class="page" id="pg-expenses">
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;gap:16px;flex-wrap:wrap;">
+  <div>
+    <h2 style="font-family:var(--font-head);font-size:20px;font-weight:800;color:var(--text);">Office Expenses</h2>
+    <span style="font-size:12px;color:var(--text-mid);">Track daily school expenses and spending</span>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <select id="exp-month" onchange="loadExpenses()" style="padding:9px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;">
+      <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+      <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+      <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+      <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+    </select>
+    <select id="exp-year" onchange="loadExpenses()" style="padding:9px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;">
+      <option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option>
+    </select>
+    <select id="exp-cat-filter" onchange="loadExpenses()" style="padding:9px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;">
+      <option value="">All Categories</option>
+    </select>
+    <button onclick="openExpenseForm()" style="display:flex;align-items:center;gap:8px;padding:9px 18px;background:var(--accent);border:none;border-radius:var(--radius-sm);color:#060D18;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 0 16px var(--accent-glow);">
+      <i class="fas fa-plus"></i> Add Expense
+    </button>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:22px;">
+  <div class="glass-card" style="padding:20px;display:flex;align-items:center;gap:14px;">
+    <div class="stat-ico si-r"><i class="fas fa-receipt"></i></div>
+    <div><h3 style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--text);" id="exp-total">0 AFN</h3><p style="font-size:12px;color:var(--text-mid);">Total This Month</p></div>
+  </div>
+  <div class="glass-card" style="padding:20px;display:flex;align-items:center;gap:14px;">
+    <div class="stat-ico si-o"><i class="fas fa-list"></i></div>
+    <div><h3 style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--text);" id="exp-count">0</h3><p style="font-size:12px;color:var(--text-mid);">Transactions</p></div>
+  </div>
+  <div class="glass-card" style="padding:20px;display:flex;align-items:center;gap:14px;">
+    <div class="stat-ico si-b"><i class="fas fa-chart-pie"></i></div>
+    <div><h3 style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--text);" id="exp-top-cat">—</h3><p style="font-size:12px;color:var(--text-mid);">Top Category</p></div>
+  </div>
+</div>
+
+<div class="glass-card" style="margin-bottom:16px;display:none;" id="exp-breakdown-card">
+  <div class="card-hdr"><h4><i class="fas fa-chart-bar"></i>Category Breakdown</h4></div>
+  <div id="exp-breakdown" style="padding:16px 20px;display:flex;flex-wrap:wrap;gap:10px;"></div>
+</div>
+
+<div class="glass-card">
+  <div class="card-hdr">
+    <h4><i class="fas fa-file-invoice-dollar"></i>Expense Records</h4>
+    <span class="meta" id="exp-meta">Loading...</span>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="scan-tbl" style="min-width:700px;">
+      <thead><tr><th>Title</th><th>Category</th><th>Date</th><th>Paid To</th><th>Amount</th><th style="text-align:center;">Actions</th></tr></thead>
+      <tbody id="exp-tbody"><tr><td colspan="6"><div class="empty"><i class="fas fa-receipt"></i><p>Loading...</p></div></td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<div id="exp-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:1000;" onclick="closeExpenseForm(event)"></div>
+<div id="exp-panel" style="display:none;position:fixed;top:0;right:0;width:460px;max-width:100%;height:100vh;background:rgba(240,249,252,.97);border-left:1px solid rgba(26,74,92,.12);z-index:1001;overflow-y:auto;transform:translateX(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);backdrop-filter:blur(20px);">
+  <div style="padding:24px 28px;border-bottom:1px solid rgba(26,74,92,.10);display:flex;align-items:center;justify-content:space-between;">
+    <div>
+      <h3 style="font-family:var(--font-head);font-size:17px;font-weight:800;color:var(--text);" id="exp-panel-title">Add Expense</h3>
+      <span style="font-size:12px;color:var(--text-mid);">Fill in the expense details</span>
+    </div>
+    <button onclick="closeExpenseForm()" style="width:34px;height:34px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--text-mid);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;"><i class="fas fa-times"></i></button>
+  </div>
+  <div style="padding:24px 28px;display:grid;gap:14px;">
+    <input type="hidden" id="exp-edit-id">
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Title *</label>
+      <input id="exp-title" type="text" placeholder="e.g. Monthly rent payment" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Amount (AFN) *</label>
+        <input id="exp-amount" type="number" min="0" step="1" placeholder="0" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:14px;font-weight:700;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Date</label>
+        <input id="exp-date" type="date" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;color-scheme:light;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+      </div>
+    </div>
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Category</label>
+      <select id="exp-category" style="width:100%;padding:10px 13px;background:rgba(255,255,255,.85);border:1px solid rgba(26,74,92,.12);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;"></select>
+    </div>
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Paid To</label>
+      <input id="exp-paid-to" type="text" placeholder="Person or company name" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+    </div>
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Notes</label>
+      <input id="exp-notes" type="text" placeholder="Optional notes..." style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+    </div>
+    <div style="display:flex;gap:10px;margin-top:4px;">
+      <button onclick="saveExpense()" id="exp-save-btn" style="flex:1;padding:12px;background:linear-gradient(135deg,var(--accent),#3aaa85);border:none;border-radius:var(--radius-sm);color:#060D18;font-family:var(--font-head);font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 0 20px var(--accent-glow);"><i class="fas fa-save"></i> Save Expense</button>
+      <button onclick="closeExpenseForm()" style="padding:12px 18px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text-mid);font-family:var(--font-head);font-size:13px;cursor:pointer;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+</div>
+
 <div class="page" id="pg-reports"><div class="cs"><div class="cs-orb cs-b"><i class="fas fa-chart-bar"></i></div><h2>Reports</h2><p>Generate and print all 11 report types — attendance, payroll, transcripts and more.</p><div class="pp">🔨 Coming in Part 12</div></div></div>
 <div class="page" id="pg-whatsapp">
 
@@ -3711,6 +3815,199 @@ function printTranscript() {
   @media print{body{padding:0;}}</style></head>
   <body>${content}</body></html>`);
   w.document.close(); w.print();
+}
+
+
+// ═══════════════════════════════════════════════════
+//  OFFICE EXPENSES JS
+// ═══════════════════════════════════════════════════
+let expensesList = [];
+let expCategories = [];
+
+const origGoExp = window.go;
+window.go = function(id, el) {
+  origGoExp(id, el);
+  if (id === 'expenses') initExpenses();
+};
+
+async function initExpenses() {
+  const now = new Date();
+  document.getElementById('exp-month').value = now.getMonth() + 1;
+  document.getElementById('exp-year').value  = now.getFullYear();
+  document.getElementById('exp-date').value  = now.toISOString().split('T')[0];
+
+  try {
+    const res = await fetch('/api/expenses/categories');
+    expCategories = await res.json();
+
+    // Populate category dropdowns
+    const catFilter = document.getElementById('exp-cat-filter');
+    const catSelect = document.getElementById('exp-category');
+    catFilter.innerHTML = '<option value="">All Categories</option>';
+    catSelect.innerHTML = '';
+    expCategories.forEach(c => {
+      catFilter.innerHTML += `<option value="${c}">${c}</option>`;
+      catSelect.innerHTML += `<option value="${c}">${c}</option>`;
+    });
+  } catch(e) { console.error(e); }
+
+  loadExpenses();
+}
+
+async function loadExpenses() {
+  const month    = document.getElementById('exp-month').value;
+  const year     = document.getElementById('exp-year').value;
+  const category = document.getElementById('exp-cat-filter').value;
+
+  try {
+    let url = `/api/expenses?month=${month}&year=${year}`;
+    if (category) url += `&category=${encodeURIComponent(category)}`;
+    const res = await fetch(url);
+    expensesList = await res.json();
+
+    // Summary
+    const total = expensesList.reduce((s, e) => s + parseFloat(e.amount), 0);
+    document.getElementById('exp-total').textContent = Math.round(total).toLocaleString() + ' AFN';
+    document.getElementById('exp-count').textContent = expensesList.length;
+    document.getElementById('exp-meta').textContent  = expensesList.length + ' records';
+
+    // Top category
+    const catTotals = {};
+    expensesList.forEach(e => {
+      catTotals[e.category] = (catTotals[e.category] || 0) + parseFloat(e.amount);
+    });
+    const topCat = Object.entries(catTotals).sort((a,b) => b[1]-a[1])[0];
+    document.getElementById('exp-top-cat').textContent = topCat ? topCat[0] : '—';
+
+    // Category breakdown
+    if (Object.keys(catTotals).length > 0) {
+      document.getElementById('exp-breakdown-card').style.display = 'block';
+      const colors = ['var(--accent)','#5b9ef7','#ffaa3d','#b57dff','#ff7875','#48d085'];
+      document.getElementById('exp-breakdown').innerHTML = Object.entries(catTotals)
+        .sort((a,b) => b[1]-a[1])
+        .map(([cat, amt], i) => {
+          const pct = Math.round((amt / total) * 100);
+          return `<div style="padding:10px 14px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);min-width:140px;">
+            <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;">${cat}</div>
+            <div style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:${colors[i%colors.length]};">${Math.round(amt).toLocaleString()} AFN</div>
+            <div style="font-size:11px;color:var(--text-dim);margin-top:2px;">${pct}% of total</div>
+          </div>`;
+        }).join('');
+    } else {
+      document.getElementById('exp-breakdown-card').style.display = 'none';
+    }
+
+    // Table
+    const tb = document.getElementById('exp-tbody');
+    if (!expensesList.length) {
+      tb.innerHTML = '<tr><td colspan="6"><div class="empty"><i class="fas fa-receipt"></i><p>No expenses recorded this month.</p></div></td></tr>';
+      return;
+    }
+
+    const catColors = {'Rent':'#5b9ef7','Electricity':'#ffaa3d','Water':'#48d085','Internet':'#b57dff','Stationery':'var(--accent)','Maintenance':'#ff7875','Other':'var(--text-dim)'};
+
+    tb.innerHTML = expensesList.map(e => {
+      const date   = new Date(e.expense_date).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+      const color  = catColors[e.category] || 'var(--text-dim)';
+      return `<tr>
+        <td>
+          <div style="font-weight:600;font-size:13px;color:var(--text);">${e.description||e.title||'—'}</div>
+        </td>
+        <td><span style="padding:4px 10px;background:${color}22;color:${color};border:1px solid ${color}44;border-radius:20px;font-size:11px;font-weight:700;font-family:var(--font-head);">${e.category}</span></td>
+        <td><span style="font-family:var(--font-mono);font-size:12px;color:var(--text-mid);">${date}</span></td>
+        <td><span style="font-size:12px;color:var(--text-mid);">${e.paid_to || '—'}</span></td>
+        <td><span style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--text);">${Number(e.amount).toLocaleString()} AFN</span></td>
+        <td style="text-align:center;">
+          <div style="display:flex;gap:6px;justify-content:center;">
+            <button onclick="openExpenseForm(${e.id})" style="width:30px;height:30px;border-radius:6px;background:var(--glass);border:1px solid var(--glass-border);color:var(--text-mid);cursor:pointer;font-size:12px;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--glass-border)';this.style.color='var(--text-mid)'"><i class="fas fa-edit"></i></button>
+            <button onclick="deleteExpense(${e.id},'${(e.description||e.title||'').replace(/'/g,"\'")}')" style="width:30px;height:30px;border-radius:6px;background:var(--glass);border:1px solid var(--glass-border);color:var(--text-mid);cursor:pointer;font-size:12px;" onmouseover="this.style.borderColor='#ff7875';this.style.color='#ff7875'" onmouseout="this.style.borderColor='var(--glass-border)';this.style.color='var(--text-mid)'"><i class="fas fa-trash"></i></button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e) { console.error('loadExpenses error:', e); }
+}
+
+function openExpenseForm(id) {
+  document.getElementById('exp-edit-id').value = id || '';
+  document.getElementById('exp-panel-title').textContent = id ? 'Edit Expense' : 'Add Expense';
+
+  if (id) {
+    const exp = expensesList.find(e => e.id === id);
+    if (!exp) return;
+    document.getElementById('exp-title').value    = exp.description || exp.title || '';
+    document.getElementById('exp-amount').value   = exp.amount || '';
+    document.getElementById('exp-date').value     = exp.expense_date ? exp.expense_date.split('T')[0] : '';
+    document.getElementById('exp-category').value = exp.category || 'Other';
+    document.getElementById('exp-paid-to').value  = exp.paid_to || '';
+    document.getElementById('exp-notes').value    = exp.notes || '';
+  } else {
+    document.getElementById('exp-title').value    = '';
+    document.getElementById('exp-amount').value   = '';
+    document.getElementById('exp-date').value     = new Date().toISOString().split('T')[0];
+    document.getElementById('exp-category').value = expCategories[0] || 'Other';
+    document.getElementById('exp-paid-to').value  = '';
+    document.getElementById('exp-notes').value    = '';
+  }
+
+  document.getElementById('exp-overlay').style.display = 'block';
+  document.getElementById('exp-panel').style.display   = 'block';
+  setTimeout(() => document.getElementById('exp-panel').style.transform = 'translateX(0)', 10);
+}
+
+function closeExpenseForm(e) {
+  if (e && e.target !== document.getElementById('exp-overlay')) return;
+  document.getElementById('exp-panel').style.transform = 'translateX(100%)';
+  setTimeout(() => {
+    document.getElementById('exp-panel').style.display   = 'none';
+    document.getElementById('exp-overlay').style.display = 'none';
+  }, 350);
+}
+
+async function saveExpense() {
+  const title  = document.getElementById('exp-title').value.trim();
+  const amount = document.getElementById('exp-amount').value;
+  if (!title || !amount) { showAlert({title:'Missing Info',message:'Title and amount are required.',type:'warning'}); return; }
+
+  const btn = document.getElementById('exp-save-btn');
+  btn.textContent = 'Saving...'; btn.disabled = true;
+
+  const id   = document.getElementById('exp-edit-id').value;
+  const body = {
+    title,
+    amount:       parseFloat(amount),
+    category:     document.getElementById('exp-category').value,
+    expense_date: document.getElementById('exp-date').value,
+    paid_to:      document.getElementById('exp-paid-to').value,
+    notes:        document.getElementById('exp-notes').value,
+  };
+
+  try {
+    const res  = await fetch(id ? `/api/expenses/${id}` : '/api/expenses', {
+      method:  id ? 'PUT' : 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body:    JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Save failed');
+    closeExpenseForm();
+    loadExpenses();
+    showAlert({title:'Saved',message:`Expense "${title}" recorded.`,type:'success'});
+  } catch(e) { showAlert({title:'Error',message:e.message,type:'error'}); }
+  finally { btn.innerHTML='<i class="fas fa-save"></i> Save Expense'; btn.disabled=false; }
+}
+
+async function deleteExpense(id, title) {
+  showConfirm({
+    title:'Delete Expense', message:`Delete "${title}"?`,
+    confirmText:'Yes, Delete', type:'danger',
+    onConfirm: async () => {
+      try {
+        await fetch('/api/expenses/'+id, { method:'DELETE' });
+        loadExpenses();
+      } catch(e) { showAlert({title:'Error',message:e.message,type:'error'}); }
+    }
+  });
 }
 
 // Keyboard close

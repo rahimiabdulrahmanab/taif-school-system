@@ -138,3 +138,7 @@ module.exports = app;
 // Grades routes
 const gradesRoutes = require('./routes/grades');
 app.use('/api/grades', gradesRoutes);
+
+// Office Expenses routes
+const expensesRoutes = require('./routes/expenses');
+app.use('/api/expenses', expensesRoutes);
