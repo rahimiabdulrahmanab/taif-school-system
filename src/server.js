@@ -94,16 +94,7 @@ app.get('/api/dashboard/scans', async (req, res) => {
   }
 });
 
-// Classes list (needed by student form)
-app.get('/api/classes', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM classes ORDER BY name');
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
+// Classes routes handled by src/routes/classes.js
 // Student routes
 const studentRoutes = require('./routes/students');
 app.use('/api/students', studentRoutes);
@@ -115,6 +106,10 @@ app.use('/api', peopleRoutes);
 // Classes routes
 const classRoutes = require('./routes/classes');
 app.use('/api/classes', classRoutes);
+
+// Attendance routes
+const attendanceRoutes = require('./routes/attendance');
+app.use('/api/attendance', attendanceRoutes);
 
 // Root redirect
 app.get('/', (req, res) => res.redirect('/admin'));

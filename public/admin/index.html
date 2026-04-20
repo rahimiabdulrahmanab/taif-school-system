@@ -843,6 +843,14 @@ body::after{
     <div><label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Address</label><input id="teachers-addr" type="text" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="District, City"></div>
     <div style="border-top:1px solid var(--glass-border);padding-top:14px;"><span style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.1em;">Salary</span></div>
     <div><label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Monthly Salary (AFN)</label><input id="teachers-salary" type="number" min="0" step="1" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="0"></div>
+    <!-- Classes this teacher teaches -->
+    <div style="border-top:1px solid var(--glass-border);padding-top:14px;">
+      <span style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.1em;">Classes & Subjects</span>
+    </div>
+    <div id="teachers-class-list" style="display:flex;flex-direction:column;gap:6px;min-height:32px;">
+      <div style="font-size:12px;color:var(--text-dim);">Save teacher first, then assign from Classes page.</div>
+    </div>
+
     <div style="display:flex;gap:10px;margin-top:4px;">
       <button type="button" onclick="saveTeacher()" id="teachers-save-btn" style="flex:1;padding:12px;background:linear-gradient(135deg,var(--accent),#3aaa85);border:none;border-radius:var(--radius-sm);color:#060D18;font-family:var(--font-head);font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 0 20px var(--accent-glow);"><i class="fas fa-save"></i> Save</button>
       <button type="button" onclick="closeTeacherForm()" style="padding:12px 18px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text-mid);font-family:var(--font-head);font-size:13px;cursor:pointer;">Cancel</button>
@@ -950,8 +958,16 @@ body::after{
 <div id="cls-students-drawer" style="display:none;margin-top:20px;">
   <div class="glass-card">
     <div class="card-hdr">
-      <h4><i class="fas fa-users"></i><span id="cls-drawer-title">Class Students</span></h4>
+      <h4><i class="fas fa-door-open"></i><span id="cls-drawer-title">Class</span></h4>
       <div style="display:flex;gap:8px;align-items:center;">
+        <div style="display:flex;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;overflow:hidden;">
+          <button onclick="switchDrawerTab('students')" id="tab-students" style="padding:6px 14px;border:none;border-radius:20px;font-family:var(--font-head);font-size:12px;font-weight:700;cursor:pointer;background:var(--accent);color:#060D18;transition:var(--transition);">
+            <i class="fas fa-users"></i> Students
+          </button>
+          <button onclick="switchDrawerTab('teachers')" id="tab-teachers" style="padding:6px 14px;border:none;border-radius:20px;font-family:var(--font-head);font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:var(--text-mid);transition:var(--transition);">
+            <i class="fas fa-chalkboard-teacher"></i> Teachers
+          </button>
+        </div>
         <button onclick="toggleAddPanel()" id="add-panel-btn" style="padding:6px 14px;background:var(--accent);border:none;border-radius:20px;color:#060D18;font-family:var(--font-head);font-size:12px;font-weight:700;cursor:pointer;">
           <i class="fas fa-plus"></i> Add Student
         </button>
@@ -974,6 +990,9 @@ body::after{
 
     <!-- Enrolled students -->
     <div id="cls-students-list" style="padding:8px 0;"></div>
+
+    <!-- Teachers list -->
+    <div id="cls-teachers-list" style="padding:8px 0;display:none;"></div>
   </div>
 </div>
 
@@ -1023,13 +1042,6 @@ body::after{
     </div>
 
     <div>
-      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Homeroom Teacher</label>
-      <select id="cls-teacher" style="width:100%;padding:10px 13px;background:rgba(255,255,255,.85);border:1px solid rgba(26,74,92,.12);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;">
-        <option value="" style="background:#f4f8fd;color:#18324a;">No teacher assigned</option>
-      </select>
-    </div>
-
-    <div>
       <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Description / Notes</label>
       <input id="cls-desc" type="text" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="Optional notes about this class">
     </div>
@@ -1046,7 +1058,81 @@ body::after{
 </div>
 
 </div>
-<div class="page" id="pg-attendance"><div class="cs"><div class="cs-orb cs-t"><i class="fas fa-clipboard-check"></i></div><h2>Attendance</h2><p>View daily and monthly attendance by class or individual, send WhatsApp alerts.</p><div class="pp">🔨 Coming in Part 6</div></div></div>
+<div class="page" id="pg-attendance">
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;gap:16px;flex-wrap:wrap;">
+  <div>
+    <h2 style="font-family:var(--font-head);font-size:20px;font-weight:800;color:var(--text);">Attendance</h2>
+    <span style="font-size:12px;color:var(--text-mid);">Daily attendance records by class and person</span>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <input type="date" id="att-date" onchange="loadAttendance()" style="padding:8px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;color-scheme:light;">
+    <select id="att-class" onchange="loadAttendance()" style="padding:9px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;">
+      <option value="">All Classes</option>
+    </select>
+    <select id="att-type" onchange="loadAttendance()" style="padding:9px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;">
+      <option value="">Everyone</option>
+      <option value="student">Students</option>
+      <option value="teacher">Teachers</option>
+      <option value="staff">Staff</option>
+    </select>
+    <button onclick="window.open('/gate','_blank')" style="display:flex;align-items:center;gap:8px;padding:9px 18px;background:var(--accent);border:none;border-radius:var(--radius-sm);color:#060D18;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 0 16px var(--accent-glow);">
+      <i class="fas fa-tv"></i> Gate Screen
+    </button>
+  </div>
+</div>
+
+<!-- Summary cards -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:22px;">
+  <div class="glass-card" style="padding:20px;display:flex;align-items:center;gap:14px;">
+    <div class="stat-ico si-g"><i class="fas fa-check-circle"></i></div>
+    <div><h3 style="font-family:var(--font-mono);font-size:28px;font-weight:700;color:var(--text);" id="att-present-cnt">0</h3><p style="font-size:12px;color:var(--text-mid);">Present</p></div>
+  </div>
+  <div class="glass-card" style="padding:20px;display:flex;align-items:center;gap:14px;">
+    <div class="stat-ico si-r"><i class="fas fa-times-circle"></i></div>
+    <div><h3 style="font-family:var(--font-mono);font-size:28px;font-weight:700;color:var(--text);" id="att-absent-cnt">0</h3><p style="font-size:12px;color:var(--text-mid);">Absent</p></div>
+  </div>
+  <div class="glass-card" style="padding:20px;display:flex;align-items:center;gap:14px;">
+    <div class="stat-ico si-b"><i class="fas fa-percent"></i></div>
+    <div><h3 style="font-family:var(--font-mono);font-size:28px;font-weight:700;color:var(--text);" id="att-rate">0%</h3><p style="font-size:12px;color:var(--text-mid);">Attendance Rate</p></div>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div style="display:flex;gap:4px;margin-bottom:16px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:4px;width:fit-content;">
+  <button onclick="switchAttTab('present')" id="att-tab-present" style="padding:8px 20px;border:none;border-radius:6px;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;background:var(--accent);color:#060D18;transition:var(--transition);">
+    <i class="fas fa-check"></i> Present
+  </button>
+  <button onclick="switchAttTab('absent')" id="att-tab-absent" style="padding:8px 20px;border:none;border-radius:6px;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;background:transparent;color:var(--text-mid);transition:var(--transition);">
+    <i class="fas fa-times"></i> Absent
+  </button>
+</div>
+
+<!-- Present list -->
+<div id="att-present-panel">
+  <div class="glass-card">
+    <table class="scan-tbl">
+      <thead><tr><th>Person</th><th>Type</th><th>Class</th><th>Time</th></tr></thead>
+      <tbody id="att-present-tbody">
+        <tr><td colspan="4"><div class="empty"><i class="fas fa-clipboard-check"></i><p>No attendance records yet.</p></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Absent list -->
+<div id="att-absent-panel" style="display:none;">
+  <div class="glass-card">
+    <table class="scan-tbl">
+      <thead><tr><th>Student</th><th>Class</th><th>Parent Phone</th></tr></thead>
+      <tbody id="att-absent-tbody">
+        <tr><td colspan="3"><div class="empty"><i class="fas fa-check-circle" style="color:#48d085;opacity:1;"></i><p>All students present!</p></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+</div>
 <div class="page" id="pg-grades"><div class="cs"><div class="cs-orb cs-b"><i class="fas fa-graduation-cap"></i></div><h2>Grades & Marks</h2><p>Set subjects per class, enter midterm and final marks, generate transcripts.</p><div class="pp">🔨 Coming in Part 10</div></div></div>
 <div class="page" id="pg-fees"><div class="cs"><div class="cs-orb cs-g"><i class="fas fa-money-bill-wave"></i></div><h2>Fee Collection</h2><p>Record payments, apply discounts, print receipts and send WhatsApp confirmations.</p><div class="pp">🔨 Coming in Part 7</div></div></div>
 <div class="page" id="pg-payroll"><div class="cs"><div class="cs-orb cs-o"><i class="fas fa-wallet"></i></div><h2>Payroll</h2><p>Monthly salary calculation, mid-month advances, deductions and payslip generation.</p><div class="pp">🔨 Coming in Part 9</div></div></div>
@@ -1549,6 +1635,8 @@ function makePeopleModule(cfg) {
         document.getElementById(`${pid}-joindate`).value = p.join_date ? p.join_date.split('T')[0] : '';
         if (p.photo) document.getElementById(`${pid}-photo-preview`).innerHTML =
           `<img src="/uploads/${apiPath}/${p.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+        // Load class assignments for teachers
+        if (pid === 'teachers') loadTeacherClasses(id);
       }
       document.getElementById(`${pid}-overlay`).style.display = 'block';
       document.getElementById(`${pid}-panel`).style.display   = 'block';
@@ -1701,6 +1789,7 @@ function staffPreviewUpload(i){ staffModule.previewUpload(i); }
 //  CLASSES JS
 // ═══════════════════════════════════════════════════
 let allClasses = [];
+let allTeachersList = [];
 let activeClassId = null;
 let unassignedStudents = [];
 
@@ -1712,27 +1801,16 @@ window.go = function(id, el) {
 
 async function loadClasses() {
   try {
-    const [clsRes, tchRes, stuRes] = await Promise.all([
-      fetch('/api/classes'),
-      fetch('/api/teachers'),
-      fetch('/api/students'),
+    const [clsData, tchData, stuData] = await Promise.all([
+      fetch('/api/classes').then(r => r.json()),
+      fetch('/api/teachers').then(r => r.json()),
+      fetch('/api/students').then(r => r.json()),
     ]);
-    allClasses = await clsRes.json();
-    const teachers = await tchRes.json();
-    const students = await stuRes.json();
-
-    // Populate teacher dropdown in form
-    const tSel = document.getElementById('cls-teacher');
-    tSel.innerHTML = '<option value="" style="background:#f4f8fd;color:#18324a;">No teacher assigned</option>';
-    teachers.forEach(t => {
-      tSel.innerHTML += `<option value="${t.id}" style="background:#f4f8fd;color:#18324a;">${t.first_name} ${t.last_name}${t.subject ? ' — ' + t.subject : ''}</option>`;
-    });
-
-    // Unassigned students for adding to class
-    unassignedStudents = students;
-
+    allClasses       = clsData;
+    allTeachersList  = tchData;
+    unassignedStudents = stuData;
     renderClasses(allClasses);
-  } catch(e) { console.error(e); }
+  } catch(e) { console.error('loadClasses error:', e); }
 }
 
 function renderClasses(list) {
@@ -1764,12 +1842,12 @@ function renderClasses(list) {
 
         <div style="display:flex;gap:10px;margin-bottom:14px;">
           <div style="flex:1;padding:10px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);text-align:center;">
-            <div style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--text);">${parseInt(c.student_count)||0}</div>
+            <div style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--text);">${Number(c.student_count ?? c.cnt ?? 0)}</div>
             <div style="font-size:10px;color:var(--text-dim);margin-top:2px;">Students</div>
           </div>
           <div style="flex:1;padding:10px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);text-align:center;overflow:hidden;">
-            <div style="font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.teacher_name || '—'}</div>
-            <div style="font-size:10px;color:var(--text-dim);margin-top:2px;">Teacher</div>
+            <div style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--text);">${c.teachers ? c.teachers.length : 0}</div>
+            <div style="font-size:10px;color:var(--text-dim);margin-top:2px;">Teachers</div>
           </div>
         </div>
 
@@ -1777,7 +1855,7 @@ function renderClasses(list) {
 
         <div style="display:flex;gap:6px;">
           <button onclick="openStudentsDrawer(${c.id},'${c.name}')" style="flex:1;padding:8px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text-mid);font-size:12px;font-family:var(--font-head);font-weight:600;cursor:pointer;transition:var(--transition);" onmouseover="this.style.borderColor='${color}';this.style.color='${color}'" onmouseout="this.style.borderColor='var(--glass-border)';this.style.color='var(--text-mid)'">
-            <i class="fas fa-users"></i> Students
+            <i class="fas fa-users-cog"></i> Manage Class
           </button>
           <button onclick="openClassForm(${c.id})" style="width:34px;height:34px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text-mid);cursor:pointer;transition:var(--transition);font-size:12px;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--glass-border)';this.style.color='var(--text-mid)'">
             <i class="fas fa-edit"></i>
@@ -1801,12 +1879,10 @@ function openClassForm(id) {
     document.getElementById('cls-name').value    = c.name || '';
     document.getElementById('cls-grade').value   = c.grade_level || '';
     document.getElementById('cls-section').value = c.section || '';
-    document.getElementById('cls-teacher').value = c.teacher_id || '';
     document.getElementById('cls-desc').value    = c.description || '';
   } else {
     ['cls-name','cls-section','cls-desc'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('cls-grade').value   = '';
-    document.getElementById('cls-teacher').value = '';
   }
 
   document.getElementById('cls-overlay').style.display = 'block';
@@ -1835,7 +1911,6 @@ async function saveClass() {
     name,
     grade_level:  document.getElementById('cls-grade').value,
     section:      document.getElementById('cls-section').value,
-    teacher_id:   document.getElementById('cls-teacher').value || null,
     description:  document.getElementById('cls-desc').value,
   };
 
@@ -1877,9 +1952,10 @@ async function deleteClass(id, btn) {
 // ── Students drawer ───────────────────────────────────────────
 async function openStudentsDrawer(classId, className) {
   activeClassId = classId;
-  document.getElementById('cls-drawer-title').textContent = className + ' — Students';
+  document.getElementById('cls-drawer-title').textContent = className;
   document.getElementById('cls-students-drawer').style.display = 'block';
   document.getElementById('cls-students-drawer').scrollIntoView({ behavior:'smooth' });
+  switchDrawerTab('students');
   await refreshDrawer(classId);
 }
 
@@ -1922,6 +1998,29 @@ async function refreshDrawer(classId) {
       s.class_name = cls ? cls.name : null;
     });
     unassignedStudents = allStu.filter(s => !enrolledIds.includes(s.id));
+    // Refresh teachers list
+    const teachersList = document.getElementById('cls-teachers-list');
+    if (!data.teachers || !data.teachers.length) {
+      teachersList.innerHTML = `<div class="empty"><i class="fas fa-chalkboard-teacher"></i><p>No teachers assigned yet. Click Add Teacher.</p></div>`;
+    } else {
+      teachersList.innerHTML = data.teachers.map(t => {
+        const ini = (t.first_name[0]+(t.last_name[0]||'')).toUpperCase();
+        const photo = t.photo
+          ? `<img src="/uploads/teachers/${t.photo}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:1.5px solid var(--glass-border);">`
+          : `<div style="width:36px;height:36px;border-radius:50%;background:var(--glass-mid);border:1.5px solid var(--glass-border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--accent);font-family:var(--font-head);">${ini}</div>`;
+        return `<div style="display:flex;align-items:center;gap:12px;padding:10px 20px;border-bottom:1px solid var(--glass-border);transition:var(--transition);" onmouseover="this.style.background='var(--glass)'" onmouseout="this.style.background='transparent'">
+          ${photo}
+          <div style="flex:1;">
+            <div style="font-weight:600;font-size:13px;color:var(--text);font-family:var(--font-head);">${t.first_name} ${t.last_name}</div>
+            <div style="font-size:11px;color:var(--accent);font-weight:600;">${t.subject || '—'}</div>
+          </div>
+          <button onclick="removeTeacher(${t.id})" style="padding:5px 12px;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;color:var(--text-dim);font-size:11px;font-family:var(--font-head);cursor:pointer;transition:var(--transition);" onmouseover="this.style.borderColor='#ff7875';this.style.color='#ff7875'" onmouseout="this.style.borderColor='var(--glass-border)';this.style.color='var(--text-dim)'">
+            <i class="fas fa-times"></i> Remove
+          </button>
+        </div>`;
+      }).join('');
+    }
+
     // Refresh add panel if open
     if (document.getElementById('add-student-panel').style.display !== 'none') {
       filterAddList();
@@ -1941,10 +2040,12 @@ function toggleAddPanel() {
 }
 
 function filterAddList() {
-  const q = document.getElementById('add-student-search').value.toLowerCase();
+  const q = document.getElementById('add-student-search').value;
+  if (drawerTab === 'teachers') { renderAddTeacherList(q); return; }
+  const ql = q.toLowerCase();
   const list = document.getElementById('add-student-list');
   const filtered = unassignedStudents.filter(s =>
-    (s.first_name + ' ' + s.last_name + ' ' + s.student_code).toLowerCase().includes(q)
+    (s.first_name + ' ' + s.last_name + ' ' + s.student_code).toLowerCase().includes(ql)
   );
   if (!filtered.length) {
     list.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-dim);font-size:13px;">No students found</div>';
@@ -1998,6 +2099,300 @@ async function removeFromClass(studentId) {
 function closeDrawer() {
   document.getElementById('cls-students-drawer').style.display = 'none';
   activeClassId = null;
+}
+
+
+// ── Drawer tab switching ──────────────────────────────────────
+let drawerTab = 'students';
+
+function switchDrawerTab(tab) {
+  drawerTab = tab;
+  const isStu = tab === 'students';
+
+  document.getElementById('cls-students-list').style.display = isStu ? 'block' : 'none';
+  document.getElementById('cls-teachers-list').style.display = isStu ? 'none'  : 'block';
+  document.getElementById('add-student-panel').style.display = 'none';
+
+  document.getElementById('tab-students').style.background = isStu ? 'var(--accent)' : 'transparent';
+  document.getElementById('tab-students').style.color      = isStu ? '#060D18' : 'var(--text-mid)';
+  document.getElementById('tab-teachers').style.background = !isStu ? 'var(--accent)' : 'transparent';
+  document.getElementById('tab-teachers').style.color      = !isStu ? '#060D18' : 'var(--text-mid)';
+
+  // Update add button
+  const btn = document.getElementById('add-panel-btn');
+  btn.innerHTML = isStu ? '<i class="fas fa-plus"></i> Add Student' : '<i class="fas fa-plus"></i> Add Teacher';
+  btn.onclick = isStu ? toggleAddPanel : toggleAddTeacherPanel;
+}
+
+// ── Add teacher panel ─────────────────────────────────────────
+let addTeacherPanelOpen = false;
+
+function toggleAddTeacherPanel() {
+  const panel = document.getElementById('add-student-panel');
+  addTeacherPanelOpen = !addTeacherPanelOpen;
+  panel.style.display = addTeacherPanelOpen ? 'block' : 'none';
+  if (addTeacherPanelOpen) renderAddTeacherList('');
+}
+
+function renderAddTeacherList(q) {
+  const list = document.getElementById('add-student-list');
+  const search = document.getElementById('add-student-search');
+  search.placeholder = 'Search teachers by name or subject...';
+
+  // Get teachers already in class
+  const cls = allClasses.find(c => c.id === activeClassId);
+  const enrolledIds = cls && cls.teachers ? cls.teachers.map(t => t.id) : [];
+
+  const filtered = allTeachersList.filter(t =>
+    !enrolledIds.includes(t.id) &&
+    (t.first_name + ' ' + t.last_name + ' ' + (t.subject||'')).toLowerCase().includes(q.toLowerCase())
+  );
+
+  if (!filtered.length) {
+    list.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-dim);font-size:13px;">No teachers available</div>';
+    return;
+  }
+
+  list.innerHTML = filtered.map(t => {
+    const ini = (t.first_name[0]+(t.last_name[0]||'')).toUpperCase();
+    const photo = t.photo
+      ? `<img src="/uploads/teachers/${t.photo}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;">`
+      : `<div style="width:32px;height:32px;border-radius:50%;background:var(--glass-mid);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--accent);font-family:var(--font-head);">${ini}</div>`;
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--radius-sm);background:var(--glass);border:1px solid var(--glass-border);">
+      ${photo}
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;color:var(--text);font-family:var(--font-head);">${t.first_name} ${t.last_name}</div>
+        <div style="font-size:11px;color:var(--text-dim);">${t.subject || 'No subject set'}</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <input id="subj-${t.id}" type="text" placeholder="Subject for this class" value="${t.subject||''}"
+          style="padding:5px 8px;background:var(--glass-mid);border:1px solid var(--glass-border);border-radius:6px;color:var(--text);font-size:11px;width:140px;outline:none;">
+        <button onclick="assignTeacher(${t.id},'subj-${t.id}')"
+          style="padding:5px 12px;background:var(--accent);border:none;border-radius:20px;color:#060D18;font-size:11px;font-family:var(--font-head);font-weight:700;cursor:pointer;white-space:nowrap;">
+          <i class="fas fa-plus"></i> Add
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function assignTeacher(teacherId, subjectInputId) {
+  const subject = document.getElementById(subjectInputId).value.trim();
+  try {
+    const res = await fetch('/api/classes/' + activeClassId + '/assign-teacher', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({ teacher_id: teacherId, subject }),
+    });
+    if (!res.ok) throw new Error('Failed to assign teacher');
+    await loadClasses();
+    await refreshDrawer(activeClassId);
+    renderAddTeacherList(document.getElementById('add-student-search').value);
+  } catch(e) { showAlert({ title:'Error', message:e.message, type:'error' }); }
+}
+
+async function removeTeacher(teacherId) {
+  try {
+    const res = await fetch('/api/classes/' + activeClassId + '/remove-teacher/' + teacherId, { method:'DELETE' });
+    if (!res.ok) throw new Error('Failed to remove teacher');
+    await loadClasses();
+    await refreshDrawer(activeClassId);
+  } catch(e) { showAlert({ title:'Error', message:e.message, type:'error' }); }
+}
+
+
+// ── Teacher class assignments ─────────────────────────────────
+async function loadTeacherClasses(teacherId) {
+  const container = document.getElementById('teachers-class-list');
+  if (!container) return;
+  try {
+    const res  = await fetch('/api/classes');
+    const classes = await res.json();
+    const assigned = classes.filter(c => c.teachers && c.teachers.some(t => t.id === teacherId));
+
+    if (!assigned.length) {
+      container.innerHTML = `
+        <div style="font-size:12px;color:var(--text-dim);padding:8px 0;">Not assigned to any class yet.</div>
+        <div style="margin-top:6px;">` +
+          classes.map(c => `
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+            <span style="font-size:12px;font-weight:600;color:var(--text);min-width:80px;">${c.name}</span>
+            <input id="tc-subj-${c.id}" type="text" placeholder="Subject taught..." style="flex:1;padding:6px 10px;background:var(--glass);border:1px solid var(--glass-border);border-radius:6px;color:var(--text);font-size:12px;outline:none;">
+            <button onclick="assignTeacherToClass(${teacherId},${c.id},'tc-subj-${c.id}')" style="padding:5px 12px;background:var(--accent);border:none;border-radius:20px;color:#060D18;font-size:11px;font-family:var(--font-head);font-weight:700;cursor:pointer;">Assign</button>
+          </div>`).join('') +
+        `</div>`;
+      return;
+    }
+
+    container.innerHTML = assigned.map(c => {
+      const tch = c.teachers.find(t => t.id === teacherId);
+      return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);">
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:600;color:var(--text);font-family:var(--font-head);">${c.name}</div>
+          <div style="font-size:11px;color:var(--accent);">${tch.subject || '—'}</div>
+        </div>
+        <button onclick="removeTeacherFromClass(${teacherId},${c.id})" style="padding:4px 10px;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;color:var(--text-dim);font-size:11px;cursor:pointer;" onmouseover="this.style.color='#ff7875'" onmouseout="this.style.color='var(--text-dim)'">
+          <i class="fas fa-times"></i> Remove
+        </button>
+      </div>`;
+    }).join('') +
+    `<div style="margin-top:8px;font-size:11px;color:var(--text-dim);">Assign to more classes:</div>` +
+    classes.filter(c => !assigned.some(a => a.id === c.id)).map(c => `
+      <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+        <span style="font-size:12px;font-weight:600;color:var(--text);min-width:80px;">${c.name}</span>
+        <input id="tc-subj-${c.id}" type="text" placeholder="Subject..." style="flex:1;padding:6px 10px;background:var(--glass);border:1px solid var(--glass-border);border-radius:6px;color:var(--text);font-size:12px;outline:none;">
+        <button onclick="assignTeacherToClass(${teacherId},${c.id},'tc-subj-${c.id}')" style="padding:5px 12px;background:var(--accent);border:none;border-radius:20px;color:#060D18;font-size:11px;font-family:var(--font-head);font-weight:700;cursor:pointer;">Assign</button>
+      </div>`).join('');
+  } catch(e) { console.error('loadTeacherClasses error:', e); }
+}
+
+async function assignTeacherToClass(teacherId, classId, inputId) {
+  const subject = document.getElementById(inputId)?.value.trim() || '';
+  try {
+    const res = await fetch('/api/classes/' + classId + '/assign-teacher', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({ teacher_id: teacherId, subject }),
+    });
+    if (!res.ok) throw new Error('Failed to assign');
+    await loadClasses();
+    loadTeacherClasses(teacherId);
+  } catch(e) { showAlert({ title:'Error', message:e.message, type:'error' }); }
+}
+
+async function removeTeacherFromClass(teacherId, classId) {
+  try {
+    const res = await fetch('/api/classes/' + classId + '/remove-teacher/' + teacherId, { method:'DELETE' });
+    if (!res.ok) throw new Error('Failed to remove');
+    await loadClasses();
+    loadTeacherClasses(teacherId);
+  } catch(e) { showAlert({ title:'Error', message:e.message, type:'error' }); }
+}
+
+
+// ═══════════════════════════════════════════════════
+//  ATTENDANCE JS
+// ═══════════════════════════════════════════════════
+let attTab = 'present';
+
+const origGoAtt = window.go;
+window.go = function(id, el) {
+  origGoAtt(id, el);
+  if (id === 'attendance') initAttendance();
+};
+
+async function initAttendance() {
+  // Set today's date
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('att-date').value = today;
+
+  // Load classes for filter
+  try {
+    const r = await fetch('/api/classes');
+    const classes = await r.json();
+    const sel = document.getElementById('att-class');
+    sel.innerHTML = '<option value="">All Classes</option>';
+    classes.forEach(c => {
+      sel.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+    });
+  } catch(e) {}
+
+  loadAttendance();
+}
+
+function switchAttTab(tab) {
+  attTab = tab;
+  const isPresent = tab === 'present';
+  document.getElementById('att-present-panel').style.display = isPresent ? 'block' : 'none';
+  document.getElementById('att-absent-panel').style.display  = isPresent ? 'none'  : 'block';
+  document.getElementById('att-tab-present').style.background = isPresent ? 'var(--accent)' : 'transparent';
+  document.getElementById('att-tab-present').style.color      = isPresent ? '#060D18' : 'var(--text-mid)';
+  document.getElementById('att-tab-absent').style.background  = !isPresent ? 'var(--accent)' : 'transparent';
+  document.getElementById('att-tab-absent').style.color       = !isPresent ? '#060D18' : 'var(--text-mid)';
+}
+
+async function loadAttendance() {
+  const date    = document.getElementById('att-date').value;
+  const classId = document.getElementById('att-class').value;
+  const type    = document.getElementById('att-type').value;
+
+  try {
+    // Load present
+    let url = '/api/attendance?date=' + date;
+    if (type)    url += '&person_type=' + type;
+    if (classId) url += '&class_id=' + classId;
+
+    const [presRes, absRes, statsRes] = await Promise.all([
+      fetch(url),
+      fetch('/api/attendance/absent' + (classId ? '?class_id=' + classId : '')),
+      fetch('/api/dashboard/stats'),
+    ]);
+
+    const present = await presRes.json();
+    const absent  = await absRes.json();
+    const stats   = await statsRes.json();
+
+    // Summary
+    const presentCount = present.length;
+    const absentCount  = absent.length;
+    const total        = presentCount + absentCount;
+    const rate         = total > 0 ? Math.round((presentCount / total) * 100) : 0;
+
+    document.getElementById('att-present-cnt').textContent = presentCount;
+    document.getElementById('att-absent-cnt').textContent  = absentCount;
+    document.getElementById('att-rate').textContent        = rate + '%';
+
+    // Present table
+    const ptb = document.getElementById('att-present-tbody');
+    if (!present.length) {
+      ptb.innerHTML = '<tr><td colspan="4"><div class="empty"><i class="fas fa-clipboard-check"></i><p>No records for this date.</p></div></td></tr>';
+    } else {
+      ptb.innerHTML = present.map(s => {
+        const ini  = ((s.first_name||'?')[0] + (s.last_name||'')[0]).toUpperCase();
+        const folder = s.person_type === 'student' ? 'students' : s.person_type === 'teacher' ? 'teachers' : 'staff';
+        const photoHtml = s.photo
+          ? `<img src="/uploads/${folder}/${s.photo}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:1.5px solid var(--glass-border);">`
+          : `<div style="width:34px;height:34px;border-radius:50%;background:var(--glass-mid);border:1.5px solid var(--glass-border);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--accent);font-family:var(--font-head);">${ini}</div>`;
+        const typeBadge = s.person_type === 'student'
+          ? '<span class="badge bg-t">Student</span>'
+          : s.person_type === 'teacher'
+          ? '<span class="badge bg-b">Teacher</span>'
+          : '<span class="badge bg-o">Staff</span>';
+        const time = new Date(s.scan_time).toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:true });
+        return `<tr>
+          <td><div class="pc">${photoHtml}<div>
+            <div class="pname">${s.first_name} ${s.last_name}</div>
+            <div class="pcls">${s.person_code || '—'}</div>
+          </div></div></td>
+          <td>${typeBadge}</td>
+          <td>${s.class_name ? `<span class="badge bg-t">${s.class_name}</span>` : '—'}</td>
+          <td><span class="tmono">${time}</span></td>
+        </tr>`;
+      }).join('');
+    }
+
+    // Absent table
+    const atb = document.getElementById('att-absent-tbody');
+    if (!absent.length) {
+      atb.innerHTML = '<tr><td colspan="3"><div class="empty"><i class="fas fa-check-circle" style="color:#48d085;opacity:1;"></i><p>All students present!</p></div></td></tr>';
+    } else {
+      atb.innerHTML = absent.map(s => {
+        const ini = ((s.first_name||'?')[0] + (s.last_name||'')[0]).toUpperCase();
+        const photoHtml = s.photo
+          ? `<img src="/uploads/students/${s.photo}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:1.5px solid rgba(255,100,100,.3);">`
+          : `<div style="width:34px;height:34px;border-radius:50%;background:rgba(255,100,100,.12);border:1.5px solid rgba(255,100,100,.2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#ff7875;font-family:var(--font-head);">${ini}</div>`;
+        return `<tr>
+          <td><div class="pc">${photoHtml}<div>
+            <div class="pname">${s.first_name} ${s.last_name}</div>
+            <div class="pcls">${s.student_code}</div>
+          </div></div></td>
+          <td>${s.class_name ? `<span class="badge bg-t">${s.class_name}</span>` : '—'}</td>
+          <td><span style="font-family:var(--font-mono);font-size:12px;">${s.parent_phone || '—'}</span></td>
+        </tr>`;
+      }).join('');
+    }
+
+  } catch(e) { console.error('loadAttendance error:', e); }
 }
 
 // Keyboard close

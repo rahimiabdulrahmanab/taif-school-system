@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gate Screen — Taif High School</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%;
+  font-family: 'Syne', sans-serif;
+  background: #060D18;
+  color: #E8EDF5;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 10% 0%, rgba(26,74,92,.55) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 90% 100%, rgba(93,202,165,.1) 0%, transparent 55%),
+    linear-gradient(135deg, #060D18 0%, #080F1C 50%, #060A14 100%);
+  pointer-events: none;
+}
+
+.screen {
+  position: relative; z-index: 1;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ── */
+.gate-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 40px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  background: rgba(6,13,24,.7);
+  backdrop-filter: blur(20px);
+  flex-shrink: 0;
+}
+.school-info { display: flex; align-items: center; gap: 14px; }
+.school-badge {
+  width: 48px; height: 48px;
+  background: linear-gradient(135deg, #5DCAA5, #3aaa85);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 800; color: #060D18;
+  box-shadow: 0 0 20px rgba(93,202,165,.35);
+}
+.school-name { font-size: 20px; font-weight: 800; color: #fff; }
+.school-sub  { font-size: 12px; color: rgba(255,255,255,.4); text-transform: uppercase; letter-spacing: .1em; }
+.gate-time {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 28px; font-weight: 600;
+  color: #5DCAA5;
+  text-shadow: 0 0 20px rgba(93,202,165,.4);
+}
+.gate-date { font-size: 13px; color: rgba(255,255,255,.4); text-align: right; margin-top: 2px; }
+
+/* ── Main area ── */
+.gate-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  gap: 60px;
+}
+
+/* ── Scan input (hidden but active) ── */
+#scan-input {
+  position: fixed;
+  top: -100px; left: 0;
+  opacity: 0;
+  width: 1px; height: 1px;
+}
+
+/* ── Welcome/idle state ── */
+.idle-state {
+  text-align: center;
+  animation: float 4s ease-in-out infinite;
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-12px); }
+}
+.idle-icon {
+  width: 120px; height: 120px;
+  background: rgba(93,202,165,.1);
+  border: 2px solid rgba(93,202,165,.2);
+  border-radius: 30px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 50px; margin: 0 auto 28px;
+  box-shadow: 0 0 40px rgba(93,202,165,.15);
+}
+.idle-title {
+  font-size: 32px; font-weight: 800; color: #fff;
+  margin-bottom: 10px;
+}
+.idle-sub { font-size: 16px; color: rgba(255,255,255,.35); }
+.scan-hint {
+  margin-top: 28px;
+  padding: 10px 24px;
+  background: rgba(93,202,165,.08);
+  border: 1px solid rgba(93,202,165,.2);
+  border-radius: 30px;
+  font-size: 14px; color: rgba(93,202,165,.8);
+  display: inline-block;
+  animation: pulse-hint 2s ease-in-out infinite;
+}
+@keyframes pulse-hint {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: .5; }
+}
+
+/* ── Person card ── */
+.person-card {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: card-in .4s cubic-bezier(.4,0,.2,1);
+}
+@keyframes card-in {
+  from { opacity: 0; transform: scale(.9) translateY(20px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.person-photo-wrap {
+  position: relative;
+  margin-bottom: 28px;
+}
+.person-photo {
+  width: 220px; height: 220px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid #5DCAA5;
+  box-shadow: 0 0 50px rgba(93,202,165,.4), 0 0 100px rgba(93,202,165,.15);
+}
+.person-initials {
+  width: 220px; height: 220px;
+  border-radius: 50%;
+  background: rgba(93,202,165,.12);
+  border: 4px solid #5DCAA5;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 72px; font-weight: 800; color: #5DCAA5;
+  box-shadow: 0 0 50px rgba(93,202,165,.4);
+}
+.status-ring {
+  position: absolute; bottom: 10px; right: 10px;
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  border: 3px solid #060D18;
+}
+.ring-present { background: #2d8b5f; }
+.ring-already  { background: #d97706; }
+
+.person-name {
+  font-size: 42px; font-weight: 800; color: #fff;
+  margin-bottom: 8px; letter-spacing: -.02em;
+}
+.person-class {
+  font-size: 18px; color: rgba(255,255,255,.5);
+  margin-bottom: 16px;
+}
+.person-code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px; color: rgba(93,202,165,.7);
+  margin-bottom: 20px;
+}
+.person-type-badge {
+  padding: 8px 24px;
+  border-radius: 30px;
+  font-size: 14px; font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.badge-student { background: rgba(93,202,165,.2); color: #5DCAA5; border: 1px solid rgba(93,202,165,.3); }
+.badge-teacher { background: rgba(56,139,255,.2); color: #5b9ef7; border: 1px solid rgba(56,139,255,.3); }
+.badge-staff   { background: rgba(255,160,60,.2);  color: #ffaa3d; border: 1px solid rgba(255,160,60,.3); }
+
+.status-msg {
+  margin-top: 16px;
+  font-size: 16px; font-weight: 600;
+  padding: 10px 24px;
+  border-radius: 20px;
+}
+.msg-present { background: rgba(45,139,95,.2); color: #48d085; border: 1px solid rgba(45,139,95,.3); }
+.msg-already  { background: rgba(217,119,6,.2);  color: #ffaa3d; border: 1px solid rgba(217,119,6,.3); }
+
+/* ── Recent scans sidebar ── */
+.recent-scans {
+  width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.recent-title {
+  font-size: 12px; font-weight: 700;
+  color: rgba(255,255,255,.3);
+  text-transform: uppercase; letter-spacing: .12em;
+  margin-bottom: 12px;
+}
+.scan-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px;
+  background: rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  transition: .3s ease;
+  animation: slide-in .3s ease;
+}
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.scan-av {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: rgba(93,202,165,.15);
+  border: 1.5px solid rgba(93,202,165,.25);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; color: #5DCAA5;
+  flex-shrink: 0; overflow: hidden;
+}
+.scan-av img { width: 100%; height: 100%; object-fit: cover; }
+.scan-info { flex: 1; min-width: 0; }
+.scan-name { font-size: 13px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.scan-meta { font-size: 10px; color: rgba(255,255,255,.35); margin-top: 1px; }
+.scan-time-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; color: rgba(93,202,165,.7);
+  flex-shrink: 0;
+}
+
+/* ── Footer ── */
+.gate-footer {
+  padding: 14px 40px;
+  border-top: 1px solid rgba(255,255,255,.06);
+  background: rgba(6,13,24,.7);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+.footer-stats { display: flex; gap: 32px; }
+.stat-item { text-align: center; }
+.stat-num  { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 600; color: #5DCAA5; }
+.stat-lbl  { font-size: 10px; color: rgba(255,255,255,.3); text-transform: uppercase; letter-spacing: .1em; }
+.connection-status {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: rgba(255,255,255,.3);
+}
+.conn-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #5DCAA5;
+  box-shadow: 0 0 8px rgba(93,202,165,.6);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: .3; }
+}
+
+/* ── Error flash ── */
+.error-flash {
+  display: none;
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(197,48,48,.9);
+  border: 1px solid #ff7875;
+  border-radius: 16px;
+  padding: 24px 40px;
+  text-align: center;
+  z-index: 100;
+  backdrop-filter: blur(10px);
+}
+.error-flash.show { display: block; animation: flash-in .2s ease; }
+@keyframes flash-in {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(.9); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+</style>
+</head>
+<body>
+
+<div class="screen">
+
+  <!-- Header -->
+  <div class="gate-header">
+    <div class="school-info">
+      <div class="school-badge" id="school-badge">TS</div>
+      <div>
+        <div class="school-name" id="school-name">Taif High School</div>
+        <div class="school-sub">Gate Attendance System</div>
+      </div>
+    </div>
+    <div style="text-align:right;">
+      <div class="gate-time" id="gate-clock">--:--</div>
+      <div class="gate-date" id="gate-date">--</div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="gate-main">
+
+    <!-- Idle state -->
+    <div class="idle-state" id="idle-state">
+      <div class="idle-icon">📷</div>
+      <div class="idle-title">Ready to Scan</div>
+      <div class="idle-sub">Point QR card at the scanner</div>
+      <div class="scan-hint">🔍 Waiting for QR scan...</div>
+    </div>
+
+    <!-- Person card (shown after scan) -->
+    <div class="person-card" id="person-card">
+      <div class="person-photo-wrap">
+        <div class="person-initials" id="person-initials">--</div>
+        <img id="person-photo" src="" style="display:none;" class="person-photo">
+        <div class="status-ring" id="status-ring">✓</div>
+      </div>
+      <div class="person-name"    id="person-name">--</div>
+      <div class="person-class"   id="person-class">--</div>
+      <div class="person-code"    id="person-code">--</div>
+      <div class="person-type-badge" id="person-type">--</div>
+      <div class="status-msg"     id="status-msg">--</div>
+    </div>
+
+    <!-- Recent scans -->
+    <div class="recent-scans" id="recent-scans-wrap">
+      <div class="recent-title">Recent Scans</div>
+      <div id="recent-list">
+        <div style="color:rgba(255,255,255,.2);font-size:13px;text-align:center;padding:20px 0;">No scans yet today</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <div class="gate-footer">
+    <div class="footer-stats">
+      <div class="stat-item">
+        <div class="stat-num" id="present-count">0</div>
+        <div class="stat-lbl">Present Today</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num" id="absent-count">0</div>
+        <div class="stat-lbl">Absent</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num" id="total-count">0</div>
+        <div class="stat-lbl">Total Students</div>
+      </div>
+    </div>
+    <div class="connection-status">
+      <span class="conn-dot"></span>
+      System Online
+    </div>
+  </div>
+
+</div>
+
+<!-- Hidden scan input — always focused -->
+<input id="scan-input" type="text" autocomplete="off">
+
+<!-- Manual test bar (for testing without physical scanner) -->
+<div id="manual-bar" style="position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:200;display:flex;gap:8px;align-items:center;background:rgba(6,13,24,.9);border:1px solid rgba(93,202,165,.3);border-radius:30px;padding:8px 8px 8px 20px;backdrop-filter:blur(20px);">
+  <span style="font-size:12px;color:rgba(93,202,165,.7);white-space:nowrap;">Manual Test:</span>
+  <input id="manual-input" type="text" placeholder="Type student code..." style="background:none;border:none;outline:none;color:#fff;font-family:'JetBrains Mono',monospace;font-size:13px;width:200px;" onkeydown="if(event.key==='Enter'){processScan(this.value.trim());this.value='';}">
+  <button onclick="processScan(document.getElementById('manual-input').value.trim());document.getElementById('manual-input').value='';" style="padding:7px 16px;background:rgba(93,202,165,.2);border:1px solid rgba(93,202,165,.3);border-radius:20px;color:#5DCAA5;font-size:12px;font-family:'Syne',sans-serif;font-weight:700;cursor:pointer;">Scan</button>
+</div>
+
+<!-- Error flash -->
+<div class="error-flash" id="error-flash">
+  <div style="font-size:28px;margin-bottom:8px;">❌</div>
+  <div style="font-size:18px;font-weight:700;" id="error-msg">Not Found</div>
+</div>
+
+<script>
+// ── Clock ─────────────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  document.getElementById('gate-clock').textContent =
+    now.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:true });
+  document.getElementById('gate-date').textContent =
+    now.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+}
+updateClock();
+setInterval(updateClock, 1000);
+
+// ── Load school config ────────────────────────────────────────
+fetch('/api/config').then(r => r.json()).then(cfg => {
+  document.getElementById('school-name').textContent  = cfg.name || 'School';
+  document.getElementById('school-badge').textContent = cfg.abbreviation || 'S';
+  document.title = `Gate — ${cfg.name}`;
+}).catch(() => {});
+
+// ── Load today's stats ────────────────────────────────────────
+let recentScans = [];
+
+async function loadStats() {
+  try {
+    const [statsRes, scansRes] = await Promise.all([
+      fetch('/api/dashboard/stats'),
+      fetch('/api/attendance?person_type=student'),
+    ]);
+    const stats  = await statsRes.json();
+    const scans  = await scansRes.json();
+
+    document.getElementById('total-count').textContent   = stats.students || 0;
+    document.getElementById('present-count').textContent = stats.present  || 0;
+    document.getElementById('absent-count').textContent  = stats.absent   || 0;
+
+    recentScans = scans.slice(0, 8);
+    renderRecent();
+  } catch(e) { console.error('loadStats error:', e); }
+}
+
+function renderRecent() {
+  const list = document.getElementById('recent-list');
+  if (!recentScans.length) {
+    list.innerHTML = '<div style="color:rgba(255,255,255,.2);font-size:13px;text-align:center;padding:20px 0;">No scans yet today</div>';
+    return;
+  }
+  list.innerHTML = recentScans.map(s => {
+    const ini  = ((s.first_name||'?')[0] + (s.last_name||'')[0]).toUpperCase();
+    const time = new Date(s.scan_time).toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:true });
+    const photoHtml = s.photo
+      ? `<img src="/uploads/${s.person_type === 'student' ? 'students' : s.person_type === 'teacher' ? 'teachers' : 'staff'}/${s.photo}" style="width:100%;height:100%;object-fit:cover;">`
+      : ini;
+    return `<div class="scan-item">
+      <div class="scan-av">${photoHtml}</div>
+      <div class="scan-info">
+        <div class="scan-name">${s.first_name} ${s.last_name}</div>
+        <div class="scan-meta">${s.class_name || s.person_type || '—'}</div>
+      </div>
+      <div class="scan-time-badge">${time}</div>
+    </div>`;
+  }).join('');
+}
+
+loadStats();
+setInterval(loadStats, 30000);
+
+// ── QR Scanner input ──────────────────────────────────────────
+const scanInput = document.getElementById('scan-input');
+let scanBuffer  = '';
+let scanTimer   = null;
+let idleTimer   = null;
+
+// Always keep input focused
+document.addEventListener('click', () => scanInput.focus());
+scanInput.focus();
+setInterval(() => { if (document.activeElement !== scanInput) scanInput.focus(); }, 500);
+
+scanInput.addEventListener('input', () => {
+  scanBuffer += scanInput.value;
+  scanInput.value = '';
+  clearTimeout(scanTimer);
+  scanTimer = setTimeout(() => {
+    if (scanBuffer.trim()) processScan(scanBuffer.trim());
+    scanBuffer = '';
+  }, 150);
+});
+
+scanInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && scanBuffer.trim()) {
+    clearTimeout(scanTimer);
+    processScan(scanBuffer.trim());
+    scanBuffer = '';
+    scanInput.value = '';
+  }
+});
+
+// ── Process scan ──────────────────────────────────────────────
+async function processScan(code) {
+  try {
+    const res  = await fetch('/api/attendance/scan', {
+      method:  'POST',
+      headers: { 'Content-Type':'application/json' },
+      body:    JSON.stringify({ code }),
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      showError(data.error || 'Not Found');
+      return;
+    }
+
+    showPerson(data);
+    await loadStats();
+  } catch(e) {
+    showError('Connection error');
+  }
+}
+
+// ── Show person after scan ────────────────────────────────────
+function showPerson(data) {
+  // Hide idle, show card
+  document.getElementById('idle-state').style.display   = 'none';
+  document.getElementById('person-card').style.display  = 'flex';
+  document.getElementById('person-card').style.animation = 'none';
+  void document.getElementById('person-card').offsetWidth; // reflow
+  document.getElementById('person-card').style.animation = 'card-in .4s cubic-bezier(.4,0,.2,1)';
+
+  // Fill data
+  const ini = ((data.first_name||'?')[0] + (data.last_name||'')[0]).toUpperCase();
+  document.getElementById('person-name').textContent  = data.first_name + ' ' + data.last_name;
+  document.getElementById('person-class').textContent = data.class_name || '—';
+  document.getElementById('person-code').textContent  = data.person_code || '';
+  document.getElementById('person-initials').textContent = ini;
+
+  // Photo
+  const photoEl    = document.getElementById('person-photo');
+  const initialsEl = document.getElementById('person-initials');
+  if (data.photo) {
+    const folder = data.person_type === 'student' ? 'students' : data.person_type === 'teacher' ? 'teachers' : 'staff';
+    photoEl.src = `/uploads/${folder}/${data.photo}`;
+    photoEl.style.display    = 'block';
+    initialsEl.style.display = 'none';
+  } else {
+    photoEl.style.display    = 'none';
+    initialsEl.style.display = 'flex';
+  }
+
+  // Type badge
+  const typeEl = document.getElementById('person-type');
+  typeEl.textContent = data.person_type.charAt(0).toUpperCase() + data.person_type.slice(1);
+  typeEl.className   = 'person-type-badge badge-' + data.person_type;
+
+  // Status
+  const ring   = document.getElementById('status-ring');
+  const msgEl  = document.getElementById('status-msg');
+  if (data.already_scanned) {
+    ring.className  = 'status-ring ring-already';
+    ring.textContent = '!';
+    msgEl.textContent = '⚠ Already scanned today';
+    msgEl.className   = 'status-msg msg-already';
+  } else {
+    ring.className  = 'status-ring ring-present';
+    ring.textContent = '✓';
+    msgEl.textContent = '✅ Attendance recorded';
+    msgEl.className   = 'status-msg msg-present';
+  }
+
+  // Add to recent list
+  recentScans.unshift({
+    first_name: data.first_name,
+    last_name:  data.last_name,
+    photo:      data.photo,
+    person_type: data.person_type,
+    class_name:  data.class_name,
+    scan_time:   new Date().toISOString(),
+  });
+  if (recentScans.length > 8) recentScans.pop();
+  renderRecent();
+
+  // Reset to idle after 4 seconds
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(resetToIdle, 4000);
+}
+
+function resetToIdle() {
+  document.getElementById('person-card').style.display = 'none';
+  document.getElementById('idle-state').style.display  = 'block';
+}
+
+// ── Error display ─────────────────────────────────────────────
+function showError(msg) {
+  const el = document.getElementById('error-flash');
+  document.getElementById('error-msg').textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
