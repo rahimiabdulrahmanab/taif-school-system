@@ -142,3 +142,7 @@ app.use('/api/grades', gradesRoutes);
 // Office Expenses routes
 const expensesRoutes = require('./routes/expenses');
 app.use('/api/expenses', expensesRoutes);
+
+// Reports routes
+const reportsRoutes = require('./routes/reports');
+app.use('/api/reports', reportsRoutes);

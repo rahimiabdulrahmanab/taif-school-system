@@ -1487,7 +1487,115 @@ body::after{
 
 </div>
 
-<div class="page" id="pg-reports"><div class="cs"><div class="cs-orb cs-b"><i class="fas fa-chart-bar"></i></div><h2>Reports</h2><p>Generate and print all 11 report types — attendance, payroll, transcripts and more.</p><div class="pp">🔨 Coming in Part 12</div></div></div>
+<div class="page" id="pg-reports">
+
+<div style="margin-bottom:22px;">
+  <h2 style="font-family:var(--font-head);font-size:20px;font-weight:800;color:var(--text);">Reports</h2>
+  <span style="font-size:12px;color:var(--text-mid);">Generate and print reports for all modules</span>
+</div>
+
+<!-- Report cards grid -->
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;align-items:stretch;">
+
+  <!-- Student List -->
+  <div class="glass-card" style="padding:24px;display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="width:44px;height:44px;border-radius:12px;background:rgba(93,202,165,.15);border:1.5px solid rgba(93,202,165,.3);display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:18px;flex-shrink:0;"><i class="fas fa-users"></i></div>
+      <div><div style="font-family:var(--font-head);font-size:15px;font-weight:800;color:var(--text);">Student List</div><div style="font-size:11px;color:var(--text-dim);">All students by class</div></div>
+    </div>
+    <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.06em;">Filter by Class</label>
+    <select id="rpt-student-class" style="width:100%;padding:9px 12px;background:#f4f8fd;border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;cursor:pointer;">
+      <option value="">All Classes</option>
+    </select>
+    <button onclick="printStudentList()" style="width:100%;padding:11px;background:var(--accent);border:none;border-radius:var(--radius-sm);color:#060D18;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;margin-top:auto;"><i class="fas fa-print"></i> Print Student List</button>
+  </div>
+
+  <!-- Attendance Report -->
+  <div class="glass-card" style="padding:24px;display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="width:44px;height:44px;border-radius:12px;background:rgba(91,158,247,.15);border:1.5px solid rgba(91,158,247,.3);display:flex;align-items:center;justify-content:center;color:#5b9ef7;font-size:18px;flex-shrink:0;"><i class="fas fa-clipboard-check"></i></div>
+      <div><div style="font-family:var(--font-head);font-size:15px;font-weight:800;color:var(--text);">Attendance Report</div><div style="font-size:11px;color:var(--text-dim);">Daily present & absent</div></div>
+    </div>
+    <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.06em;">Select Date</label>
+    <input type="date" id="rpt-att-date" style="width:100%;padding:9px 12px;background:#f4f8fd;border:1px solid rgba(26,74,92,.15);border-radius:var(--radius-sm);color:#18324a;font-family:var(--font-mono);font-size:13px;outline:none;color-scheme:light;cursor:pointer;">
+    <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.06em;">Filter by Class</label>
+    <select id="rpt-att-class" style="width:100%;padding:9px 12px;background:#f4f8fd;border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;cursor:pointer;">
+      <option value="">All Classes</option>
+    </select>
+    <button onclick="printAttendanceReport()" style="width:100%;padding:11px;background:#5b9ef7;border:none;border-radius:var(--radius-sm);color:#fff;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;margin-top:auto;"><i class="fas fa-print"></i> Print Attendance</button>
+  </div>
+
+  <!-- Fee Collection Report -->
+  <div class="glass-card" style="padding:24px;display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="width:44px;height:44px;border-radius:12px;background:rgba(72,208,133,.15);border:1.5px solid rgba(72,208,133,.3);display:flex;align-items:center;justify-content:center;color:#48d085;font-size:18px;flex-shrink:0;"><i class="fas fa-money-bill-wave"></i></div>
+      <div><div style="font-family:var(--font-head);font-size:15px;font-weight:800;color:var(--text);">Fee Collection</div><div style="font-size:11px;color:var(--text-dim);">Paid & outstanding fees</div></div>
+    </div>
+    <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.06em;">Month & Year</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <select id="rpt-fee-month" style="padding:9px 10px;background:#f4f8fd;border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;cursor:pointer;">
+        <option value="1">January</option><option value="2">February</option><option value="3">March</option><option value="4">April</option><option value="5">May</option><option value="6">June</option><option value="7">July</option><option value="8">August</option><option value="9">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option>
+      </select>
+      <select id="rpt-fee-year" style="padding:9px 10px;background:#f4f8fd;border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;cursor:pointer;">
+        <option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option>
+      </select>
+    </div>
+    <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.06em;">Filter by Class</label>
+    <select id="rpt-fee-class" style="width:100%;padding:9px 12px;background:#f4f8fd;border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;cursor:pointer;">
+      <option value="">All Classes</option>
+    </select>
+    <button onclick="printFeeReport()" style="width:100%;padding:11px;background:#48d085;border:none;border-radius:var(--radius-sm);color:#060D18;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;margin-top:auto;"><i class="fas fa-print"></i> Print Fee Report</button>
+  </div>
+
+  <!-- Payroll Report -->
+  <div class="glass-card" style="padding:24px;display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="width:44px;height:44px;border-radius:12px;background:rgba(255,170,61,.15);border:1.5px solid rgba(255,170,61,.3);display:flex;align-items:center;justify-content:center;color:#ffaa3d;font-size:18px;flex-shrink:0;"><i class="fas fa-wallet"></i></div>
+      <div><div style="font-family:var(--font-head);font-size:15px;font-weight:800;color:var(--text);">Payroll Report</div><div style="font-size:11px;color:var(--text-dim);">Staff salaries & advances</div></div>
+    </div>
+    <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.06em;">Month & Year</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <select id="rpt-pay-month" style="padding:9px 10px;background:#f4f8fd;border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;cursor:pointer;">
+        <option value="1">January</option><option value="2">February</option><option value="3">March</option><option value="4">April</option><option value="5">May</option><option value="6">June</option><option value="7">July</option><option value="8">August</option><option value="9">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option>
+      </select>
+      <select id="rpt-pay-year" style="padding:9px 10px;background:#f4f8fd;border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;cursor:pointer;">
+        <option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option>
+      </select>
+    </div>
+    <button onclick="printPayrollReport()" style="width:100%;padding:11px;background:#ffaa3d;border:none;border-radius:var(--radius-sm);color:#060D18;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;margin-top:auto;"><i class="fas fa-print"></i> Print Payroll</button>
+  </div>
+
+  <!-- Expense Report -->
+  <div class="glass-card" style="padding:24px;display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="width:44px;height:44px;border-radius:12px;background:rgba(181,125,255,.15);border:1.5px solid rgba(181,125,255,.3);display:flex;align-items:center;justify-content:center;color:#b57dff;font-size:18px;flex-shrink:0;"><i class="fas fa-receipt"></i></div>
+      <div><div style="font-family:var(--font-head);font-size:15px;font-weight:800;color:var(--text);">Expense Report</div><div style="font-size:11px;color:var(--text-dim);">Monthly office spending</div></div>
+    </div>
+    <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.06em;">Month & Year</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <select id="rpt-exp-month" style="padding:9px 10px;background:#f4f8fd;border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;cursor:pointer;">
+        <option value="1">January</option><option value="2">February</option><option value="3">March</option><option value="4">April</option><option value="5">May</option><option value="6">June</option><option value="7">July</option><option value="8">August</option><option value="9">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option>
+      </select>
+      <select id="rpt-exp-year" style="padding:9px 10px;background:#f4f8fd;border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;cursor:pointer;">
+        <option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option>
+      </select>
+    </div>
+    <button onclick="printExpenseReport()" style="width:100%;padding:11px;background:#b57dff;border:none;border-radius:var(--radius-sm);color:#fff;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;margin-top:auto;"><i class="fas fa-print"></i> Print Expenses</button>
+  </div>
+
+  <!-- Class Summary -->
+  <div class="glass-card" style="padding:24px;display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="width:44px;height:44px;border-radius:12px;background:rgba(255,120,117,.15);border:1.5px solid rgba(255,120,117,.3);display:flex;align-items:center;justify-content:center;color:#ff7875;font-size:18px;flex-shrink:0;"><i class="fas fa-door-open"></i></div>
+      <div><div style="font-family:var(--font-head);font-size:15px;font-weight:800;color:var(--text);">Class Summary</div><div style="font-size:11px;color:var(--text-dim);">All classes overview</div></div>
+    </div>
+    <p style="font-size:13px;color:var(--text-dim);line-height:1.6;">Shows all classes with student count, teacher count and subjects assigned.</p>
+    <button onclick="printClassSummary()" style="width:100%;padding:11px;background:#ff7875;border:none;border-radius:var(--radius-sm);color:#fff;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;margin-top:auto;"><i class="fas fa-print"></i> Print Class Summary</button>
+  </div>
+
+</div>
+</div>
+
 <div class="page" id="pg-whatsapp">
 
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;gap:16px;flex-wrap:wrap;">
@@ -4008,6 +4116,270 @@ async function deleteExpense(id, title) {
       } catch(e) { showAlert({title:'Error',message:e.message,type:'error'}); }
     }
   });
+}
+
+
+// ═══════════════════════════════════════════════════
+//  REPORTS JS
+// ═══════════════════════════════════════════════════
+const MONTHS_RPT = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
+
+const origGoRpt = window.go;
+window.go = function(id, el) {
+  origGoRpt(id, el);
+  if (id === 'reports') initReports();
+};
+
+async function initReports() {
+  const now = new Date();
+  document.getElementById('rpt-att-date').value  = now.toISOString().split('T')[0];
+  document.getElementById('rpt-fee-month').value  = now.getMonth() + 1;
+  document.getElementById('rpt-fee-year').value   = now.getFullYear();
+  document.getElementById('rpt-pay-month').value  = now.getMonth() + 1;
+  document.getElementById('rpt-pay-year').value   = now.getFullYear();
+  document.getElementById('rpt-exp-month').value  = now.getMonth() + 1;
+  document.getElementById('rpt-exp-year').value   = now.getFullYear();
+
+  // Load classes for filters
+  try {
+    const res = await fetch('/api/classes');
+    const classes = await res.json();
+    ['rpt-student-class','rpt-att-class','rpt-fee-class'].forEach(id => {
+      const sel = document.getElementById(id);
+      sel.innerHTML = '<option value="">All Classes</option>';
+      classes.forEach(c => sel.innerHTML += `<option value="${c.id}">${c.name}</option>`);
+    });
+  } catch(e) {}
+}
+
+function openPrintWindow(content, title) {
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html><head><title>${title}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; padding: 30px; color: #111; font-size: 13px; }
+    .header { text-align: center; border-bottom: 2px solid #1A4A5C; padding-bottom: 14px; margin-bottom: 20px; }
+    .school-name { font-size: 22px; font-weight: bold; color: #1A4A5C; }
+    .report-title { font-size: 15px; color: #555; margin-top: 4px; }
+    .report-date { font-size: 12px; color: #888; margin-top: 2px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th { background: #1A4A5C; color: white; padding: 8px 10px; text-align: left; font-size: 12px; }
+    td { padding: 7px 10px; border-bottom: 1px solid #eee; font-size: 12px; }
+    tr:nth-child(even) { background: #f8f8f8; }
+    .summary { display: flex; gap: 20px; margin: 16px 0; flex-wrap: wrap; }
+    .summary-box { padding: 10px 16px; background: #f0f9fc; border: 1px solid #c8e6f0; border-radius: 6px; }
+    .summary-num { font-size: 22px; font-weight: bold; color: #1A4A5C; }
+    .summary-lbl { font-size: 11px; color: #666; }
+    .badge-pass { color: #2d8b5f; font-weight: bold; }
+    .badge-fail { color: #c0392b; font-weight: bold; }
+    .section-title { font-size: 14px; font-weight: bold; color: #1A4A5C; margin: 18px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #ddd; }
+    .footer { text-align: center; margin-top: 30px; font-size: 11px; color: #aaa; border-top: 1px solid #eee; padding-top: 12px; }
+    @media print { body { padding: 10px; } }
+  </style></head><body>${content}</body></html>`);
+  w.document.close();
+  setTimeout(() => w.print(), 500);
+}
+
+function reportHeader(title, subtitle) {
+  const now = new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  return `<div class="header">
+    <div class="school-name">Taif High School</div>
+    <div class="report-title">${title}</div>
+    <div class="report-date">${subtitle} &nbsp;|&nbsp; Generated: ${now}</div>
+  </div>`;
+}
+
+// ── Student List ──────────────────────────────────────────────
+async function printStudentList() {
+  const classId = document.getElementById('rpt-student-class').value;
+  const res  = await fetch('/api/reports/students' + (classId ? '?class_id='+classId : ''));
+  const data = await res.json();
+
+  const rows = data.map((s, i) => `<tr>
+    <td>${i+1}</td>
+    <td>${s.first_name} ${s.last_name}</td>
+    <td>${s.student_code}</td>
+    <td>${s.class_name||'—'}</td>
+    <td>${s.gender||'—'}</td>
+    <td>${s.parent_phone||'—'}</td>
+    <td>${s.monthly_fee ? Number(s.monthly_fee).toLocaleString()+' AFN' : '—'}</td>
+  </tr>`).join('');
+
+  const content = reportHeader('Student List', classId ? '' : 'All Classes') + `
+    <div class="summary">
+      <div class="summary-box"><div class="summary-num">${data.length}</div><div class="summary-lbl">Total Students</div></div>
+    </div>
+    <table>
+      <thead><tr><th>#</th><th>Student Name</th><th>Code</th><th>Class</th><th>Gender</th><th>Parent Phone</th><th>Monthly Fee</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="footer">Taif High School Management System</div>`;
+
+  openPrintWindow(content, 'Student List');
+}
+
+// ── Attendance Report ─────────────────────────────────────────
+async function printAttendanceReport() {
+  const date    = document.getElementById('rpt-att-date').value;
+  const classId = document.getElementById('rpt-att-class').value;
+  let url = '/api/reports/attendance?date=' + date;
+  if (classId) url += '&class_id=' + classId;
+  const res  = await fetch(url);
+  const data = await res.json();
+
+  const presentRows = data.present.map((s, i) => {
+    const time = new Date(s.scan_time).toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:true });
+    return `<tr><td>${i+1}</td><td>${s.first_name} ${s.last_name}</td><td>${s.student_code}</td><td>${s.class_name||'—'}</td><td>${time}</td></tr>`;
+  }).join('');
+
+  const absentRows = data.absent.map((s, i) =>
+    `<tr><td>${i+1}</td><td>${s.first_name} ${s.last_name}</td><td>${s.student_code}</td><td>${s.class_name||'—'}</td><td>${s.parent_phone||'—'}</td></tr>`
+  ).join('');
+
+  const total = data.present.length + data.absent.length;
+  const rate  = total > 0 ? Math.round((data.present.length/total)*100) : 0;
+  const dateStr = new Date(date).toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+  const content = reportHeader('Attendance Report', dateStr) + `
+    <div class="summary">
+      <div class="summary-box"><div class="summary-num">${data.present.length}</div><div class="summary-lbl">Present</div></div>
+      <div class="summary-box"><div class="summary-num">${data.absent.length}</div><div class="summary-lbl">Absent</div></div>
+      <div class="summary-box"><div class="summary-num">${rate}%</div><div class="summary-lbl">Attendance Rate</div></div>
+    </div>
+    <div class="section-title">✅ Present Students (${data.present.length})</div>
+    <table><thead><tr><th>#</th><th>Name</th><th>Code</th><th>Class</th><th>Scan Time</th></tr></thead>
+    <tbody>${presentRows || '<tr><td colspan="5" style="text-align:center;color:#888;">No students present</td></tr>'}</tbody></table>
+    <div class="section-title" style="margin-top:24px;">❌ Absent Students (${data.absent.length})</div>
+    <table><thead><tr><th>#</th><th>Name</th><th>Code</th><th>Class</th><th>Parent Phone</th></tr></thead>
+    <tbody>${absentRows || '<tr><td colspan="5" style="text-align:center;color:#888;">All students present!</td></tr>'}</tbody></table>
+    <div class="footer">Taif High School Management System</div>`;
+
+  openPrintWindow(content, 'Attendance Report');
+}
+
+// ── Fee Report ────────────────────────────────────────────────
+async function printFeeReport() {
+  const month   = document.getElementById('rpt-fee-month').value;
+  const year    = document.getElementById('rpt-fee-year').value;
+  const classId = document.getElementById('rpt-fee-class').value;
+  let url = `/api/reports/fees?month=${month}&year=${year}`;
+  if (classId) url += '&class_id=' + classId;
+  const res  = await fetch(url);
+  const data = await res.json();
+
+  const paidRows = data.paid.map((p, i) =>
+    `<tr><td>${i+1}</td><td>${p.first_name} ${p.last_name}</td><td>${p.student_code}</td><td>${p.class_name||'—'}</td><td>${Number(p.amount).toLocaleString()} AFN</td><td>${p.payment_method||'cash'}</td></tr>`
+  ).join('');
+
+  const unpaidRows = data.unpaid.map((s, i) => {
+    let fee = parseFloat(s.monthly_fee)||0;
+    if (s.discount_type==='fixed') fee = Math.max(0, fee-parseFloat(s.discount_value));
+    if (s.discount_type==='percent') fee = fee*(1-parseFloat(s.discount_value)/100);
+    return `<tr><td>${i+1}</td><td>${s.first_name} ${s.last_name}</td><td>${s.student_code}</td><td>${s.class_name||'—'}</td><td>${Math.round(fee).toLocaleString()} AFN</td></tr>`;
+  }).join('');
+
+  const content = reportHeader('Fee Collection Report', `${MONTHS_RPT[parseInt(month)]} ${year}`) + `
+    <div class="summary">
+      <div class="summary-box"><div class="summary-num">${Number(data.total_collected).toLocaleString()} AFN</div><div class="summary-lbl">Total Collected</div></div>
+      <div class="summary-box"><div class="summary-num">${data.paid.length}</div><div class="summary-lbl">Paid</div></div>
+      <div class="summary-box"><div class="summary-num">${data.unpaid.length}</div><div class="summary-lbl">Unpaid</div></div>
+    </div>
+    <div class="section-title">✅ Paid Students (${data.paid.length})</div>
+    <table><thead><tr><th>#</th><th>Name</th><th>Code</th><th>Class</th><th>Amount</th><th>Method</th></tr></thead>
+    <tbody>${paidRows||'<tr><td colspan="6" style="text-align:center;color:#888;">No payments recorded</td></tr>'}</tbody></table>
+    <div class="section-title" style="margin-top:24px;">⚠ Unpaid Students (${data.unpaid.length})</div>
+    <table><thead><tr><th>#</th><th>Name</th><th>Code</th><th>Class</th><th>Due Amount</th></tr></thead>
+    <tbody>${unpaidRows||'<tr><td colspan="5" style="text-align:center;color:#888;">All paid!</td></tr>'}</tbody></table>
+    <div class="footer">Taif High School Management System</div>`;
+
+  openPrintWindow(content, 'Fee Collection Report');
+}
+
+// ── Payroll Report ────────────────────────────────────────────
+async function printPayrollReport() {
+  const month = document.getElementById('rpt-pay-month').value;
+  const year  = document.getElementById('rpt-pay-year').value;
+  const res   = await fetch(`/api/reports/payroll?month=${month}&year=${year}`);
+  const data  = await res.json();
+
+  const rows = data.people.map((p, i) =>
+    `<tr><td>${i+1}</td><td>${p.first_name} ${p.last_name}</td><td>${p.person_type}</td>
+    <td>${Number(p.salary).toLocaleString()} AFN</td>
+    <td>${p.advance > 0 ? Number(p.advance).toLocaleString()+' AFN' : '—'}</td>
+    <td>${Number(p.net).toLocaleString()} AFN</td>
+    <td class="${p.is_paid?'badge-pass':'badge-fail'}">${p.is_paid?'Paid':'Unpaid'}</td></tr>`
+  ).join('');
+
+  const content = reportHeader('Payroll Report', `${MONTHS_RPT[parseInt(month)]} ${year}`) + `
+    <div class="summary">
+      <div class="summary-box"><div class="summary-num">${Number(data.total_salary).toLocaleString()} AFN</div><div class="summary-lbl">Total Salary</div></div>
+      <div class="summary-box"><div class="summary-num">${Number(data.total_paid).toLocaleString()} AFN</div><div class="summary-lbl">Total Paid</div></div>
+      <div class="summary-box"><div class="summary-num">${data.people.length}</div><div class="summary-lbl">Total Staff</div></div>
+    </div>
+    <table><thead><tr><th>#</th><th>Name</th><th>Type</th><th>Base Salary</th><th>Advance</th><th>Net Salary</th><th>Status</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <div class="footer">Taif High School Management System</div>`;
+
+  openPrintWindow(content, 'Payroll Report');
+}
+
+// ── Expense Report ────────────────────────────────────────────
+async function printExpenseReport() {
+  const month = document.getElementById('rpt-exp-month').value;
+  const year  = document.getElementById('rpt-exp-year').value;
+  const res   = await fetch(`/api/reports/expenses?month=${month}&year=${year}`);
+  const data  = await res.json();
+
+  const rows = data.expenses.map((e, i) => {
+    const date = new Date(e.expense_date).toLocaleDateString('en-US', { month:'short', day:'numeric' });
+    return `<tr><td>${i+1}</td><td>${e.description||e.title||'—'}</td><td>${e.category}</td><td>${date}</td><td>${Number(e.amount).toLocaleString()} AFN</td></tr>`;
+  }).join('');
+
+  // Category totals
+  const catTotals = {};
+  data.expenses.forEach(e => catTotals[e.category] = (catTotals[e.category]||0) + parseFloat(e.amount));
+  const catRows = Object.entries(catTotals).sort((a,b)=>b[1]-a[1])
+    .map(([cat, amt]) => `<tr><td>${cat}</td><td>${Number(amt).toLocaleString()} AFN</td><td>${Math.round(amt/data.total*100)}%</td></tr>`).join('');
+
+  const content = reportHeader('Expense Report', `${MONTHS_RPT[parseInt(month)]} ${year}`) + `
+    <div class="summary">
+      <div class="summary-box"><div class="summary-num">${Number(data.total).toLocaleString()} AFN</div><div class="summary-lbl">Total Expenses</div></div>
+      <div class="summary-box"><div class="summary-num">${data.expenses.length}</div><div class="summary-lbl">Transactions</div></div>
+    </div>
+    <div class="section-title">By Category</div>
+    <table><thead><tr><th>Category</th><th>Total</th><th>% of Total</th></tr></thead><tbody>${catRows}</tbody></table>
+    <div class="section-title" style="margin-top:20px;">All Transactions</div>
+    <table><thead><tr><th>#</th><th>Description</th><th>Category</th><th>Date</th><th>Amount</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <div class="footer">Taif High School Management System</div>`;
+
+  openPrintWindow(content, 'Expense Report');
+}
+
+// ── Class Summary ─────────────────────────────────────────────
+async function printClassSummary() {
+  const res  = await fetch('/api/reports/classes');
+  const data = await res.json();
+
+  const rows = data.map((c, i) =>
+    `<tr><td>${i+1}</td><td>${c.name}</td><td>${c.grade_level||'—'}</td><td>${c.section||'—'}</td>
+    <td style="text-align:center;font-weight:bold;">${c.student_count}</td>
+    <td style="text-align:center;">${c.teacher_count}</td>
+    <td style="text-align:center;">${c.subject_count}</td></tr>`
+  ).join('');
+
+  const totalStudents = data.reduce((s,c) => s+c.student_count, 0);
+
+  const content = reportHeader('Class Summary Report', 'Academic Year 2026') + `
+    <div class="summary">
+      <div class="summary-box"><div class="summary-num">${data.length}</div><div class="summary-lbl">Total Classes</div></div>
+      <div class="summary-box"><div class="summary-num">${totalStudents}</div><div class="summary-lbl">Total Students</div></div>
+    </div>
+    <table><thead><tr><th>#</th><th>Class Name</th><th>Grade</th><th>Section</th><th style="text-align:center;">Students</th><th style="text-align:center;">Teachers</th><th style="text-align:center;">Subjects</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <div class="footer">Taif High School Management System</div>`;
+
+  openPrintWindow(content, 'Class Summary');
 }
 
 // Keyboard close
