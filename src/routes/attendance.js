@@ -126,26 +126,60 @@ router.post('/scan', async (req, res) => {
   }
 });
 
-// ── GET absent students for today ─────────────────────────────
+// ── GET absent people (students / teachers / staff) ───────────
 router.get('/absent', async (req, res) => {
   try {
-    const { class_id } = req.query;
-    const today = new Date().toISOString().split('T')[0];
+    const { class_id, person_type, date } = req.query;
+    const targetDate = date || new Date().toISOString().split('T')[0];
+    const type = person_type || 'student';
 
-    let query = `
-      SELECT s.id, s.first_name, s.last_name, s.student_code, s.photo,
-             s.parent_phone, c.name as class_name
-      FROM students s
-      LEFT JOIN classes c ON c.id = s.class_id
-      WHERE s.is_active = true
-      AND s.id NOT IN (
-        SELECT person_id FROM attendance
-        WHERE scan_date = $1 AND person_type = 'student'
-      )
-    `;
-    const params = [today];
-    if (class_id) { params.push(class_id); query += ` AND s.class_id = $${params.length}`; }
-    query += ` ORDER BY c.name, s.first_name`;
+    let query, params;
+
+    if (type === 'teacher') {
+      query = `
+        SELECT t.id, t.first_name, t.last_name, t.teacher_code AS person_code,
+               t.photo, t.subject AS class_name, t.phone, 'teacher' AS person_type
+        FROM teachers t
+        WHERE t.is_active = true
+        AND t.id NOT IN (
+          SELECT person_id FROM attendance
+          WHERE scan_date = $1 AND person_type = 'teacher'
+        )
+        ORDER BY t.first_name
+      `;
+      params = [targetDate];
+
+    } else if (type === 'staff') {
+      query = `
+        SELECT st.id, st.first_name, st.last_name, st.staff_code AS person_code,
+               st.photo, st.role AS class_name, st.phone, 'staff' AS person_type
+        FROM staff st
+        WHERE st.is_active = true
+        AND st.id NOT IN (
+          SELECT person_id FROM attendance
+          WHERE scan_date = $1 AND person_type = 'staff'
+        )
+        ORDER BY st.first_name
+      `;
+      params = [targetDate];
+
+    } else {
+      // Default: students
+      query = `
+        SELECT s.id, s.first_name, s.last_name, s.student_code AS person_code,
+               s.photo, s.parent_phone, c.name AS class_name, 'student' AS person_type
+        FROM students s
+        LEFT JOIN classes c ON c.id = s.class_id
+        WHERE s.is_active = true
+        AND s.id NOT IN (
+          SELECT person_id FROM attendance
+          WHERE scan_date = $1 AND person_type = 'student'
+        )
+      `;
+      params = [targetDate];
+      if (class_id) { params.push(class_id); query += ` AND s.class_id = $${params.length}`; }
+      query += ` ORDER BY c.name, s.first_name`;
+    }
 
     const result = await pool.query(query, params);
     res.json(result.rows);

@@ -6,19 +6,52 @@
   "scripts": {
     "start": "electron .",
     "dev": "node src/server.js",
-    "build": "electron-builder"
+    "build": "electron-builder",
+    "build:win": "electron-builder --win"
   },
   "build": {
     "appId": "com.rahimitech.taifschool",
     "productName": "Taif School System",
+    "copyright": "Copyright 2026 Rahimi Tech Solution",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "public/**/*",
+      "school-config.js",
+      "package.json",
+      "node_modules/**/*",
+      "!node_modules/.cache",
+      "!dist"
+    ],
     "win": {
-      "target": "nsis",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "public/admin/icon.ico"
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
-    }
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "public/admin/icon.ico",
+      "uninstallerIcon": "public/admin/icon.ico",
+      "installerHeaderIcon": "public/admin/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Taif School System"
+    },
+    "extraResources": [
+      {
+        "from": "public/uploads",
+        "to": "uploads"
+      }
+    ]
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -28,7 +61,9 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
     "pg": "^8.11.3",
+    "puppeteer": "^24.42.0",
     "qrcode": "^1.5.3",
+    "whatsapp-web.js": "^1.34.6",
     "ws": "^8.16.0"
   },
   "devDependencies": {

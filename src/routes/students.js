@@ -139,7 +139,7 @@ router.post('/', upload.single('photo'), async (req, res) => {
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    if (req.file) fs.unlinkSync(req.file.path).catch(() => {});
+    if (req.file) try { fs.unlinkSync(req.file.path); } catch (_) {}
     res.status(500).json({ error: err.message });
   }
 });

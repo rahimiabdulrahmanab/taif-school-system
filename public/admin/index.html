@@ -482,8 +482,8 @@ body::after{
 <div class="app">
 <aside class="sidebar">
 <div class="sidebar-logo">
-<div class="logo-badge">TS</div>
-<div class="logo-text"><strong>Taif High School</strong><span>Management System</span></div>
+<div class="logo-badge" id="sidebar-logo-badge">TS</div>
+<div class="logo-text"><strong id="sidebar-school-name">Taif High School</strong><span id="sidebar-school-tagline">Management System</span></div>
 </div>
 <nav class="sidebar-nav">
 <div class="nav-section">Main</div>
@@ -1609,13 +1609,56 @@ body::after{
   </div>
 </div>
 
-<!-- Connection notice -->
-<div id="wa-connect-notice" style="padding:20px 24px;background:rgba(255,160,60,.08);border:1px solid rgba(255,160,60,.2);border-radius:var(--radius);margin-bottom:22px;display:flex;align-items:flex-start;gap:14px;">
-  <i class="fab fa-whatsapp" style="font-size:24px;color:#25D366;flex-shrink:0;margin-top:2px;"></i>
-  <div>
-    <div style="font-family:var(--font-head);font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">WhatsApp connection will be enabled in the desktop app</div>
-    <div style="font-size:13px;color:var(--text-mid);line-height:1.6;">When you install the final Electron desktop app (Part 13), WhatsApp will connect automatically by scanning a QR code once. After that all messages will be sent through your phone. For now you can compose and preview messages.</div>
+<!-- Connection panel — state managed by updateWAUI() -->
+<div id="wa-connect-panel" style="margin-bottom:22px;border-radius:var(--radius);overflow:hidden;">
+
+  <!-- Disconnected state -->
+  <div id="wa-state-disconnected" style="padding:20px 24px;background:rgba(255,160,60,.08);border:1px solid rgba(255,160,60,.2);border-radius:var(--radius);display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
+    <div style="display:flex;align-items:flex-start;gap:14px;">
+      <i class="fab fa-whatsapp" style="font-size:24px;color:#25D366;flex-shrink:0;margin-top:2px;"></i>
+      <div>
+        <div style="font-family:var(--font-head);font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">WhatsApp Not Connected</div>
+        <div style="font-size:13px;color:var(--text-mid);line-height:1.6;">Click Connect, then scan the QR code with your phone once. Messages will be sent through your WhatsApp account.</div>
+      </div>
+    </div>
+    <button onclick="connectWA()" style="padding:10px 22px;background:linear-gradient(135deg,#25D366,#128C7E);border:none;border-radius:20px;color:#fff;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+      <i class="fab fa-whatsapp"></i> Connect WhatsApp
+    </button>
   </div>
+
+  <!-- Initializing state -->
+  <div id="wa-state-initializing" style="display:none;padding:20px 24px;background:rgba(91,158,247,.08);border:1px solid rgba(91,158,247,.2);border-radius:var(--radius);display:none;align-items:center;gap:14px;">
+    <i class="fas fa-spinner fa-spin" style="font-size:22px;color:#5b9ef7;flex-shrink:0;"></i>
+    <div>
+      <div style="font-family:var(--font-head);font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px;">Starting WhatsApp…</div>
+      <div style="font-size:13px;color:var(--text-mid);">This takes about 15–30 seconds. A QR code will appear shortly.</div>
+    </div>
+  </div>
+
+  <!-- QR state -->
+  <div id="wa-state-qr" style="display:none;padding:24px;background:rgba(37,211,102,.06);border:1px solid rgba(37,211,102,.2);border-radius:var(--radius);text-align:center;">
+    <div style="font-family:var(--font-head);font-size:15px;font-weight:800;color:var(--text);margin-bottom:4px;">Scan with WhatsApp on your phone</div>
+    <div style="font-size:13px;color:var(--text-mid);margin-bottom:18px;">Open WhatsApp → Linked Devices → Link a Device → point camera at QR</div>
+    <img id="wa-qr-img" src="" alt="WhatsApp QR Code" style="width:220px;height:220px;border-radius:12px;border:3px solid rgba(37,211,102,.3);display:inline-block;">
+    <div style="font-size:11px;color:var(--text-dim);margin-top:10px;">QR refreshes automatically if it expires</div>
+  </div>
+
+  <!-- Connected state -->
+  <div id="wa-state-connected" style="display:none;padding:16px 24px;background:rgba(37,211,102,.08);border:1px solid rgba(37,211,102,.25);border-radius:var(--radius);display:none;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="width:38px;height:38px;background:rgba(37,211,102,.15);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;color:#25D366;flex-shrink:0;">
+        <i class="fab fa-whatsapp"></i>
+      </div>
+      <div>
+        <div style="font-family:var(--font-head);font-size:14px;font-weight:700;color:#25D366;">WhatsApp Connected</div>
+        <div style="font-size:12px;color:var(--text-mid);">Messages will be sent through your WhatsApp account</div>
+      </div>
+    </div>
+    <button onclick="disconnectWA()" style="padding:7px 16px;background:var(--glass);border:1px solid rgba(255,120,120,.3);border-radius:20px;color:rgba(255,120,120,.8);font-family:var(--font-head);font-size:12px;font-weight:600;cursor:pointer;">
+      <i class="fas fa-unlink"></i> Disconnect
+    </button>
+  </div>
+
 </div>
 
 <!-- Message type cards -->
@@ -1690,7 +1733,199 @@ body::after{
 </div>
 
 </div>
-<div class="page" id="pg-settings"><div class="cs"><div class="cs-orb cs-o"><i class="fas fa-cog"></i></div><h2>Settings</h2><p>School info, academic year, absence alert time and system configuration.</p><div class="pp">🔨 Coming in Part 13</div></div></div>
+<div class="page" id="pg-settings">
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;gap:16px;flex-wrap:wrap;">
+  <div>
+    <h2 style="font-family:var(--font-head);font-size:20px;font-weight:800;color:var(--text);">Settings</h2>
+    <span style="font-size:12px;color:var(--text-mid);">Configure your school profile, academic rules and system preferences</span>
+  </div>
+</div>
+
+<!-- ── SCHOOL PROFILE ───────────────────────────── -->
+<div class="glass-card" style="margin-bottom:20px;">
+  <div class="card-hdr">
+    <h4><i class="fas fa-school"></i> School Profile</h4>
+    <button onclick="saveSettings('profile')" id="btn-save-profile" style="padding:7px 18px;background:var(--accent);border:none;border-radius:20px;color:#060D18;font-family:var(--font-head);font-size:12px;font-weight:700;cursor:pointer;">
+      <i class="fas fa-save"></i> Save
+    </button>
+  </div>
+  <div style="padding:22px;display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+    <div style="grid-column:1/-1;display:flex;align-items:center;gap:20px;padding:16px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);">
+      <div id="set-logo-preview" style="width:72px;height:72px;border-radius:12px;background:var(--glass-border);display:flex;align-items:center;justify-content:center;font-size:28px;color:var(--text-dim);overflow:hidden;flex-shrink:0;">
+        <i class="fas fa-image"></i>
+      </div>
+      <div>
+        <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;">School Logo</div>
+        <div style="font-size:12px;color:var(--text-mid);margin-bottom:10px;">PNG or JPG, max 2MB. Shown on reports, ID cards and receipts.</div>
+        <label style="padding:7px 16px;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;color:var(--text);font-family:var(--font-head);font-size:12px;font-weight:600;cursor:pointer;">
+          <i class="fas fa-upload"></i> Upload Logo
+          <input type="file" id="set-logo-input" accept="image/*" onchange="uploadLogo(this)" style="display:none;">
+        </label>
+      </div>
+    </div>
+
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Full School Name</label>
+      <input id="set-school-name" type="text" placeholder="e.g. Taif High School" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+    </div>
+
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Short Name</label>
+      <input id="set-school-short" type="text" placeholder="e.g. Taif" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+    </div>
+
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Abbreviation <span style="font-weight:400;font-size:10px;">(shown in logo badge)</span></label>
+      <input id="set-school-abbr" type="text" maxlength="3" placeholder="e.g. TS" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+    </div>
+
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Tagline</label>
+      <input id="set-school-tagline" type="text" placeholder="e.g. Management System" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+    </div>
+
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Phone Number</label>
+      <input id="set-school-phone" type="tel" placeholder="+93 7xx xxx xxx" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+    </div>
+
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Email Address</label>
+      <input id="set-school-email" type="email" placeholder="school@example.com" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+    </div>
+
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Website</label>
+      <input id="set-school-website" type="url" placeholder="https://yourschool.com" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+    </div>
+
+    <div style="grid-column:1/-1;">
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Address</label>
+      <input id="set-school-address" type="text" placeholder="City, Country" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+    </div>
+
+  </div>
+</div>
+
+<!-- ── ACADEMIC SETTINGS ─────────────────────────── -->
+<div class="glass-card" style="margin-bottom:20px;">
+  <div class="card-hdr">
+    <h4><i class="fas fa-graduation-cap"></i> Academic Settings</h4>
+    <button onclick="saveSettings('academic')" style="padding:7px 18px;background:var(--accent);border:none;border-radius:20px;color:#060D18;font-family:var(--font-head);font-size:12px;font-weight:700;cursor:pointer;">
+      <i class="fas fa-save"></i> Save
+    </button>
+  </div>
+  <div style="padding:22px;display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;">
+
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Academic Year</label>
+      <input id="set-academic-year" type="text" placeholder="2026" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+    </div>
+
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Midterm Max Score</label>
+      <input id="set-midterm-max" type="number" min="0" max="200" placeholder="40" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+    </div>
+
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Final Max Score</label>
+      <input id="set-final-max" type="number" min="0" max="200" placeholder="60" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+    </div>
+
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Pass Mark</label>
+      <input id="set-pass-mark" type="number" min="0" max="200" placeholder="40" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+    </div>
+
+  </div>
+</div>
+
+<!-- ── FINANCIAL SETTINGS ───────────────────────── -->
+<div class="glass-card" style="margin-bottom:20px;">
+  <div class="card-hdr">
+    <h4><i class="fas fa-coins"></i> Financial Settings</h4>
+    <button onclick="saveSettings('finance')" style="padding:7px 18px;background:var(--accent);border:none;border-radius:20px;color:#060D18;font-family:var(--font-head);font-size:12px;font-weight:700;cursor:pointer;">
+      <i class="fas fa-save"></i> Save
+    </button>
+  </div>
+  <div style="padding:22px;display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;">
+
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Currency Name</label>
+      <input id="set-currency" type="text" placeholder="AFN" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+    </div>
+
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Currency Symbol</label>
+      <input id="set-currency-symbol" type="text" placeholder="؋" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:18px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+    </div>
+
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Default Monthly Fee</label>
+      <input id="set-default-fee" type="number" min="0" placeholder="0" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+    </div>
+
+  </div>
+</div>
+
+<!-- ── ATTENDANCE SETTINGS ──────────────────────── -->
+<div class="glass-card" style="margin-bottom:20px;">
+  <div class="card-hdr">
+    <h4><i class="fas fa-clock"></i> Attendance Settings</h4>
+    <button onclick="saveSettings('attendance')" style="padding:7px 18px;background:var(--accent);border:none;border-radius:20px;color:#060D18;font-family:var(--font-head);font-size:12px;font-weight:700;cursor:pointer;">
+      <i class="fas fa-save"></i> Save
+    </button>
+  </div>
+  <div style="padding:22px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;">
+
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Absence Alert Time</label>
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;">Students not scanned by this time are flagged as absent</div>
+      <input id="set-alert-time" type="time" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:14px;outline:none;box-sizing:border-box;color-scheme:dark;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+    </div>
+
+  </div>
+</div>
+
+<!-- ── APPEARANCE ───────────────────────────────── -->
+<div class="glass-card" style="margin-bottom:20px;">
+  <div class="card-hdr">
+    <h4><i class="fas fa-palette"></i> Appearance</h4>
+    <button onclick="saveSettings('appearance')" style="padding:7px 18px;background:var(--accent);border:none;border-radius:20px;color:#060D18;font-family:var(--font-head);font-size:12px;font-weight:700;cursor:pointer;">
+      <i class="fas fa-save"></i> Save
+    </button>
+  </div>
+  <div style="padding:22px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;">
+
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Primary Color</label>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <input id="set-brand-color" type="color" style="width:44px;height:44px;border:2px solid var(--glass-border);border-radius:8px;background:none;cursor:pointer;padding:2px;">
+        <span id="set-brand-color-hex" style="font-family:var(--font-mono);font-size:13px;color:var(--text-mid);">#1A4A5C</span>
+      </div>
+    </div>
+
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Accent Color</label>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <input id="set-accent-color" type="color" style="width:44px;height:44px;border:2px solid var(--glass-border);border-radius:8px;background:none;cursor:pointer;padding:2px;">
+        <span id="set-accent-color-hex" style="font-family:var(--font-mono);font-size:13px;color:var(--text-mid);">#5DCAA5</span>
+      </div>
+    </div>
+
+    <div style="grid-column:1/-1;">
+      <div style="font-size:12px;color:var(--text-dim);padding:10px 14px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);">
+        <i class="fas fa-info-circle" style="color:var(--accent);margin-right:6px;"></i>
+        Color changes take effect after saving and refreshing the page.
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</div>
 </div>
 </div>
 
@@ -2868,22 +3103,20 @@ async function loadAttendance() {
   const type    = document.getElementById('att-type').value;
 
   try {
-    // Load present
-    let url = '/api/attendance?date=' + date;
-    if (type)    url += '&person_type=' + type;
-    if (classId) url += '&class_id=' + classId;
+    // Build URLs — pass date and person_type to both endpoints
+    let presUrl = '/api/attendance?date=' + date;
+    if (type)    presUrl += '&person_type=' + type;
+    if (classId) presUrl += '&class_id=' + classId;
 
-    const [presRes, absRes, statsRes] = await Promise.all([
-      fetch(url),
-      fetch('/api/attendance/absent' + (classId ? '?class_id=' + classId : '')),
-      fetch('/api/dashboard/stats'),
-    ]);
+    let absUrl = '/api/attendance/absent?date=' + date;
+    if (type)    absUrl += '&person_type=' + type;
+    if (classId && (!type || type === 'student')) absUrl += '&class_id=' + classId;
 
+    const [presRes, absRes] = await Promise.all([fetch(presUrl), fetch(absUrl)]);
     const present = await presRes.json();
     const absent  = await absRes.json();
-    const stats   = await statsRes.json();
 
-    // Summary
+    // Summary — counts based on actual present + absent lists
     const presentCount = present.length;
     const absentCount  = absent.length;
     const total        = presentCount + absentCount;
@@ -2899,16 +3132,16 @@ async function loadAttendance() {
       ptb.innerHTML = '<tr><td colspan="4"><div class="empty"><i class="fas fa-clipboard-check"></i><p>No records for this date.</p></div></td></tr>';
     } else {
       ptb.innerHTML = present.map(s => {
-        const ini  = ((s.first_name||'?')[0] + (s.last_name||'')[0]).toUpperCase();
-        const folder = s.person_type === 'student' ? 'students' : s.person_type === 'teacher' ? 'teachers' : 'staff';
+        const ini    = ((s.first_name||'?')[0] + (s.last_name||'')[0]).toUpperCase();
+        const folder = s.person_type === 'teacher' ? 'teachers' : s.person_type === 'staff' ? 'staff' : 'students';
         const photoHtml = s.photo
           ? `<img src="/uploads/${folder}/${s.photo}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:1.5px solid var(--glass-border);">`
           : `<div style="width:34px;height:34px;border-radius:50%;background:var(--glass-mid);border:1.5px solid var(--glass-border);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--accent);font-family:var(--font-head);">${ini}</div>`;
-        const typeBadge = s.person_type === 'student'
-          ? '<span class="badge bg-t">Student</span>'
-          : s.person_type === 'teacher'
+        const typeBadge = s.person_type === 'teacher'
           ? '<span class="badge bg-b">Teacher</span>'
-          : '<span class="badge bg-o">Staff</span>';
+          : s.person_type === 'staff'
+          ? '<span class="badge bg-o">Staff</span>'
+          : '<span class="badge bg-t">Student</span>';
         const time = new Date(s.scan_time).toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:true });
         return `<tr>
           <td><div class="pc">${photoHtml}<div>
@@ -2922,20 +3155,47 @@ async function loadAttendance() {
       }).join('');
     }
 
-    // Absent table
-    const atb = document.getElementById('att-absent-tbody');
+    // Absent table — columns differ by type
+    const atb     = document.getElementById('att-absent-tbody');
+    const absHead = document.querySelector('#att-absent-panel thead tr');
+    const isTeacher = type === 'teacher';
+    const isStaff   = type === 'staff';
+    const allPresent = type === 'teacher' ? 'All teachers present!'
+                     : type === 'staff'   ? 'All staff present!'
+                     : 'All students present!';
+
+    // Update absent table headers dynamically
+    if (isTeacher || isStaff) {
+      absHead.innerHTML = '<th>Person</th><th>Role / Subject</th><th>Phone</th>';
+    } else {
+      absHead.innerHTML = '<th>Student</th><th>Class</th><th>Parent Phone</th>';
+    }
+
     if (!absent.length) {
-      atb.innerHTML = '<tr><td colspan="3"><div class="empty"><i class="fas fa-check-circle" style="color:#48d085;opacity:1;"></i><p>All students present!</p></div></td></tr>';
+      const cols = 3;
+      atb.innerHTML = `<tr><td colspan="${cols}"><div class="empty"><i class="fas fa-check-circle" style="color:#48d085;opacity:1;"></i><p>${allPresent}</p></div></td></tr>`;
     } else {
       atb.innerHTML = absent.map(s => {
-        const ini = ((s.first_name||'?')[0] + (s.last_name||'')[0]).toUpperCase();
+        const ini    = ((s.first_name||'?')[0] + (s.last_name||'')[0]).toUpperCase();
+        const folder = isTeacher ? 'teachers' : isStaff ? 'staff' : 'students';
         const photoHtml = s.photo
-          ? `<img src="/uploads/students/${s.photo}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:1.5px solid rgba(255,100,100,.3);">`
+          ? `<img src="/uploads/${folder}/${s.photo}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:1.5px solid rgba(255,100,100,.3);">`
           : `<div style="width:34px;height:34px;border-radius:50%;background:rgba(255,100,100,.12);border:1.5px solid rgba(255,100,100,.2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#ff7875;font-family:var(--font-head);">${ini}</div>`;
+
+        if (isTeacher || isStaff) {
+          return `<tr>
+            <td><div class="pc">${photoHtml}<div>
+              <div class="pname">${s.first_name} ${s.last_name}</div>
+              <div class="pcls">${s.person_code || '—'}</div>
+            </div></div></td>
+            <td>${s.class_name ? `<span class="badge bg-b">${s.class_name}</span>` : '—'}</td>
+            <td><span style="font-family:var(--font-mono);font-size:12px;">${s.phone || '—'}</span></td>
+          </tr>`;
+        }
         return `<tr>
           <td><div class="pc">${photoHtml}<div>
             <div class="pname">${s.first_name} ${s.last_name}</div>
-            <div class="pcls">${s.student_code}</div>
+            <div class="pcls">${s.person_code || '—'}</div>
           </div></div></td>
           <td>${s.class_name ? `<span class="badge bg-t">${s.class_name}</span>` : '—'}</td>
           <td><span style="font-family:var(--font-mono);font-size:12px;">${s.parent_phone || '—'}</span></td>
@@ -3384,6 +3644,21 @@ function setWARecipient(type, btn) {
     if (el) el.style.display = t === type ? 'block' : 'none';
   });
 
+  // Update preview hint based on recipient type
+  if (type === 'class' || type === 'absent') {
+    const template = waCurrentTemplate?.template || '';
+    document.getElementById('wa-message').value = template;
+    document.getElementById('wa-char-count').textContent = template.length + ' characters';
+    document.getElementById('wa-preview').textContent =
+      '✅ Each parent will receive a personalised message with their child\'s details filled in automatically.\n\nExample for first student:\n' +
+      (waStudentsList.length
+        ? fillTemplateForStudent(template, waStudentsList[0])
+        : template);
+  } else if (type === 'individual') {
+    // Re-run fill in case a student was already selected
+    waFillTemplate();
+  }
+
   if (type === 'absent') loadAbsentForWA();
 }
 
@@ -3438,6 +3713,26 @@ function waFillTemplate() {
   document.getElementById('wa-char-count').textContent = msg.length + ' characters';
 }
 
+function fillTemplateForStudent(template, s) {
+  const now      = new Date();
+  const months   = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const dateStr  = now.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  const monthStr = months[now.getMonth() + 1] + ' ' + now.getFullYear();
+
+  let fee = parseFloat(s.monthly_fee) || 0;
+  if (s.discount_type === 'fixed')   fee = Math.max(0, fee - parseFloat(s.discount_value || 0));
+  if (s.discount_type === 'percent') fee = fee * (1 - parseFloat(s.discount_value || 0) / 100);
+
+  return template
+    .replace(/\{student_name\}/g, `${s.first_name} ${s.last_name}`)
+    .replace(/\{student_code\}/g,  s.student_code  || '')
+    .replace(/\{parent_name\}/g,   s.parent_name   || 'Parent')
+    .replace(/\{class_name\}/g,    s.class_name    || '')
+    .replace(/\{date\}/g,          dateStr)
+    .replace(/\{month\}/g,         monthStr)
+    .replace(/\{amount\}/g,        Math.round(fee).toLocaleString());
+}
+
 async function sendWAMessage() {
   const message = document.getElementById('wa-message').value.trim();
   if (!message) { showAlert({ title:'Empty Message', message:'Please type a message first.', type:'warning' }); return; }
@@ -3465,32 +3760,36 @@ async function sendWAMessage() {
       checkboxes.forEach(cb => {
         const id  = cb.id.replace('wa-abs-','');
         const stu = waStudentsList.find(s => s.id === parseInt(id));
-        if (stu && stu.parent_phone) recipients.push({ phone: stu.parent_phone, name: stu.first_name + ' ' + stu.last_name });
+        if (stu && stu.parent_phone) recipients.push({ phone: stu.parent_phone, student: stu });
       });
       if (!recipients.length) { showAlert({ title:'No Recipients', message:'No students selected or no phone numbers.', type:'warning' }); return; }
     } else if (waRecipientType === 'class') {
       const classId = document.getElementById('wa-class-sel').value;
       if (!classId) { showAlert({ title:'Select Class', message:'Please select a class.', type:'warning' }); return; }
       const classStudents = waStudentsList.filter(s => String(s.class_id) === classId && s.parent_phone);
-      recipients = classStudents.map(s => ({ phone: s.parent_phone, name: s.first_name + ' ' + s.last_name }));
+      recipients = classStudents.map(s => ({ phone: s.parent_phone, student: s }));
       if (!recipients.length) { showAlert({ title:'No Numbers', message:'No students in this class have phone numbers.', type:'warning' }); return; }
     }
 
-    // Send to all recipients
+    // Send to all recipients — personalise template per student for class/absent modes
+    const rawTemplate = waCurrentTemplate?.template || message;
     let sent = 0;
     for (const r of recipients) {
+      const personalised = r.student ? fillTemplateForStudent(rawTemplate, r.student) : message;
       const res = await fetch('/api/whatsapp/send', {
         method:  'POST',
         headers: { 'Content-Type':'application/json' },
-        body:    JSON.stringify({ phone: r.phone, message, type: waCurrentTemplate?.id }),
+        body:    JSON.stringify({ phone: r.phone, message: personalised, type: waCurrentTemplate?.id }),
       });
       if (res.ok) sent++;
     }
 
     showAlert({
-      title:   'Messages Queued',
-      message: `${sent} message${sent !== 1 ? 's' : ''} prepared. WhatsApp sending will be active in the desktop app.`,
-      type:    'success',
+      title:   sent > 0 ? 'Messages Sent' : 'No Messages Sent',
+      message: sent > 0
+        ? `${sent} message${sent !== 1 ? 's' : ''} sent via WhatsApp.`
+        : 'Could not send messages. Make sure WhatsApp is connected.',
+      type: sent > 0 ? 'success' : 'error',
     });
 
   } catch(e) {
@@ -3501,6 +3800,86 @@ async function sendWAMessage() {
   }
 }
 
+
+// ═══════════════════════════════════════════════════
+//  WHATSAPP CONNECTION JS
+// ═══════════════════════════════════════════════════
+let _waPollTimer = null;
+
+function updateWAUI(s) {
+  const states = ['disconnected','initializing','qr','connected'];
+  states.forEach(st => {
+    const el = document.getElementById('wa-state-' + st);
+    if (el) el.style.display = st === s.status ? (st === 'qr' ? 'block' : 'flex') : 'none';
+  });
+  // Status pill
+  const dot  = document.getElementById('wa-status-dot');
+  const text = document.getElementById('wa-status-text');
+  if (s.status === 'connected') {
+    dot.style.background  = '#25D366';
+    text.textContent      = 'Connected';
+  } else if (s.status === 'qr' || s.status === 'initializing') {
+    dot.style.background  = '#ffaa3d';
+    text.textContent      = s.status === 'qr' ? 'Scan QR Code' : 'Connecting…';
+  } else {
+    dot.style.background  = '#ff7875';
+    text.textContent      = 'Not Connected';
+  }
+  if (s.qr) {
+    const img = document.getElementById('wa-qr-img');
+    if (img) img.src = s.qr;
+  }
+}
+
+async function pollWAStatus() {
+  try {
+    const r = await fetch('/api/whatsapp/status');
+    const s = await r.json();
+    updateWAUI(s);
+    // Stop polling once connected
+    if (s.status === 'connected' && _waPollTimer) {
+      clearInterval(_waPollTimer);
+      _waPollTimer = null;
+    }
+  } catch (_) {}
+}
+
+function startWAPoll() {
+  if (_waPollTimer) return;
+  _waPollTimer = setInterval(pollWAStatus, 3000);
+  pollWAStatus(); // immediate first check
+}
+
+function stopWAPoll() {
+  if (_waPollTimer) { clearInterval(_waPollTimer); _waPollTimer = null; }
+}
+
+async function initWAPage() {
+  const r = await fetch('/api/whatsapp/status').catch(() => null);
+  if (!r) return;
+  const s = await r.json();
+  updateWAUI(s);
+  if (s.status !== 'connected') startWAPoll();
+}
+
+async function connectWA() {
+  await fetch('/api/whatsapp/connect', { method: 'POST' });
+  startWAPoll();
+}
+
+async function disconnectWA() {
+  await fetch('/api/whatsapp/disconnect', { method: 'POST' });
+  stopWAPoll();
+  updateWAUI({ status: 'disconnected', connected: false, qr: null });
+}
+
+// Hook into navigation
+const _origGoWA = window.go;
+window.go = function(id, el) {
+  _origGoWA(id, el);
+  if (id === 'whatsapp') initWAPage();
+  if (id !== 'whatsapp') stopWAPoll();
+};
 
 // ═══════════════════════════════════════════════════
 //  GRADES & MARKS JS
@@ -4386,6 +4765,149 @@ async function printClassSummary() {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeConfirm(); closeAlert(); closeQR(); }
 });
+
+// ═══════════════════════════════════════════════════
+//  SETTINGS JS
+// ═══════════════════════════════════════════════════
+
+async function loadSettingsPage() {
+  try {
+    const r = await fetch('/api/settings');
+    const s = await r.json();
+
+    // School Profile
+    setVal('set-school-name',    s.school_name        || '');
+    setVal('set-school-short',   s.school_short_name  || '');
+    setVal('set-school-abbr',    s.school_abbreviation|| '');
+    setVal('set-school-tagline', s.school_tagline     || '');
+    setVal('set-school-phone',   s.school_phone       || '');
+    setVal('set-school-email',   s.school_email       || '');
+    setVal('set-school-address', s.school_address     || '');
+    setVal('set-school-website', s.school_website     || '');
+
+    // Logo preview
+    if (s.school_logo) {
+      const prev = document.getElementById('set-logo-preview');
+      prev.innerHTML = `<img src="${s.school_logo}" style="width:100%;height:100%;object-fit:cover;">`;
+    }
+
+    // Academic
+    setVal('set-academic-year', s.academic_year  || '');
+    setVal('set-midterm-max',   s.midterm_max    || '');
+    setVal('set-final-max',     s.final_max      || '');
+    setVal('set-pass-mark',     s.pass_mark      || '');
+
+    // Finance
+    setVal('set-currency',        s.currency           || '');
+    setVal('set-currency-symbol', s.currency_symbol    || '');
+    setVal('set-default-fee',     s.default_monthly_fee|| '');
+
+    // Attendance
+    setVal('set-alert-time', s.absence_alert_time || '09:00');
+
+    // Appearance
+    const bc = s.brand_color  || '#1A4A5C';
+    const ac = s.accent_color || '#5DCAA5';
+    document.getElementById('set-brand-color').value      = bc;
+    document.getElementById('set-brand-color-hex').textContent = bc;
+    document.getElementById('set-accent-color').value     = ac;
+    document.getElementById('set-accent-color-hex').textContent = ac;
+
+  } catch(e) { console.error('Settings load error:', e); }
+}
+
+function setVal(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.value = val;
+}
+
+// Live hex display for color pickers
+document.getElementById('set-brand-color').addEventListener('input', function() {
+  document.getElementById('set-brand-color-hex').textContent = this.value;
+});
+document.getElementById('set-accent-color').addEventListener('input', function() {
+  document.getElementById('set-accent-color-hex').textContent = this.value;
+});
+
+async function saveSettings(section) {
+  const data = {};
+
+  if (section === 'profile') {
+    data.school_name         = document.getElementById('set-school-name').value.trim();
+    data.school_short_name   = document.getElementById('set-school-short').value.trim();
+    data.school_abbreviation = document.getElementById('set-school-abbr').value.trim().toUpperCase();
+    data.school_tagline      = document.getElementById('set-school-tagline').value.trim();
+    data.school_phone        = document.getElementById('set-school-phone').value.trim();
+    data.school_email        = document.getElementById('set-school-email').value.trim();
+    data.school_address      = document.getElementById('set-school-address').value.trim();
+    data.school_website      = document.getElementById('set-school-website').value.trim();
+    if (!data.school_name) { showAlert({ title:'Required', message:'School name cannot be empty.', type:'warning' }); return; }
+  }
+
+  if (section === 'academic') {
+    data.academic_year = document.getElementById('set-academic-year').value.trim();
+    data.midterm_max   = document.getElementById('set-midterm-max').value;
+    data.final_max     = document.getElementById('set-final-max').value;
+    data.pass_mark     = document.getElementById('set-pass-mark').value;
+  }
+
+  if (section === 'finance') {
+    data.currency            = document.getElementById('set-currency').value.trim();
+    data.currency_symbol     = document.getElementById('set-currency-symbol').value.trim();
+    data.default_monthly_fee = document.getElementById('set-default-fee').value;
+  }
+
+  if (section === 'attendance') {
+    data.absence_alert_time = document.getElementById('set-alert-time').value;
+  }
+
+  if (section === 'appearance') {
+    data.brand_color  = document.getElementById('set-brand-color').value;
+    data.accent_color = document.getElementById('set-accent-color').value;
+  }
+
+  try {
+    const r = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!r.ok) throw new Error('Save failed');
+    showAlert({ title: 'Saved', message: 'Settings saved successfully.', type: 'success' });
+
+    // Update sidebar live
+    if (section === 'profile') {
+      if (data.school_name)         document.getElementById('sidebar-school-name').textContent    = data.school_name;
+      if (data.school_tagline)      document.getElementById('sidebar-school-tagline').textContent = data.school_tagline;
+      if (data.school_abbreviation) document.getElementById('sidebar-logo-badge').textContent     = data.school_abbreviation;
+    }
+  } catch(e) {
+    showAlert({ title: 'Error', message: e.message, type: 'error' });
+  }
+}
+
+async function uploadLogo(input) {
+  if (!input.files[0]) return;
+  const form = new FormData();
+  form.append('logo', input.files[0]);
+  try {
+    const r    = await fetch('/api/settings/logo', { method: 'POST', body: form });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error);
+    const prev = document.getElementById('set-logo-preview');
+    prev.innerHTML = `<img src="${data.logo_url}?t=${Date.now()}" style="width:100%;height:100%;object-fit:cover;">`;
+    showAlert({ title: 'Logo Uploaded', message: 'School logo saved successfully.', type: 'success' });
+  } catch(e) {
+    showAlert({ title: 'Upload Failed', message: e.message, type: 'error' });
+  }
+}
+
+// Hook navigation to load settings when page opens
+const _origGoSettings = window.go;
+window.go = function(id, el) {
+  _origGoSettings(id, el);
+  if (id === 'settings') loadSettingsPage();
+};
 
 </script>
 </body>

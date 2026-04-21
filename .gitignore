@@ -1,3 +1,6 @@
 node_modules/
 .env
 src/uploads/
+.wa-session/
+.wwebjs_cache/
+dist/

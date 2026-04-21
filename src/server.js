@@ -14,29 +14,42 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Static files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));           // student/teacher/staff photos
+app.use('/uploads', express.static(path.join(__dirname, '..', 'public', 'uploads'))); // school logo
 app.use('/admin',   express.static(path.join(__dirname, '..', 'public', 'admin')));
 app.use('/gate',    express.static(path.join(__dirname, '..', 'public', 'gate')));
 
-// Config endpoint - frontend reads school name, colors etc from here
-app.get('/api/config', (req, res) => {
-  res.json({
-    name:         CONFIG.name,
-    name_short:   CONFIG.name_short,
-    abbreviation: CONFIG.abbreviation,
-    tagline:      CONFIG.tagline,
-    phone:        CONFIG.phone,
-    email:        CONFIG.email,
-    address:      CONFIG.address,
-    current_year: CONFIG.current_year,
-    currency:     CONFIG.currency,
-    currency_symbol: CONFIG.currency_symbol,
-    brand_color:  CONFIG.brand_color,
-    accent_color: CONFIG.accent_color,
-    midterm_max:  CONFIG.midterm_max,
-    final_max:    CONFIG.final_max,
-    pass_mark:    CONFIG.pass_mark,
-  });
+// Config endpoint — merges school-config.js defaults with live DB settings
+app.get('/api/config', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT key, value FROM settings');
+    const db = {};
+    result.rows.forEach(r => { db[r.key] = r.value; });
+
+    res.json({
+      name:             db.school_name        || CONFIG.name,
+      name_short:       db.school_short_name  || CONFIG.name_short,
+      abbreviation:     db.school_abbreviation|| CONFIG.abbreviation,
+      tagline:          db.school_tagline     || CONFIG.tagline,
+      phone:            db.school_phone       || CONFIG.phone,
+      email:            db.school_email       || CONFIG.email,
+      address:          db.school_address     || CONFIG.address,
+      website:          db.school_website     || CONFIG.website || '',
+      logo:             db.school_logo        || null,
+      current_year:     db.academic_year      || CONFIG.current_year,
+      currency:         db.currency           || CONFIG.currency,
+      currency_symbol:  db.currency_symbol    || CONFIG.currency_symbol,
+      default_fee:      db.default_monthly_fee|| '0',
+      brand_color:      db.brand_color        || CONFIG.brand_color,
+      accent_color:     db.accent_color       || CONFIG.accent_color,
+      midterm_max:      parseInt(db.midterm_max  || CONFIG.midterm_max),
+      final_max:        parseInt(db.final_max    || CONFIG.final_max),
+      pass_mark:        parseInt(db.pass_mark    || CONFIG.pass_mark),
+      absence_alert_time: db.absence_alert_time || CONFIG.absence_alert_time,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Health check
@@ -94,30 +107,30 @@ app.get('/api/dashboard/scans', async (req, res) => {
   }
 });
 
-// Classes routes handled by src/routes/classes.js
-// Student routes
-const studentRoutes = require('./routes/students');
-app.use('/api/students', studentRoutes);
-
-// Teacher & Staff routes
-const peopleRoutes = require('./routes/people');
-app.use('/api', peopleRoutes);
-
-// Classes routes
-const classRoutes = require('./routes/classes');
-app.use('/api/classes', classRoutes);
-
-// Attendance routes
+// Routes
+const studentRoutes  = require('./routes/students');
+const peopleRoutes   = require('./routes/people');
+const classRoutes    = require('./routes/classes');
 const attendanceRoutes = require('./routes/attendance');
+const feeRoutes      = require('./routes/fees');
+const payrollRoutes  = require('./routes/payroll');
+const gradesRoutes   = require('./routes/grades');
+const expensesRoutes = require('./routes/expenses');
+const reportsRoutes  = require('./routes/reports');
+const waRoutes       = require('./routes/whatsapp');
+const settingsRoutes = require('./routes/settings');
+
+app.use('/api/students',   studentRoutes);
+app.use('/api',            peopleRoutes);
+app.use('/api/classes',    classRoutes);
 app.use('/api/attendance', attendanceRoutes);
-
-// Fee routes
-const feeRoutes = require('./routes/fees');
-app.use('/api/fees', feeRoutes);
-
-// WhatsApp routes
-const waRoutes = require('./routes/whatsapp');
-app.use('/api/whatsapp', waRoutes);
+app.use('/api/fees',       feeRoutes);
+app.use('/api/payroll',    payrollRoutes);
+app.use('/api/grades',     gradesRoutes);
+app.use('/api/expenses',   expensesRoutes);
+app.use('/api/reports',    reportsRoutes);
+app.use('/api/whatsapp',   waRoutes);
+app.use('/api/settings',   settingsRoutes);
 
 // Root redirect
 app.get('/', (req, res) => res.redirect('/admin'));
@@ -135,14 +148,3 @@ app.listen(PORT, () => {
 });
 
 module.exports = app;
-// Grades routes
-const gradesRoutes = require('./routes/grades');
-app.use('/api/grades', gradesRoutes);
-
-// Office Expenses routes
-const expensesRoutes = require('./routes/expenses');
-app.use('/api/expenses', expensesRoutes);
-
-// Reports routes
-const reportsRoutes = require('./routes/reports');
-app.use('/api/reports', reportsRoutes);
