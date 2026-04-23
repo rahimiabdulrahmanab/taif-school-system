@@ -1,4 +1,5 @@
 const express = require('express');
+const bcrypt  = require('bcryptjs');
 const pool    = require('../db.js');
 const router  = express.Router();
 
@@ -46,7 +47,7 @@ router.get('/marks', async (req, res) => {
     const marksMap = {};
     marksRes.rows.forEach(m => {
       if (!marksMap[m.student_id]) marksMap[m.student_id] = {};
-      marksMap[m.student_id][m.term] = m;
+      marksMap[m.student_id][m.exam_type] = m;
     });
     const subRes  = await pool.query('SELECT * FROM subjects WHERE id=$1', [subject_id]);
     const subject = subRes.rows[0] || { max_midterm: 40, max_final: 60 };
@@ -80,13 +81,16 @@ router.post('/marks', async (req, res) => {
     const subRes   = await pool.query('SELECT * FROM subjects WHERE id=$1', [subject_id]);
     if (!subRes.rows.length) return res.status(404).json({ error: 'Subject not found' });
     const subject  = subRes.rows[0];
-    const maxScore = exam_type === 'midterm' ? (subject.max_midterm || 40) : (subject.max_final || 60);
-    if (parseFloat(score) > maxScore) return res.status(400).json({ error: `Score cannot exceed ${maxScore}` });
+    const maxScore  = exam_type === 'midterm' ? (subject.max_midterm || 40) : (subject.max_final || 60);
+    const parsedScore = parseFloat(score);
+    if (isNaN(parsedScore))        return res.status(400).json({ error: 'Score must be a number' });
+    if (parsedScore < 0)           return res.status(400).json({ error: 'Score cannot be negative' });
+    if (parsedScore > maxScore)    return res.status(400).json({ error: `Score cannot exceed ${maxScore}` });
     const year   = new Date().getFullYear().toString();
     const result = await pool.query(`
-      INSERT INTO marks (student_id, subject_id, term, score, max_score, academic_year)
-      VALUES ($1,$2,$3,$4,$5,$6)
-      ON CONFLICT (student_id, subject_id, term) DO UPDATE SET score=$4
+      INSERT INTO marks (student_id, subject_id, exam_type, term, score, max_score, academic_year)
+      VALUES ($1,$2,$3,$3,$4,$5,$6)
+      ON CONFLICT (student_id, subject_id, exam_type) DO UPDATE SET score=$4
       RETURNING *
     `, [student_id, subject_id, exam_type, score, maxScore, year]);
     res.json(result.rows[0]);
@@ -111,8 +115,8 @@ router.get('/transcript/:student_id', async (req, res) => {
     );
     const transcript = await Promise.all(subjects.rows.map(async (sub) => {
       const marks    = await pool.query(`SELECT * FROM marks WHERE student_id=$1 AND subject_id=$2`, [s.id, sub.id]);
-      const midRow   = marks.rows.find(m => m.term === 'midterm');
-      const finRow   = marks.rows.find(m => m.term === 'final');
+      const midRow   = marks.rows.find(m => m.exam_type === 'midterm');
+      const finRow   = marks.rows.find(m => m.exam_type === 'final');
       const midScore = midRow ? parseFloat(midRow.score) : null;
       const finScore = finRow ? parseFloat(finRow.score) : null;
       const total    = (midScore !== null && finScore !== null) ? midScore + finScore : null;
@@ -136,6 +140,110 @@ router.get('/transcript/:student_id', async (req, res) => {
     console.error('GET /api/grades/transcript error:', err.message);
     res.status(500).json({ error: err.message });
   }
+});
+
+// ── GET /api/grades/pending — mark batches awaiting approval ──
+router.get('/pending', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        m.subject_id,
+        m.exam_type,
+        s.name       AS subject_name,
+        c.id         AS class_id,
+        c.name       AS class_name,
+        c.grade      AS class_grade,
+        t.first_name || ' ' || t.last_name AS teacher_name,
+        t.photo      AS teacher_photo,
+        COUNT(m.id)::int  AS marks_count,
+        MIN(m.submitted_at) AS submitted_at
+      FROM marks m
+      JOIN subjects s ON s.id = m.subject_id
+      JOIN classes  c ON c.id = s.class_id
+      LEFT JOIN teachers t ON t.id = s.teacher_id
+      WHERE m.status = 'submitted'
+      GROUP BY m.subject_id, m.exam_type, s.name, c.id, c.name, c.grade, t.first_name, t.last_name, t.photo
+      ORDER BY MIN(m.submitted_at) ASC
+    `);
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── POST /api/grades/approve — approve a batch ────────────────
+router.post('/approve', async (req, res) => {
+  try {
+    const { subject_id, exam_type } = req.body;
+    await pool.query(`
+      UPDATE marks
+      SET status='approved', approved_by=$3, approved_at=NOW(), rejection_note=NULL
+      WHERE subject_id=$1 AND exam_type=$2 AND status='submitted'
+    `, [subject_id, exam_type, req.user.id]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── POST /api/grades/reject — reject a batch ─────────────────
+router.post('/reject', async (req, res) => {
+  try {
+    const { subject_id, exam_type, note } = req.body;
+    await pool.query(`
+      UPDATE marks
+      SET status='rejected', rejection_note=$3
+      WHERE subject_id=$1 AND exam_type=$2 AND status='submitted'
+    `, [subject_id, exam_type, note || 'Rejected by admin']);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── POST /api/grades/teacher-login — create teacher login ─────
+router.post('/teacher-login', async (req, res) => {
+  try {
+    const { teacher_id, username, password } = req.body;
+    if (!teacher_id || !username || !password)
+      return res.status(400).json({ error: 'teacher_id, username, and password are required' });
+    if (password.length < 6)
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+
+    // Check username not taken
+    const exists = await pool.query('SELECT id FROM admin_users WHERE username=$1', [username]);
+    if (exists.rows.length) return res.status(400).json({ error: 'Username already taken' });
+
+    const teacher = await pool.query(
+      'SELECT first_name, last_name FROM teachers WHERE id=$1', [teacher_id]
+    );
+    if (!teacher.rows.length) return res.status(404).json({ error: 'Teacher not found' });
+    const t = teacher.rows[0];
+
+    const hash = await bcrypt.hash(password, 10);
+    const result = await pool.query(`
+      INSERT INTO admin_users (username, password_hash, full_name, role, teacher_id)
+      VALUES ($1,$2,$3,'teacher',$4) RETURNING id, username, full_name, role, teacher_id
+    `, [username, hash, t.first_name + ' ' + t.last_name, teacher_id]);
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── DELETE /api/grades/teacher-login/:teacher_id ──────────────
+router.delete('/teacher-login/:teacher_id', async (req, res) => {
+  try {
+    await pool.query(
+      `DELETE FROM admin_users WHERE teacher_id=$1 AND role='teacher'`,
+      [req.params.teacher_id]
+    );
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── GET /api/grades/teacher-login/:teacher_id ─────────────────
+router.get('/teacher-login/:teacher_id', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, username, full_name, role FROM admin_users WHERE teacher_id=$1 AND role='teacher'`,
+      [req.params.teacher_id]
+    );
+    res.json(result.rows[0] || null);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 function getGrade(score, max) {

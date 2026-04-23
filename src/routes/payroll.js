@@ -115,6 +115,14 @@ router.post('/advance', async (req, res) => {
     const { person_id, person_type, amount, month, year, notes } = req.body;
     const payMonth = `${year}-${String(month).padStart(2,'0')}`;
 
+    // Advance must not exceed salary
+    const salTable = person_type === 'teacher' ? 'teachers' : 'staff';
+    const salRes   = await pool.query(`SELECT monthly_salary FROM ${salTable} WHERE id=$1`, [person_id]);
+    const salary   = parseFloat(salRes.rows[0]?.monthly_salary) || 0;
+    if (parseFloat(amount) > salary) {
+      return res.status(400).json({ error: `Advance cannot exceed monthly salary of ${salary} AFN` });
+    }
+
     const exists = await pool.query(
       `SELECT id FROM payroll_advances WHERE person_id=$1 AND person_type=$2 AND pay_month=$3`,
       [person_id, person_type, payMonth]

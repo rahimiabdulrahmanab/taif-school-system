@@ -2,21 +2,42 @@ const { app, BrowserWindow, shell, Menu, dialog } = require('electron');
 const path   = require('path');
 const { fork } = require('child_process');
 const http   = require('http');
+const fs     = require('fs');
 
 let mainWindow;
 let serverProcess;
+
+// ── Load .env explicitly from project root ────────────────────
+function loadEnv() {
+  const envPath = path.join(__dirname, '..', '.env');
+  if (!fs.existsSync(envPath)) return {};
+  const lines = fs.readFileSync(envPath, 'utf8').split('\n');
+  const vars  = {};
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const idx = trimmed.indexOf('=');
+    if (idx < 0) continue;
+    const key = trimmed.slice(0, idx).trim();
+    const val = trimmed.slice(idx + 1).trim().replace(/^["']|["']$/g, '');
+    vars[key] = val;
+  }
+  return vars;
+}
 
 // ── Start the Express server ──────────────────────────────────
 function startServer() {
   const serverPath = path.join(__dirname, 'server.js');
   const appRoot    = path.join(__dirname, '..');
+  const envVars    = loadEnv();
 
   serverProcess = fork(serverPath, [], {
-    cwd: appRoot,  // ← critical: set working dir to project root
+    cwd: appRoot,
     env: {
       ...process.env,
+      ...envVars,
       ELECTRON: 'true',
-      NODE_ENV: 'production',
+      NODE_ENV:  'production',
     },
     silent: false,
   });
@@ -27,12 +48,12 @@ function startServer() {
 
 // ── Poll until server responds ────────────────────────────────
 function waitForServer(callback, attempts = 0) {
-  if (attempts > 40) { callback(false); return; }
+  if (attempts > 60) { callback(false); return; }
   http.get('http://localhost:3000/api/health', (res) => {
     if (res.statusCode === 200) { callback(true); }
-    else { setTimeout(() => waitForServer(callback, attempts + 1), 600); }
+    else { setTimeout(() => waitForServer(callback, attempts + 1), 800); }
   }).on('error', () => {
-    setTimeout(() => waitForServer(callback, attempts + 1), 600);
+    setTimeout(() => waitForServer(callback, attempts + 1), 800);
   });
 }
 
@@ -75,10 +96,20 @@ function createWindow() {
   });
 }
 
+// ── Check if server already running ───────────────────────────
+function checkAlreadyRunning(callback) {
+  http.get('http://localhost:3000/api/health', (res) => {
+    callback(res.statusCode === 200);
+  }).on('error', () => callback(false));
+}
+
 // ── Lifecycle ─────────────────────────────────────────────────
 app.whenReady().then(() => {
   const splash = createSplash();
-  startServer();
+
+  checkAlreadyRunning((alreadyUp) => {
+    if (!alreadyUp) startServer();
+  });
 
   waitForServer((ready) => {
     if (ready) {
@@ -87,7 +118,7 @@ app.whenReady().then(() => {
     } else {
       if (!splash.isDestroyed()) splash.close();
       dialog.showErrorBox('Startup Error',
-        'Could not connect to the database server.\n\nMake sure PostgreSQL is running and your .env file is configured correctly.\n\nThen restart the application.');
+        'Could not start the server.\n\nPlease check:\n• PostgreSQL service is running\n• Port 3000 is not already in use\n• Your .env file has the correct database credentials\n\nThen restart the application.');
       app.quit();
     }
   });

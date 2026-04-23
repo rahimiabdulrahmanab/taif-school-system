@@ -207,7 +207,7 @@ CREATE TABLE office_expenses (
 INSERT INTO admin_users (username, password_hash, full_name)
 VALUES (
   'admin',
-  '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
+  '$2a$10$OoJl6I4S2ptVnzTTBBajm.W2xeLvecCvnePOX8iUZintyn3jfS8Da',
   'School Administrator'
 );
 

@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Teacher Portal — Taif High School</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:'Manrope',sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden;}
+body{
+  background:linear-gradient(135deg,#ddeaf7 0%,#d4e4f5 50%,#e8f2fb 100%);
+  display:flex;height:100vh;
+}
+:root{
+  --brand:#2f5f98;--brand-deep:#244c7c;
+  --accent:#58b8a9;--accent-glow:rgba(88,184,169,.22);
+  --glass:rgba(255,255,255,.72);--glass-mid:rgba(255,255,255,.86);
+  --glass-border:rgba(52,92,136,.14);
+  --text:#18324a;--text-mid:#587088;--text-dim:#8aa0b5;
+  --radius:14px;--font-head:'Syne',sans-serif;--font-mono:'JetBrains Mono',monospace;
+  --sidebar-w:300px;
+}
+
+/* ── Sidebar ── */
+.sidebar{
+  width:var(--sidebar-w);height:100%;flex-shrink:0;
+  background:linear-gradient(180deg,#1e3a5f 0%,#162d4a 100%);
+  display:flex;flex-direction:column;
+  border-radius:0 0 0 0;
+  box-shadow:4px 0 32px rgba(10,20,40,.35);
+  position:relative;z-index:10;
+  overflow:hidden;
+}
+.sidebar::after{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,transparent,#58b8a9 50%,transparent);
+}
+.s-header{
+  padding:20px 18px 16px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+  flex-shrink:0;
+}
+.s-school{
+  font-family:var(--font-head);font-size:13px;font-weight:700;
+  color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.12em;
+  margin-bottom:12px;
+}
+.s-teacher{
+  display:flex;align-items:center;gap:11px;
+}
+.s-avatar{
+  width:42px;height:42px;border-radius:12px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--accent),#3a9a8c);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-head);font-size:15px;font-weight:800;color:#fff;
+  overflow:hidden;
+}
+.s-avatar img{width:100%;height:100%;object-fit:cover;}
+.s-name{font-family:var(--font-head);font-size:14px;font-weight:800;color:#fff;line-height:1.2;}
+.s-subject{font-size:11px;color:rgba(255,255,255,.45);margin-top:2px;}
+
+.s-nav-title{
+  padding:18px 18px 7px;
+  font-size:10px;font-weight:700;color:rgba(255,255,255,.30);
+  text-transform:uppercase;letter-spacing:.14em;font-family:var(--font-head);
+  display:flex;align-items:center;gap:8px;
+}
+.s-nav-title::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.08);}
+
+.s-nav{flex:1;overflow-y:auto;padding:0 10px 10px;}
+.s-nav::-webkit-scrollbar{width:4px;}
+.s-nav::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:2px;}
+
+.class-group{margin-bottom:4px;}
+.class-label{
+  padding:7px 8px;font-size:11px;font-weight:700;
+  color:rgba(255,255,255,.5);font-family:var(--font-head);
+  text-transform:uppercase;letter-spacing:.1em;
+  display:flex;align-items:center;gap:6px;
+}
+.class-label i{font-size:10px;color:rgba(255,255,255,.3);}
+
+.subj-btn{
+  width:100%;display:flex;align-items:center;gap:10px;
+  padding:9px 10px;border-radius:8px;margin:1px 0;
+  background:none;border:none;cursor:pointer;
+  text-align:left;transition:background .15s;
+  position:relative;
+}
+.subj-btn:hover{background:rgba(255,255,255,.07);}
+.subj-btn.active{background:rgba(88,184,169,.15);border:1px solid rgba(88,184,169,.25);}
+.subj-btn.active::before{
+  content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);
+  width:3px;height:55%;background:var(--accent);border-radius:0 3px 3px 0;
+}
+.subj-icon{
+  width:30px;height:30px;flex-shrink:0;border-radius:7px;
+  background:rgba(255,255,255,.07);
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;color:rgba(255,255,255,.5);
+  transition:background .15s;
+}
+.subj-btn.active .subj-icon{background:rgba(88,184,169,.2);color:var(--accent);}
+.subj-info{flex:1;min-width:0;}
+.subj-name{font-size:13px;font-weight:600;color:rgba(255,255,255,.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.subj-meta{font-size:10.5px;color:rgba(255,255,255,.38);margin-top:1px;}
+.subj-badges{display:flex;gap:4px;flex-shrink:0;flex-direction:column;align-items:flex-end;}
+
+.status-dot{
+  width:8px;height:8px;border-radius:50%;flex-shrink:0;
+}
+.sd-empty{background:rgba(255,255,255,.2);}
+.sd-draft{background:#ffaa3d;}
+.sd-submitted{background:#5b9ef7;}
+.sd-approved{background:#48d085;}
+.sd-rejected{background:#ff7875;}
+
+.s-footer{
+  padding:12px 10px;border-top:1px solid rgba(255,255,255,.08);flex-shrink:0;
+}
+.logout-btn{
+  width:100%;padding:10px;border-radius:8px;
+  background:rgba(255,80,80,.12);border:1px solid rgba(255,80,80,.18);
+  color:rgba(255,180,180,.8);font-family:var(--font-head);font-size:13px;
+  font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:background .15s;
+}
+.logout-btn:hover{background:rgba(255,80,80,.22);color:#ffb0b0;}
+
+/* ── Main content ── */
+.main{
+  flex:1;display:flex;flex-direction:column;
+  background:rgba(255,255,255,.38);
+  margin:10px 10px 10px 0;border-radius:14px;
+  box-shadow:0 8px 40px rgba(47,95,152,.12),0 0 0 1px rgba(52,92,136,.12);
+  overflow:hidden;min-width:0;
+}
+
+/* Topbar */
+.topbar{
+  height:62px;display:flex;align-items:center;padding:0 28px;gap:16px;flex-shrink:0;
+  background:rgba(255,255,255,.68);backdrop-filter:blur(24px);
+  border-bottom:1px solid rgba(52,92,136,.10);
+}
+.tb-title{flex:1;}
+.tb-title h2{font-family:var(--font-head);font-size:17px;font-weight:800;color:var(--brand-deep);}
+.tb-title span{font-size:11.5px;color:var(--text-mid);display:block;margin-top:1px;}
+.tb-pill{
+  display:flex;align-items:center;gap:7px;padding:6px 13px;
+  background:rgba(255,255,255,.56);border:1px solid var(--glass-border);
+  border-radius:30px;font-size:11.5px;font-weight:600;color:var(--text-mid);
+  font-family:var(--font-mono);
+}
+.tb-dot{width:6px;height:6px;background:var(--accent);border-radius:50%;animation:pd 2s ease-in-out infinite;}
+@keyframes pd{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(.65);}}
+
+/* Content area */
+.content{flex:1;overflow-y:auto;padding:28px;}
+.content::-webkit-scrollbar{width:6px;}
+.content::-webkit-scrollbar-thumb{background:rgba(52,92,136,.18);border-radius:3px;}
+
+/* Empty / welcome state */
+.welcome{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:60vh;text-align:center;gap:16px;
+}
+.welcome-orb{
+  width:88px;height:88px;border-radius:24px;
+  background:rgba(47,95,152,.1);border:1.5px solid rgba(47,95,152,.15);
+  display:flex;align-items:center;justify-content:center;
+  font-size:36px;color:var(--brand);margin-bottom:8px;
+}
+.welcome h3{font-family:var(--font-head);font-size:20px;font-weight:800;color:var(--brand-deep);}
+.welcome p{font-size:13.5px;color:var(--text-mid);max-width:320px;line-height:1.7;}
+
+/* Subject header card */
+.subj-header-card{
+  background:var(--glass-mid);border:1px solid var(--glass-border);
+  border-radius:var(--radius);padding:20px 24px;margin-bottom:20px;
+  display:flex;align-items:center;gap:20px;flex-wrap:wrap;
+}
+.sh-icon{
+  width:52px;height:52px;border-radius:14px;flex-shrink:0;
+  background:linear-gradient(135deg,rgba(47,95,152,.18),rgba(47,95,152,.08));
+  border:1.5px solid rgba(47,95,152,.18);
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;color:var(--brand);
+}
+.sh-info{flex:1;min-width:0;}
+.sh-info h3{font-family:var(--font-head);font-size:17px;font-weight:800;color:var(--brand-deep);}
+.sh-info p{font-size:12px;color:var(--text-mid);margin-top:3px;}
+.sh-badges{display:flex;gap:8px;flex-wrap:wrap;}
+
+/* Exam tabs */
+.exam-tabs{
+  display:flex;gap:6px;margin-bottom:20px;
+  background:rgba(255,255,255,.56);border:1px solid var(--glass-border);
+  border-radius:10px;padding:5px;width:fit-content;
+}
+.exam-tab{
+  padding:8px 20px;border-radius:7px;font-family:var(--font-head);
+  font-size:13px;font-weight:700;cursor:pointer;
+  border:none;background:none;color:var(--text-mid);transition:all .2s;
+  display:flex;align-items:center;gap:7px;
+}
+.exam-tab.active{
+  background:linear-gradient(135deg,var(--brand),#3a7abf);
+  color:#fff;box-shadow:0 4px 12px rgba(47,95,152,.25);
+}
+.exam-tab .etab-dot{width:7px;height:7px;border-radius:50%;}
+
+/* Status banner */
+.status-banner{
+  display:flex;align-items:center;gap:12px;padding:12px 18px;
+  border-radius:10px;margin-bottom:16px;font-size:13px;font-weight:600;
+}
+.sb-draft{background:rgba(255,170,61,.12);border:1px solid rgba(255,170,61,.3);color:#8b5a0e;}
+.sb-submitted{background:rgba(56,139,255,.12);border:1px solid rgba(56,139,255,.3);color:#1a4fa0;}
+.sb-approved{background:rgba(45,139,95,.12);border:1px solid rgba(45,139,95,.3);color:#186b38;}
+.sb-rejected{background:rgba(220,50,50,.12);border:1px solid rgba(220,50,50,.3);color:#8b1a1a;}
+.sb-empty{background:rgba(52,92,136,.06);border:1px solid rgba(52,92,136,.14);color:var(--text-mid);}
+
+/* Marks table */
+.marks-card{
+  background:var(--glass-mid);border:1px solid var(--glass-border);
+  border-radius:var(--radius);overflow:hidden;margin-bottom:16px;
+}
+.marks-card-hdr{
+  padding:15px 22px;border-bottom:1px solid rgba(52,92,136,.08);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.marks-card-hdr h4{
+  font-family:var(--font-head);font-size:14px;font-weight:700;
+  color:var(--brand-deep);display:flex;align-items:center;gap:8px;
+}
+.marks-card-hdr h4 i{color:var(--accent);}
+.marks-card-hdr span{font-size:11px;color:var(--text-dim);font-family:var(--font-mono);}
+.marks-tbl{width:100%;border-collapse:collapse;}
+.marks-tbl th{
+  padding:11px 20px;font-size:10px;font-weight:700;color:var(--text-mid);
+  text-transform:uppercase;letter-spacing:.1em;text-align:left;
+  background:rgba(47,95,152,.04);border-bottom:1px solid rgba(52,92,136,.08);
+  font-family:var(--font-head);
+}
+.marks-tbl td{
+  padding:10px 20px;border-bottom:1px solid rgba(52,92,136,.06);
+  color:var(--text);font-size:13px;vertical-align:middle;
+}
+.marks-tbl tbody tr:last-child td{border-bottom:none;}
+.marks-tbl tbody tr:hover td{background:rgba(255,255,255,.5);}
+
+.score-input{
+  width:80px;padding:7px 10px;
+  background:rgba(255,255,255,.8);
+  border:1.5px solid rgba(52,92,136,.18);
+  border-radius:7px;font-family:var(--font-mono);font-size:14px;
+  font-weight:600;color:var(--brand-deep);text-align:center;
+  outline:none;transition:.2s;
+}
+.score-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(88,184,169,.15);}
+.score-input:disabled{background:rgba(255,255,255,.4);color:var(--text-dim);cursor:not-allowed;}
+.score-input.approved{
+  background:rgba(45,139,95,.06);border-color:rgba(45,139,95,.25);color:#186b38;
+}
+
+/* Action buttons */
+.actions-row{
+  display:flex;gap:10px;padding-top:4px;flex-wrap:wrap;
+}
+.btn{
+  display:flex;align-items:center;gap:8px;padding:11px 22px;
+  border:none;border-radius:9px;font-family:var(--font-head);
+  font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;
+}
+.btn-save{
+  background:linear-gradient(135deg,var(--accent),#3a9a8c);
+  color:#fff;box-shadow:0 6px 18px rgba(88,184,169,.3);
+}
+.btn-save:hover{filter:brightness(1.05);transform:translateY(-1px);}
+.btn-submit{
+  background:linear-gradient(135deg,var(--brand),#3a7abf);
+  color:#fff;box-shadow:0 6px 18px rgba(47,95,152,.28);
+}
+.btn-submit:hover{filter:brightness(1.05);transform:translateY(-1px);}
+.btn-ghost{
+  background:rgba(255,255,255,.7);border:1px solid var(--glass-border);
+  color:var(--text-mid);
+}
+.btn-ghost:hover{background:rgba(255,255,255,.95);color:var(--brand);}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none !important;filter:none !important;}
+
+/* Badge */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;font-family:var(--font-head);}
+.bg-draft{background:rgba(255,170,61,.15);color:#8b5a0e;border:1px solid rgba(255,170,61,.3);}
+.bg-sub{background:rgba(56,139,255,.15);color:#1a4fa0;border:1px solid rgba(56,139,255,.3);}
+.bg-app{background:rgba(45,139,95,.15);color:#186b38;border:1px solid rgba(45,139,95,.3);}
+.bg-rej{background:rgba(220,50,50,.12);color:#8b1a1a;border:1px solid rgba(220,50,50,.25);}
+.bg-emp{background:rgba(52,92,136,.08);color:var(--text-dim);border:1px solid rgba(52,92,136,.14);}
+
+/* Toast */
+#toast{
+  position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(80px);
+  background:#1e3a5f;color:#fff;padding:12px 22px;border-radius:30px;
+  font-family:var(--font-head);font-size:13px;font-weight:700;
+  box-shadow:0 8px 28px rgba(10,20,40,.3);
+  transition:transform .3s cubic-bezier(.4,0,.2,1);z-index:9999;
+  display:flex;align-items:center;gap:9px;white-space:nowrap;
+}
+#toast.show{transform:translateX(-50%) translateY(0);}
+#toast.toast-ok{background:#1e5f3a;}
+#toast.toast-err{background:#5f1e1e;}
+
+/* Loading spinner */
+.spin{animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* Mobile sidebar toggle */
+@media(max-width:768px){
+  .sidebar{position:fixed;left:-320px;top:0;height:100%;transition:left .3s;z-index:100;}
+  .sidebar.open{left:0;}
+  .main{margin:8px;}
+  .mob-menu{display:flex !important;}
+}
+.mob-menu{display:none;width:38px;height:38px;border-radius:8px;
+  background:rgba(47,95,152,.1);border:1px solid var(--glass-border);
+  color:var(--brand);font-size:16px;align-items:center;justify-content:center;cursor:pointer;}
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar" id="sidebar">
+  <div class="s-header">
+    <div class="s-school" id="s-school-name">Taif High School</div>
+    <div class="s-teacher">
+      <div class="s-avatar" id="s-avatar">?</div>
+      <div>
+        <div class="s-name" id="s-name">Loading...</div>
+        <div class="s-subject" id="s-role">Teacher Portal</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="s-nav" id="s-nav">
+    <div style="padding:28px 16px;text-align:center;color:rgba(255,255,255,.35);font-size:12px;">
+      <i class="fas fa-spinner spin" style="font-size:20px;display:block;margin-bottom:10px;"></i>
+      Loading subjects...
+    </div>
+  </div>
+
+  <div class="s-footer">
+    <button class="logout-btn" onclick="logout()">
+      <i class="fas fa-sign-out-alt"></i> Sign Out
+    </button>
+  </div>
+</aside>
+
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <button class="mob-menu" id="mob-menu-btn" onclick="toggleSidebar()">
+      <i class="fas fa-bars"></i>
+    </button>
+    <div class="tb-title">
+      <h2 id="tb-title">Select a Subject</h2>
+      <span id="tb-sub">Choose a class and subject from the left panel</span>
+    </div>
+    <div class="tb-pill">
+      <span class="tb-dot"></span>
+      <span id="tb-academic-year">2026</span>
+    </div>
+  </div>
+
+  <div class="content" id="content">
+    <div class="welcome" id="welcome-state">
+      <div class="welcome-orb"><i class="fas fa-chalkboard-teacher"></i></div>
+      <h3>Welcome to your Marks Portal</h3>
+      <p>Select a subject from the left panel to start entering or reviewing marks for your students.</p>
+    </div>
+  </div>
+</div>
+
+<div id="toast"><i class="fas fa-check-circle" id="toast-icon"></i><span id="toast-msg">Saved</span></div>
+
+<!-- Confirm Dialog -->
+<div id="confirm-overlay" style="display:none;position:fixed;inset:0;background:rgba(10,20,40,.6);backdrop-filter:blur(6px);z-index:9000;"></div>
+<div id="confirm-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:380px;max-width:calc(100vw - 32px);background:rgba(245,249,255,.98);border:1px solid rgba(52,92,136,.14);border-radius:16px;z-index:9001;box-shadow:0 30px 80px rgba(10,20,40,.25);padding:28px 24px;">
+  <div style="text-align:center;margin-bottom:18px;">
+    <div id="confirm-icon-wrap" style="width:52px;height:52px;border-radius:14px;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;font-size:22px;"></div>
+    <h3 id="confirm-title" style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:#18324a;margin-bottom:7px;"></h3>
+    <p id="confirm-message" style="font-size:13px;color:#587088;line-height:1.6;"></p>
+  </div>
+  <div style="display:flex;gap:10px;">
+    <button id="confirm-ok" style="flex:1;padding:12px;border:none;border-radius:9px;font-family:'Syne',sans-serif;font-size:13px;font-weight:800;cursor:pointer;color:#fff;"></button>
+    <button onclick="resolveConfirm(false)" style="padding:12px 18px;background:rgba(255,255,255,.7);border:1px solid rgba(52,92,136,.15);border-radius:9px;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;color:#587088;">Cancel</button>
+  </div>
+</div>
+
+<script>
+const TOKEN = localStorage.getItem('auth_token');
+const USER  = JSON.parse(localStorage.getItem('auth_user') || '{}');
+
+// ── Auth guard ────────────────────────────────────────────────
+if (!TOKEN || USER.role !== 'teacher') {
+  window.location.href = '/login';
+}
+
+let subjectsData  = [];
+let currentSubjectId = null;
+let currentExamType  = 'midterm';
+let currentMarks     = [];
+let batchStatus      = 'empty';
+
+// ── Init ──────────────────────────────────────────────────────
+async function init() {
+  try {
+    // Load school config
+    const cfg = await apiFetch('/api/config');
+    document.getElementById('s-school-name').textContent = cfg.name || 'Taif High School';
+    document.title = `Teacher Portal — ${cfg.name || 'Taif High School'}`;
+    document.getElementById('tb-academic-year').textContent = cfg.current_year || new Date().getFullYear();
+
+    // Load teacher profile
+    const profile = await apiFetch('/api/teacher/profile');
+    document.getElementById('s-name').textContent    = profile.first_name + ' ' + profile.last_name;
+    document.getElementById('s-role').textContent    = profile.subject || 'Teacher';
+    const av = document.getElementById('s-avatar');
+    if (profile.photo) {
+      av.innerHTML = `<img src="/uploads/teachers/${profile.photo}" alt="">`;
+    } else {
+      av.textContent = (profile.first_name[0] + (profile.last_name[0] || '')).toUpperCase();
+    }
+
+    // Load subjects
+    await loadSubjects();
+  } catch(e) {
+    if (e.status === 401 || e.status === 403) logout();
+    showToast('Failed to load: ' + e.message, 'err');
+  }
+}
+
+async function loadSubjects() {
+  subjectsData = await apiFetch('/api/teacher/subjects');
+  renderSidebar();
+}
+
+function renderSidebar() {
+  const nav = document.getElementById('s-nav');
+  if (!subjectsData.length) {
+    nav.innerHTML = `<div style="padding:28px 16px;text-align:center;color:rgba(255,255,255,.35);font-size:12px;">
+      <i class="fas fa-inbox" style="font-size:24px;display:block;margin-bottom:10px;opacity:.5;"></i>
+      No subjects assigned yet.<br>Contact the admin.
+    </div>`;
+    return;
+  }
+
+  // Group by class
+  const byClass = {};
+  subjectsData.forEach(s => {
+    const key = s.class_id;
+    if (!byClass[key]) byClass[key] = { name: s.class_name, grade: s.class_grade, subjects: [] };
+    byClass[key].subjects.push(s);
+  });
+
+  nav.innerHTML = '';
+  Object.values(byClass).forEach(cls => {
+    const group = document.createElement('div');
+    group.className = 'class-group';
+    group.innerHTML = `<div class="class-label"><i class="fas fa-door-open"></i>${cls.grade} — ${cls.name}</div>`;
+
+    cls.subjects.forEach(s => {
+      const midSt = termStatus(s.midterm_status, s.midterm_count);
+      const finSt = termStatus(s.final_status, s.final_count);
+      const btn = document.createElement('button');
+      btn.className = 'subj-btn' + (s.id === currentSubjectId ? ' active' : '');
+      btn.id = `sbtn-${s.id}`;
+      btn.innerHTML = `
+        <div class="subj-icon"><i class="fas fa-book"></i></div>
+        <div class="subj-info">
+          <div class="subj-name">${s.subject_name}</div>
+          <div class="subj-meta">${s.student_count} students</div>
+        </div>
+        <div class="subj-badges">
+          <div title="Midterm" style="display:flex;align-items:center;gap:3px;">
+            <span style="font-size:9px;color:rgba(255,255,255,.3);">M</span>
+            <div class="status-dot sd-${midSt}"></div>
+          </div>
+          <div title="Final" style="display:flex;align-items:center;gap:3px;">
+            <span style="font-size:9px;color:rgba(255,255,255,.3);">F</span>
+            <div class="status-dot sd-${finSt}"></div>
+          </div>
+        </div>`;
+      btn.onclick = () => openSubject(s.id);
+      group.appendChild(btn);
+    });
+
+    nav.appendChild(group);
+  });
+}
+
+function termStatus(statusVal, count) {
+  if (!count || count === 0) return 'empty';
+  if (statusVal === 'approved') return 'approved';
+  if (statusVal === 'submitted') return 'submitted';
+  if (statusVal === 'rejected') return 'rejected';
+  return 'draft';
+}
+
+// ── Open a subject ────────────────────────────────────────────
+async function openSubject(subjectId) {
+  currentSubjectId = subjectId;
+  currentExamType  = 'midterm';
+
+  // Update sidebar active state
+  document.querySelectorAll('.subj-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById(`sbtn-${subjectId}`);
+  if (btn) btn.classList.add('active');
+
+  // Close mobile sidebar
+  document.getElementById('sidebar').classList.remove('open');
+
+  await renderMarkEntry();
+}
+
+async function renderMarkEntry() {
+  const content = document.getElementById('content');
+  content.innerHTML = `<div style="text-align:center;padding:60px;color:var(--text-mid);">
+    <i class="fas fa-spinner spin" style="font-size:28px;"></i>
+  </div>`;
+
+  try {
+    const data = await apiFetch(`/api/teacher/marks/${currentSubjectId}/${currentExamType}`);
+    currentMarks  = data.students;
+    batchStatus   = data.batch_status;
+    const subject = data.subject;
+    const maxScore = data.max_score;
+
+    // Update topbar
+    document.getElementById('tb-title').textContent = subject.subject_name;
+    document.getElementById('tb-sub').textContent   = `${subject.class_grade ? subject.class_grade + ' — ' : ''}${subject.class_name} · ${data.students.length} students`;
+
+    const isSubmitted = batchStatus === 'submitted';
+
+    // Status banner
+    const bannerMap = {
+      empty:     { cls:'sb-empty',     icon:'fa-inbox',         text:'No marks entered yet. Start entering scores below.' },
+      draft:     { cls:'sb-draft',     icon:'fa-edit',          text:'Draft — marks saved but not yet submitted for approval.' },
+      submitted: { cls:'sb-submitted', icon:'fa-clock',         text:'Submitted — waiting for admin approval. You cannot edit until reviewed.' },
+      approved:  { cls:'sb-approved',  icon:'fa-check-circle',  text:'Approved by admin and visible on transcripts. You can still edit and resubmit if corrections are needed.' },
+      rejected:  { cls:'sb-rejected',  icon:'fa-times-circle',  text:`Rejected by admin${data.rejection_note ? ': ' + data.rejection_note : ''}. Please correct and resubmit.` },
+    };
+    const b = bannerMap[batchStatus] || bannerMap.empty;
+
+    // Midterm status for tab dots
+    const midData = subjectsData.find(s => s.id === currentSubjectId);
+
+    content.innerHTML = `
+      <!-- Subject header -->
+      <div class="subj-header-card">
+        <div class="sh-icon"><i class="fas fa-book-open"></i></div>
+        <div class="sh-info">
+          <h3>${subject.subject_name}</h3>
+          <p>${subject.class_grade} — ${subject.class_name} &nbsp;·&nbsp; Academic Year ${subject.academic_year || new Date().getFullYear()}</p>
+        </div>
+        <div class="sh-badges">
+          <span class="badge bg-emp"><i class="fas fa-users" style="font-size:9px;"></i> ${data.students.length} Students</span>
+          <span class="badge bg-emp"><i class="fas fa-star" style="font-size:9px;"></i> Max: ${subject.max_midterm || 40} / ${subject.max_final || 60}</span>
+        </div>
+      </div>
+
+      <!-- Exam type tabs -->
+      <div class="exam-tabs">
+        <button class="exam-tab ${currentExamType==='midterm'?'active':''}" onclick="switchExam('midterm')">
+          <div class="etab-dot" style="background:${dotColor(midData?.midterm_status, midData?.midterm_count)};"></div>
+          Midterm <span style="opacity:.6;font-weight:400;">(out of ${subject.max_midterm || 40})</span>
+        </button>
+        <button class="exam-tab ${currentExamType==='final'?'active':''}" onclick="switchExam('final')">
+          <div class="etab-dot" style="background:${dotColor(midData?.final_status, midData?.final_count)};"></div>
+          Final <span style="opacity:.6;font-weight:400;">(out of ${subject.max_final || 60})</span>
+        </button>
+      </div>
+
+      <!-- Status banner -->
+      <div class="status-banner ${b.cls}">
+        <i class="fas ${b.icon}"></i> ${b.text}
+      </div>
+
+      <!-- Marks table -->
+      <div class="marks-card">
+        <div class="marks-card-hdr">
+          <h4><i class="fas fa-list-ol"></i>${currentExamType === 'midterm' ? 'Midterm' : 'Final'} Marks</h4>
+          <span>${maxScore} marks total</span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="marks-tbl">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Student</th>
+                <th>Code</th>
+                <th>Score / ${maxScore}</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="marks-tbody">
+              ${data.students.map((s,i) => {
+                const val = s.score !== null ? s.score : '';
+                const st  = s.status || 'empty';
+                const locked = isSubmitted;
+                const ini = (s.first_name[0] + (s.last_name[0]||'')).toUpperCase();
+                const photo = s.photo
+                  ? `<img src="/uploads/students/${s.photo}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:1.5px solid rgba(52,92,136,.15);">`
+                  : `<div style="width:32px;height:32px;border-radius:50%;background:rgba(47,95,152,.12);border:1.5px solid rgba(47,95,152,.18);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--brand);font-family:var(--font-head);">${ini}</div>`;
+                return `<tr>
+                  <td style="color:var(--text-dim);font-family:var(--font-mono);font-size:12px;">${i+1}</td>
+                  <td><div style="display:flex;align-items:center;gap:10px;">${photo}
+                    <div>
+                      <div style="font-weight:700;font-size:13px;color:var(--brand-deep);">${s.first_name} ${s.last_name}</div>
+                    </div>
+                  </div></td>
+                  <td style="font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim);">${s.student_code}</td>
+                  <td>
+                    <input type="number" class="score-input ${st==='approved'?'approved':''}"
+                      id="score-${s.id}" value="${val}" min="0" max="${maxScore}"
+                      placeholder="—" ${locked ? 'disabled' : ''}
+                      oninput="clampScore(this,${maxScore})">
+                  </td>
+                  <td>${statusBadge(st)}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Action buttons -->
+      ${!isSubmitted ? `
+      <div class="actions-row">
+        <button class="btn btn-save" onclick="saveMarks()">
+          <i class="fas fa-save"></i> Save Draft
+        </button>
+        <button class="btn btn-submit" onclick="submitMarks()">
+          <i class="fas fa-paper-plane"></i> ${batchStatus === 'approved' ? 'Re-submit for Approval' : 'Submit for Approval'}
+        </button>
+      </div>` : `
+      <div class="actions-row">
+        <div style="font-size:13px;color:var(--text-mid);display:flex;align-items:center;gap:8px;padding:10px 0;">
+          <i class="fas fa-info-circle" style="color:#5b9ef7;"></i>
+          Marks are under admin review. You cannot edit until the admin approves or rejects.
+        </div>
+      </div>`}
+    `;
+
+  } catch(e) {
+    content.innerHTML = `<div style="padding:40px;text-align:center;color:#ff7875;">
+      <i class="fas fa-exclamation-triangle" style="font-size:28px;display:block;margin-bottom:12px;"></i>
+      ${e.message}
+    </div>`;
+  }
+}
+
+function dotColor(statusVal, count) {
+  const st = termStatus(statusVal, count);
+  return {empty:'rgba(255,255,255,.2)',draft:'#ffaa3d',submitted:'#5b9ef7',approved:'#48d085',rejected:'#ff7875'}[st];
+}
+
+function statusBadge(st) {
+  const map = {
+    empty:     `<span class="badge bg-emp">Not entered</span>`,
+    draft:     `<span class="badge bg-draft"><i class="fas fa-circle" style="font-size:7px;"></i> Draft</span>`,
+    submitted: `<span class="badge bg-sub"><i class="fas fa-clock" style="font-size:9px;"></i> Submitted</span>`,
+    approved:  `<span class="badge bg-app"><i class="fas fa-check" style="font-size:9px;"></i> Approved</span>`,
+    rejected:  `<span class="badge bg-rej"><i class="fas fa-times" style="font-size:9px;"></i> Rejected</span>`,
+  };
+  return map[st] || map.empty;
+}
+
+function clampScore(input, max) {
+  const v = parseFloat(input.value);
+  if (!isNaN(v) && v > max) input.value = max;
+  if (!isNaN(v) && v < 0)   input.value = 0;
+}
+
+async function switchExam(type) {
+  currentExamType = type;
+  await renderMarkEntry();
+}
+
+function collectScores() {
+  return currentMarks.map(s => ({
+    student_id: s.id,
+    score: document.getElementById(`score-${s.id}`)?.value ?? '',
+  }));
+}
+
+async function saveMarks() {
+  const marks = collectScores();
+  const btn = document.querySelector('.btn-save');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner spin"></i> Saving...'; }
+  try {
+    const res = await apiFetch('/api/teacher/marks/save', 'POST', {
+      subject_id: currentSubjectId, exam_type: currentExamType, marks,
+    });
+    showToast(res.message || 'Marks saved as draft', 'ok');
+    await loadSubjects();
+    await renderMarkEntry();
+  } catch(e) {
+    showToast(e.message, 'err');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save Draft'; }
+  }
+}
+
+async function submitMarks() {
+  const isResubmit = batchStatus === 'approved';
+  const confirmed = await showConfirm({
+    title: isResubmit ? 'Re-submit for Approval?' : 'Submit for Approval?',
+    message: isResubmit
+      ? `These marks were already approved. Resubmitting will require the admin to re-approve before they appear on transcripts again.`
+      : `Submit ${currentExamType} marks for admin approval? You cannot edit them until the admin reviews.`,
+    okLabel: isResubmit ? 'Yes, Re-submit' : 'Yes, Submit',
+    type: isResubmit ? 'warning' : 'info',
+  });
+  if (!confirmed) return;
+  const btn = document.querySelector('.btn-submit');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner spin"></i> Submitting...'; }
+  try {
+    const res = await apiFetch('/api/teacher/marks/submit', 'POST', {
+      subject_id: currentSubjectId, exam_type: currentExamType,
+    });
+    showToast(res.message || 'Submitted for approval', 'ok');
+    await loadSubjects();
+    await renderMarkEntry();
+  } catch(e) {
+    showToast(e.message, 'err');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit for Approval'; }
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────
+async function apiFetch(url, method = 'GET', body = null) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN },
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  const data = await res.json();
+  if (!res.ok) { const err = new Error(data.error || 'Request failed'); err.status = res.status; throw err; }
+  return data;
+}
+
+let toastTimer;
+function showToast(msg, type = 'ok') {
+  const t   = document.getElementById('toast');
+  const ico = document.getElementById('toast-icon');
+  const txt = document.getElementById('toast-msg');
+  t.className = type === 'ok' ? 'toast-ok' : 'toast-err';
+  ico.className = type === 'ok' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle';
+  txt.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+let _confirmResolve = null;
+function showConfirm({ title, message, okLabel = 'Confirm', type = 'info' }) {
+  return new Promise(resolve => {
+    _confirmResolve = resolve;
+    const colors = {
+      info:    { bg:'rgba(56,139,255,.12)', color:'#1a4fa0', btnBg:'linear-gradient(135deg,#2f5f98,#3a7abf)', icon:'fa-paper-plane' },
+      warning: { bg:'rgba(255,170,61,.14)', color:'#8b5a0e', btnBg:'linear-gradient(135deg,#d97706,#b45309)', icon:'fa-exclamation-triangle' },
+    };
+    const c = colors[type] || colors.info;
+    const wrap = document.getElementById('confirm-icon-wrap');
+    wrap.style.background = c.bg;
+    wrap.style.color = c.color;
+    wrap.innerHTML = `<i class="fas ${c.icon}"></i>`;
+    document.getElementById('confirm-title').textContent   = title;
+    document.getElementById('confirm-message').textContent = message;
+    const okBtn = document.getElementById('confirm-ok');
+    okBtn.textContent = okLabel;
+    okBtn.style.background = c.btnBg;
+    okBtn.onclick = () => resolveConfirm(true);
+    document.getElementById('confirm-overlay').style.display = 'block';
+    document.getElementById('confirm-modal').style.display   = 'block';
+  });
+}
+function resolveConfirm(result) {
+  document.getElementById('confirm-overlay').style.display = 'none';
+  document.getElementById('confirm-modal').style.display   = 'none';
+  if (_confirmResolve) { _confirmResolve(result); _confirmResolve = null; }
+}
+
+function logout() {
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('auth_user');
+  window.location.href = '/login';
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+
+// ── Start ─────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
