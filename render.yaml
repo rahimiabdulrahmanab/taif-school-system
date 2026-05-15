@@ -1,0 +1,26 @@
+# ─────────────────────────────────────────────────────────────
+#  Render deployment for the Taif School Management System.
+#
+#  This runs the Express server (src/server.js) as a web service.
+#  It does NOT run the Electron desktop build — `npm start` is for
+#  the desktop app, so the start command below calls node directly.
+#
+#  Setup: Render Dashboard → New → Blueprint → pick this repo.
+#  Render reads this file automatically. Then set the two secret
+#  env vars (DATABASE_URL, JWT_SECRET) when prompted.
+# ─────────────────────────────────────────────────────────────
+services:
+  - type: web
+    name: taif-school-system
+    runtime: node
+    plan: free
+    branch: main
+    buildCommand: npm install
+    startCommand: node src/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false   # secret — set in the Render dashboard
+      - key: JWT_SECRET
+        sync: false   # secret — set in the Render dashboard
