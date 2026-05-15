@@ -222,16 +222,21 @@ app.use('/api/teacher',    auth, teacherRoutes);
 // Root redirect
 app.get('/', (req, res) => res.redirect('/login'));
 
-app.listen(PORT, () => {
-  console.log('');
-  console.log('╔══════════════════════════════════════════╗');
-  console.log(`║  ${CONFIG.name.padEnd(40)} ║`);
-  console.log('╠══════════════════════════════════════════╣');
-  console.log(`║  Server  →  http://localhost:${PORT}         ║`);
-  console.log(`║  Admin   →  http://localhost:${PORT}/admin   ║`);
-  console.log(`║  Gate    →  http://localhost:${PORT}/gate    ║`);
-  console.log('╚══════════════════════════════════════════╝');
-  console.log('');
-});
+// On Vercel the app runs as a serverless function — the platform invokes the
+// exported `app` directly, so we must NOT call listen(). Locally / on Render
+// we start a normal HTTP server.
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log('');
+    console.log('╔══════════════════════════════════════════╗');
+    console.log(`║  ${CONFIG.name.padEnd(40)} ║`);
+    console.log('╠══════════════════════════════════════════╣');
+    console.log(`║  Server  →  http://localhost:${PORT}         ║`);
+    console.log(`║  Admin   →  http://localhost:${PORT}/admin   ║`);
+    console.log(`║  Gate    →  http://localhost:${PORT}/gate    ║`);
+    console.log('╚══════════════════════════════════════════╝');
+    console.log('');
+  });
+}
 
 module.exports = app;
