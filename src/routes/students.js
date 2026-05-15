@@ -111,6 +111,7 @@ router.post('/', upload.single('photo'), async (req, res) => {
       first_name, last_name, date_of_birth, gender,
       class_id, parent_name, parent_phone, address,
       monthly_fee, discount_type, discount_value, discount_note,
+      enrolled_at, previous_debt,
     } = req.body;
 
     const student_code = await nextStudentCode();
@@ -123,8 +124,10 @@ router.post('/', upload.single('photo'), async (req, res) => {
         date_of_birth, gender, class_id,
         parent_name, parent_phone, address,
         photo, monthly_fee,
-        discount_type, discount_value, discount_note
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+        discount_type, discount_value, discount_note,
+        enrolled_at, previous_debt
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
+                COALESCE($16::date, CURRENT_DATE),$17)
       RETURNING *
     `, [
       student_code, barcode, first_name, last_name,
@@ -135,6 +138,8 @@ router.post('/', upload.single('photo'), async (req, res) => {
       discount_type || 'none',
       parseFloat(discount_value) || 0,
       discount_note || null,
+      enrolled_at || null,
+      Math.max(0, parseFloat(previous_debt) || 0),
     ]);
 
     res.status(201).json(result.rows[0]);
@@ -153,7 +158,7 @@ router.put('/:id', upload.single('photo'), async (req, res) => {
       first_name, last_name, date_of_birth, gender,
       class_id, parent_name, parent_phone, address,
       monthly_fee, discount_type, discount_value, discount_note,
-      is_active,
+      is_active, enrolled_at, previous_debt,
     } = req.body;
 
     // Get existing student to handle old photo
@@ -178,8 +183,10 @@ router.put('/:id', upload.single('photo'), async (req, res) => {
         parent_phone   = $7,  address        = $8,
         photo          = $9,  monthly_fee    = $10,
         discount_type  = $11, discount_value = $12,
-        discount_note  = $13, is_active      = $14
-      WHERE id = $15
+        discount_note  = $13, is_active      = $14,
+        enrolled_at    = COALESCE($15::date, enrolled_at),
+        previous_debt  = $16
+      WHERE id = $17
       RETURNING *
     `, [
       first_name, last_name,
@@ -192,6 +199,8 @@ router.put('/:id', upload.single('photo'), async (req, res) => {
       parseFloat(discount_value) || 0,
       discount_note || null,
       is_active !== 'false',
+      enrolled_at || null,
+      Math.max(0, parseFloat(previous_debt) || 0),
       req.params.id,
     ]);
 

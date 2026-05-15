@@ -1783,6 +1783,25 @@ button[style*="background:linear-gradient"]{
         <input id="sf-dnote" type="text" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;transition:var(--transition);" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="e.g. Scholarship, Staff child...">
       </div>
 
+      <!-- Enrollment Date (Shamsi) — controls which months show as outstanding fees -->
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;" data-i18n="lbl_enrollment_date">Enrollment Date (Shamsi)</label>
+        <input id="sf-enrolled" type="hidden">
+        <div style="display:flex;gap:6px;direction:rtl;">
+          <select id="sf-enr-day"   onchange="syncEnrolledShamsi()" style="flex:1;padding:9px 6px;background:rgba(255,255,255,.85);border:1px solid rgba(26,74,92,.12);border-radius:var(--radius-sm);color:#0C1526;font-family:var(--font-body);font-size:13px;outline:none;"></select>
+          <select id="sf-enr-month" onchange="syncEnrolledShamsi()" style="flex:2;padding:9px 6px;background:rgba(255,255,255,.85);border:1px solid rgba(26,74,92,.12);border-radius:var(--radius-sm);color:#0C1526;font-family:var(--font-body);font-size:13px;outline:none;"></select>
+          <select id="sf-enr-year"  onchange="syncEnrolledShamsi()" style="flex:1.5;padding:9px 6px;background:rgba(255,255,255,.85);border:1px solid rgba(26,74,92,.12);border-radius:var(--radius-sm);color:#0C1526;font-family:var(--font-body);font-size:13px;outline:none;"></select>
+        </div>
+        <div style="font-size:10.5px;color:var(--text-dim);margin-top:5px;line-height:1.5;" data-i18n="hint_enrollment_date">Pick the month/year the student actually joined. The fee system tracks owed months from this date.</div>
+      </div>
+
+      <!-- Previous Debt (legacy carry-forward balance) -->
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;" data-i18n="lbl_previous_debt">Previous Debt — Legacy Balance (AFN)</label>
+        <input id="sf-prev-debt" type="text" inputmode="numeric" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;transition:var(--transition);" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="0" oninput="this.value=toWesternDigits(this.value).replace(/[^0-9]/g,'')">
+        <div style="font-size:10.5px;color:var(--text-dim);margin-top:5px;line-height:1.5;" data-i18n="hint_previous_debt">Lump-sum debt the student already owed before joining (e.g. unpaid fees from a previous school year). Tracked separately from monthly fees.</div>
+      </div>
+
       <!-- Submit -->
       <div style="display:flex;gap:10px;margin-top:8px;">
         <button type="button" onclick="saveStudent()" id="stu-save-btn" style="flex:1;padding:12px;background:linear-gradient(135deg,var(--accent),#3aaa85);border:none;border-radius:var(--radius-sm);color:#060D18;font-family:var(--font-head);font-size:14px;font-weight:800;cursor:pointer;transition:var(--transition);box-shadow:0 0 20px var(--accent-glow);">
@@ -2847,6 +2866,28 @@ button[style*="background:linear-gradient"]{
       <div style="margin-left:auto;text-align:right;">
         <div style="font-family:var(--font-mono);font-size:18px;font-weight:700;color:var(--text);" id="fee-effective-amount">0 AFN</div>
         <div style="font-size:11px;color:var(--text-dim);" data-i18n="lbl_fee_per_month">Per Month</div>
+      </div>
+    </div>
+
+    <!-- Previous (legacy) debt — appears only when student.previous_debt > paid -->
+    <div id="fee-prev-debt-block" style="display:none;margin-bottom:18px;padding:14px 16px;background:linear-gradient(135deg,rgba(220,79,76,.10),rgba(180,40,40,.06));border:1px solid rgba(220,79,76,.30);border-radius:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#dc4f4c;text-transform:uppercase;letter-spacing:.08em;font-family:var(--font-head);"><i class="fas fa-history"></i> <span data-i18n="lbl_previous_balance">Previous Balance (legacy)</span></div>
+          <div style="font-size:12px;color:var(--text-mid);margin-top:4px;line-height:1.45;" data-i18n="hint_previous_balance">Debt the student owed before joining. Pay against it independently of monthly fees.</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-family:var(--font-mono);font-size:18px;font-weight:800;color:#dc4f4c;" id="fee-prev-debt-balance">0 AFN</div>
+          <div style="font-size:10.5px;color:var(--text-dim);margin-top:2px;">
+            <span data-i18n="lbl_original">Original</span>: <span id="fee-prev-debt-orig" style="font-family:var(--font-mono);">0</span> · <span data-i18n="lbl_paid">Paid</span>: <span id="fee-prev-debt-paid" style="font-family:var(--font-mono);">0</span>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap;">
+        <input id="fee-prev-debt-pay" type="text" inputmode="numeric" placeholder="0" style="flex:1;min-width:120px;padding:8px 12px;background:rgba(255,255,255,.7);border:1px solid rgba(220,79,76,.35);border-radius:8px;color:#0C1526;font-family:var(--font-mono);font-size:14px;font-weight:700;outline:none;" oninput="this.value=toWesternDigits(this.value).replace(/[^0-9]/g,'')">
+        <button onclick="payPreviousDebt()" style="padding:8px 16px;background:linear-gradient(135deg,#dc4f4c,#b13333);border:none;border-radius:8px;color:#fff;font-family:var(--font-head);font-size:12px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:6px;box-shadow:0 4px 10px rgba(220,79,76,.30);">
+          <i class="fas fa-coins"></i> <span data-i18n="btn_apply_to_legacy">Apply to Previous</span>
+        </button>
       </div>
     </div>
 
@@ -4215,6 +4256,14 @@ const LANG = {
     lbl_parent_name:'Parent Name', lbl_whatsapp_num:'WhatsApp Number',
     lbl_address:'Address', lbl_fee_discount:'Fee & Discount',
     lbl_monthly_fee_afn:'Monthly Fee (AFN)',
+    lbl_enrollment_date:'Enrollment Date (Shamsi)',
+    hint_enrollment_date:'Pick the month/year the student actually joined. The fee system tracks owed months from this date.',
+    lbl_previous_debt:'Previous Debt — Legacy Balance (AFN)',
+    hint_previous_debt:'Lump-sum debt the student already owed before joining (e.g. unpaid fees from a previous school year). Tracked separately from monthly fees.',
+    lbl_previous_balance:'Previous Balance (legacy)',
+    hint_previous_balance:'Debt the student owed before joining. Pay against it independently of monthly fees.',
+    lbl_original:'Original', lbl_paid:'Paid',
+    btn_apply_to_legacy:'Apply to Previous',
     lbl_discount_type:'Discount Type', lbl_discount_amount:'Amount (AFN)',
     lbl_discount_reason:'Discount Reason',
     btn_save_student:'Save Student', btn_capture:'Capture', btn_upload:'Upload',
@@ -4566,6 +4615,14 @@ const LANG = {
     lbl_parent_name:'د والدینو نوم', lbl_whatsapp_num:'واټساپ شمېره',
     lbl_address:'پته', lbl_fee_discount:'فیس او تخفیف',
     lbl_monthly_fee_afn:'میاشتنی فیس (افغاني)',
+    lbl_enrollment_date:'د شاملیدو نیټه (لمریز)',
+    hint_enrollment_date:'هغه میاشت/کال وټاکئ چې زده‌کوونکی واقعاً پکې شامل شوی. د فیس سیسټم له همدې نیټې وروسته باقي‌دار میاشتې شمیري.',
+    lbl_previous_debt:'پخوانی پور — د پخوا پاتې اندازه (افغاني)',
+    hint_previous_debt:'هغه پور چې زده‌کوونکي د شاملیدو دمخه درلود (لکه د تیر کال نه ورکړل شوي فیسونه). له میاشتني فیس څخه جلا تعقیبیږي.',
+    lbl_previous_balance:'پخوانۍ پاتې اندازه',
+    hint_previous_balance:'هغه پور چې زده‌کوونکي د شاملیدو دمخه درلود. له میاشتني فیس څخه په خپلواکه توګه ورکړئ.',
+    lbl_original:'اصلي', lbl_paid:'ورکړل شوی',
+    btn_apply_to_legacy:'پخواني ته ورکړه',
     lbl_discount_type:'د تخفیف ډول', lbl_discount_amount:'مبلغ (افغاني)',
     lbl_discount_reason:'د تخفیف لامل',
     btn_save_student:'زده کوونکی خوندي کول', btn_capture:'عکس اخیستل', btn_upload:'اپلوډ',
@@ -5506,9 +5563,14 @@ initTeacherShamsiPicker();
 initStaffShamsiPicker();
 _initShamsiField('tj',   'teachers-joindate');
 _initShamsiField('sj',   'staff-joindate');
-_initShamsiField('att',  'att-date');
-_initShamsiField('exd',  'exp-date');
-_initShamsiField('ratt', 'rpt-att-date');
+_initShamsiField('att',    'att-date');
+_initShamsiField('exd',    'exp-date');
+_initShamsiField('ratt',   'rpt-att-date');
+_initShamsiField('sf-enr', 'sf-enrolled');     // Student enrollment date picker
+// Wrapper called from the student form's onchange attributes
+function syncEnrolledShamsi() { _syncShamsiField('sf-enr'); }
+function loadEnrolledShamsi(iso) { _loadShamsiField('sf-enr', iso); }
+function clearEnrolledShamsi()   { _clearShamsiField('sf-enr'); }
 applyLang(_lang);
 
 // ═══════════════════════════════════════════════════
@@ -5645,6 +5707,11 @@ function openStudentForm(id) {
     document.getElementById('sf-dtype').value  = s.discount_type || 'none';
     document.getElementById('sf-dvalue').value = s.discount_value || 0;
     document.getElementById('sf-dnote').value  = s.discount_note || '';
+    // Enrollment date + previous debt
+    const enrolledIso = s.enrolled_at ? s.enrolled_at.split('T')[0] : '';
+    document.getElementById('sf-enrolled').value = enrolledIso;
+    loadEnrolledShamsi(enrolledIso);
+    document.getElementById('sf-prev-debt').value = s.previous_debt || 0;
     toggleDiscount();
     if (s.photo) {
       const prev = document.getElementById('stu-photo-preview');
@@ -5670,8 +5737,9 @@ function closeStudentForm(e) {
 }
 
 function clearStudentForm() {
-  ['sf-fname','sf-lname','sf-dob','sf-pname','sf-addr'].forEach(id => document.getElementById(id).value = '');
+  ['sf-fname','sf-lname','sf-dob','sf-pname','sf-addr','sf-enrolled','sf-prev-debt'].forEach(id => document.getElementById(id).value = '');
   clearShamsiPicker();
+  clearEnrolledShamsi();
   document.getElementById('sf-gender').value = '';
   document.getElementById('sf-class').value  = '';
   document.getElementById('sf-fee').value    = '';
@@ -5767,6 +5835,8 @@ async function saveStudent() {
   fd.append('discount_type',  document.getElementById('sf-dtype').value);
   fd.append('discount_value', document.getElementById('sf-dvalue').value || 0);
   fd.append('discount_note',  document.getElementById('sf-dnote').value);
+  fd.append('enrolled_at',    document.getElementById('sf-enrolled').value || '');
+  fd.append('previous_debt',  document.getElementById('sf-prev-debt').value || 0);
 
   // Photo: captured blob or file input
   if (capturedBlob) {
@@ -7754,6 +7824,9 @@ async function openFeePanel(studentId) {
     const res  = await fetch(`/api/fees/student/${studentId}?current_year=${_cur.year}&current_month=${_cur.month}`);
     feeStudentData = await res.json();
     const { student, effective_fee, payments, outstanding } = feeStudentData;
+    const prevDebtBalance = parseFloat(feeStudentData.previous_debt_balance || 0);
+    const prevDebtOrig    = parseFloat(feeStudentData.previous_debt        || 0);
+    const prevDebtPaid    = parseFloat(feeStudentData.previous_debt_paid   || 0);
 
     document.getElementById('fee-student-id').value   = studentId;
     document.getElementById('fee-panel-title').textContent = t('lbl_fee_collect');
@@ -7770,6 +7843,18 @@ async function openFeePanel(studentId) {
     av.innerHTML = student.photo
       ? `<img src="/uploads/students/${student.photo}" style="width:100%;height:100%;object-fit:cover;">`
       : ini;
+
+    // Previous (legacy) debt block
+    const pdBlock = document.getElementById('fee-prev-debt-block');
+    if (prevDebtBalance > 0) {
+      pdBlock.style.display = 'block';
+      document.getElementById('fee-prev-debt-balance').textContent = Math.round(prevDebtBalance).toLocaleString() + ' AFN';
+      document.getElementById('fee-prev-debt-orig').textContent    = Math.round(prevDebtOrig).toLocaleString();
+      document.getElementById('fee-prev-debt-paid').textContent    = Math.round(prevDebtPaid).toLocaleString();
+      document.getElementById('fee-prev-debt-pay').value           = Math.round(prevDebtBalance);
+    } else {
+      pdBlock.style.display = 'none';
+    }
 
     // Outstanding months
     selectedMonths = [];
@@ -7907,6 +7992,38 @@ function closeFeePanel(e) {
     _fp.style.display = 'none';
     document.getElementById('fee-overlay').style.display = 'none';
   }, 320);
+}
+
+// Pay against the student's legacy (pre-enrollment) debt
+async function payPreviousDebt() {
+  const studentId = document.getElementById('fee-student-id').value;
+  const amount    = parseFloat(document.getElementById('fee-prev-debt-pay').value);
+  const method    = document.getElementById('fee-method').value;
+  const notes     = document.getElementById('fee-notes').value;
+
+  if (!amount || amount <= 0) {
+    showAlert({ title: t('alert_title_invalid'), message: t('msg_invalid_amount'), type: 'warning' });
+    return;
+  }
+  try {
+    const res = await fetch('/api/fees', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        student_id: parseInt(studentId),
+        amount,
+        payment_method: method,
+        notes: notes || 'Previous balance payment',
+        is_previous_debt: true,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed');
+    showAlert({ title: t('alert_title_saved'), message: `${Number(amount).toLocaleString()} AFN — ${t('msg_payment_ok')}`, type: 'success' });
+    openFeePanel(parseInt(studentId)); // refresh modal in place
+    loadFeeList();
+    loadFeeSummary();
+  } catch(e) { showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' }); }
 }
 
 async function recordPayment() {

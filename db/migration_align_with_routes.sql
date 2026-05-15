@@ -52,3 +52,15 @@ CREATE TABLE IF NOT EXISTS staff_monthly_attendance (
   updated_at   TIMESTAMP   DEFAULT NOW(),
   UNIQUE (person_type, person_id, pay_month)
 );
+
+-- ── Legacy debt from before the system existed.
+--    students.previous_debt = lump-sum carry-forward balance the student owed
+--    when they were registered in the system (e.g. unpaid fees from a prior
+--    school year that aren't broken into Shamsi months).
+ALTER TABLE students
+  ADD COLUMN IF NOT EXISTS previous_debt NUMERIC(10,2) DEFAULT 0;
+
+-- Mark fee_payments that go AGAINST the legacy debt (not a specific month).
+-- The fee endpoint sums these to compute how much of the legacy debt is paid.
+ALTER TABLE fee_payments
+  ADD COLUMN IF NOT EXISTS is_previous_debt BOOLEAN DEFAULT FALSE;

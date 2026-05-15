@@ -128,13 +128,24 @@ router.get('/student/:student_id', async (req, res) => {
     // Newest first so the current month surfaces at the top
     outstanding.reverse();
 
+    // ─── Previous (legacy) debt — carry-forward from before enrollment ───
+    // Sum payments flagged as legacy via is_previous_debt
+    const prevDebtOriginal = Math.max(0, parseFloat(s.previous_debt) || 0);
+    const prevDebtPaid     = payments.rows
+      .filter(p => p.is_previous_debt === true)
+      .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+    const prevDebtBalance  = Math.max(0, +(prevDebtOriginal - prevDebtPaid).toFixed(2));
+
     res.json({
       student:        s,
       effective_fee:  effectiveFee,
       payments:       payments.rows,
       outstanding,                                                  // all unpaid + partial back to enrollment
       total_paid:     payments.rows.reduce((sum, p) => sum + parseFloat(p.amount), 0),
-      total_balance:  outstanding.reduce((sum, o) => sum + o.balance, 0),
+      total_balance:  outstanding.reduce((sum, o) => sum + o.balance, 0) + prevDebtBalance,
+      previous_debt:         prevDebtOriginal,    // original legacy debt on the student record
+      previous_debt_paid:    prevDebtPaid,         // sum of payments tagged as legacy
+      previous_debt_balance: prevDebtBalance,      // what's still owed from before enrollment
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -144,10 +155,21 @@ router.post('/', async (req, res) => {
   try {
     const {
       student_id, amount, payment_month, payment_year,
-      payment_method, notes, months_paid,
+      payment_method, notes, months_paid, is_previous_debt,
     } = req.body;
 
     if (!student_id || !amount) return res.status(400).json({ error: 'Student and amount are required' });
+
+    // ── Legacy-debt payment: not tied to a specific month ──
+    if (is_previous_debt) {
+      const r = await pool.query(`
+        INSERT INTO fee_payments
+          (student_id, amount, payment_month, payment_year, payment_method, notes, payment_date, is_previous_debt)
+        VALUES ($1, $2, NULL, NULL, $3, $4, NOW(), TRUE)
+        RETURNING *
+      `, [student_id, parseFloat(amount), payment_method||'cash', notes||null]);
+      return res.status(201).json({ success: true, payments: [r.rows[0]] });
+    }
 
     // Pay one or more Shamsi months. Multiple partial payments to the SAME
     // month are allowed — they accumulate on the student's monthly balance.
