@@ -19,16 +19,18 @@ UPDATE fee_payments
  WHERE amount IS NULL
    AND amount_paid IS NOT NULL;
 
--- The legacy `amount_paid` column was NOT NULL. The app now writes `amount`
--- only, so drop the NOT NULL so new inserts don't fail. (Safe if the column
--- was already dropped or never existed — wrapped in a DO block.)
+-- The legacy `amount_paid` and `original_fee` columns were NOT NULL in the
+-- original schema. The app writes to `amount` only, so drop NOT NULL on the
+-- legacy columns to prevent insert failures. Safe to re-run.
 DO $$
 BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'fee_payments' AND column_name = 'amount_paid'
-  ) THEN
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_name = 'fee_payments' AND column_name = 'amount_paid') THEN
     EXECUTE 'ALTER TABLE fee_payments ALTER COLUMN amount_paid DROP NOT NULL';
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_name = 'fee_payments' AND column_name = 'original_fee') THEN
+    EXECUTE 'ALTER TABLE fee_payments ALTER COLUMN original_fee DROP NOT NULL';
   END IF;
 END $$;
 
@@ -77,3 +79,37 @@ ALTER TABLE students
 -- The fee endpoint sums these to compute how much of the legacy debt is paid.
 ALTER TABLE fee_payments
   ADD COLUMN IF NOT EXISTS is_previous_debt BOOLEAN DEFAULT FALSE;
+
+-- Marker row for an unpaid month the admin chose to "carry forward" into the
+-- student's running Total Due. The month is closed (no longer shows as
+-- outstanding) and students.previous_debt is incremented by monthly_fee.
+ALTER TABLE fee_payments
+  ADD COLUMN IF NOT EXISTS carried_forward BOOLEAN DEFAULT FALSE;
+
+-- ── Per-student unpaid-month history.
+--    At registration the admin lists specific (year, month, amount) entries
+--    for months the student didn't pay BEFORE the system was installed.
+--    These appear in the student's outstanding-months list alongside the
+--    months auto-generated from the install date forward.
+CREATE TABLE IF NOT EXISTS student_unpaid_history (
+  id            SERIAL PRIMARY KEY,
+  student_id    INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  payment_year  INTEGER NOT NULL,
+  payment_month INTEGER NOT NULL,
+  owed_amount   NUMERIC(10,2) NOT NULL DEFAULT 0,
+  notes         TEXT,
+  created_at    TIMESTAMP DEFAULT NOW(),
+  UNIQUE (student_id, payment_year, payment_month)
+);
+CREATE INDEX IF NOT EXISTS idx_unpaid_history_student
+  ON student_unpaid_history (student_id);
+
+-- ── Default install cutoff. Months from this Shamsi year/month forward are
+--    auto-generated as expected and tracked paid/partial/unpaid. Months before
+--    the cutoff only appear if explicitly listed in student_unpaid_history.
+INSERT INTO settings (key, value)
+  VALUES ('install_year', '1405')
+  ON CONFLICT (key) DO NOTHING;
+INSERT INTO settings (key, value)
+  VALUES ('install_month', '3')
+  ON CONFLICT (key) DO NOTHING;

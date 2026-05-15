@@ -4,6 +4,48 @@ const CONFIG  = require('../../school-config.js');
 const { toShamsi } = require('../shamsi.js');
 const router  = express.Router();
 
+// ─────────────────────────────────────────────────────────────────────
+//  SIMPLE FEE MODEL
+//  Each student has ONE running Total Due (students.previous_debt). The
+//  system auto-tracks each Shamsi month from enrolled_at → today.
+//
+//   • Pay for a month  → fee_payments row tagged (year, month)
+//   • Pay against debt → fee_payments row with is_previous_debt = TRUE
+//   • Carry forward    → fee_payments marker (carried_forward = TRUE) +
+//                        students.previous_debt += effective_fee. The month
+//                        no longer shows as outstanding; the debt grew.
+// ─────────────────────────────────────────────────────────────────────
+
+// Compute the student's effective monthly fee (after discount).
+function effectiveFeeOf(s) {
+  let fee = parseFloat(s.monthly_fee) || 0;
+  if (s.discount_type === 'fixed')   fee = Math.max(0, fee - parseFloat(s.discount_value || 0));
+  if (s.discount_type === 'percent') fee = fee * (1 - parseFloat(s.discount_value || 0) / 100);
+  return fee;
+}
+
+// Convert enrolled_at (or today) → Shamsi (year, month) walk-start.
+// Caps lookback at 60 months for safety on ancient enrollment dates.
+function walkStart(enrolledAt) {
+  const now = new Date();
+  const cur = toShamsi(now.getFullYear(), now.getMonth() + 1, now.getDate());
+  let y = cur.year, m = cur.month;
+  if (enrolledAt) {
+    const e = new Date(enrolledAt);
+    if (!isNaN(e)) {
+      const eS = toShamsi(e.getFullYear(), e.getMonth() + 1, e.getDate());
+      y = eS.year; m = eS.month;
+    }
+  }
+  // Safety cap — never look back more than 60 months
+  const elapsed = (cur.year - y) * 12 + (cur.month - m);
+  if (elapsed > 60) {
+    y = cur.year; m = cur.month - 59;
+    while (m <= 0) { m += 12; y -= 1; }
+  }
+  return { startY: y, startM: m, curY: cur.year, curM: cur.month };
+}
+
 // ── GET all payments (with filters) ──────────────────────────
 router.get('/', async (req, res) => {
   try {
@@ -20,12 +62,10 @@ router.get('/', async (req, res) => {
       WHERE 1=1
     `;
     const params = [];
-
     if (student_id) { params.push(student_id); query += ` AND fp.student_id = $${params.length}`; }
     if (month)      { params.push(month);      query += ` AND fp.payment_month = $${params.length}`; }
-    if (year)       { params.push(year);        query += ` AND fp.payment_year = $${params.length}`; }
-    if (class_id)   { params.push(class_id);    query += ` AND s.class_id = $${params.length}`; }
-
+    if (year)       { params.push(year);       query += ` AND fp.payment_year = $${params.length}`; }
+    if (class_id)   { params.push(class_id);   query += ` AND s.class_id = $${params.length}`; }
     query += ` ORDER BY fp.payment_date DESC`;
     const result = await pool.query(query, params);
     res.json(result.rows);
@@ -43,157 +83,296 @@ router.get('/student/:student_id', async (req, res) => {
       LEFT JOIN classes c ON c.id = s.class_id
       WHERE s.id = $1
     `, [student_id]);
-
     if (!student.rows.length) return res.status(404).json({ error: 'Student not found' });
-    const s = student.rows[0];
+    const s   = student.rows[0];
+    const fee = effectiveFeeOf(s);
 
-    // Calculate effective fee after discount
-    let effectiveFee = parseFloat(s.monthly_fee) || 0;
-    if (s.discount_type === 'fixed')   effectiveFee = Math.max(0, effectiveFee - parseFloat(s.discount_value));
-    if (s.discount_type === 'percent') effectiveFee = effectiveFee * (1 - parseFloat(s.discount_value) / 100);
-
-    // Get all payments
     const payments = await pool.query(
-      `SELECT * FROM fee_payments WHERE student_id = $1 ORDER BY payment_year DESC, payment_month DESC`,
+      `SELECT * FROM fee_payments WHERE student_id = $1 ORDER BY payment_date DESC`,
       [student_id]
     );
 
-    // ─── Outstanding months (with partial-payment tracking) ───────────
-    // payment_year/payment_month in the DB are Shamsi values.
-    // For each Shamsi month from enrollment → now we compute:
-    //   amount  = effective monthly fee
-    //   paid    = SUM of all payments tagged with that year-month
-    //   balance = max(0, amount − paid)
-    //   status  = 'paid' | 'partial' | 'unpaid'
-    // The `outstanding` list returned to the UI keeps only partial + unpaid.
-
-    // Today in Shamsi
-    const now = new Date();
-    const cur = toShamsi(now.getFullYear(), now.getMonth() + 1, now.getDate());
-    const curYear  = cur.year;    // e.g. 1405
-    const curMonth = cur.month;   // e.g. 2 (ثور)
-
-    // Enrollment in Shamsi (fallback: 12 months back if enrolled_at is missing)
-    let startYear, startMonth;
-    if (s.enrolled_at) {
-      const e = new Date(s.enrolled_at);
-      const eShamsi = toShamsi(e.getFullYear(), e.getMonth() + 1, e.getDate());
-      startYear  = eShamsi.year;
-      startMonth = eShamsi.month;
-    } else {
-      startYear = curYear; startMonth = curMonth - 11;
-      if (startMonth <= 0) { startMonth += 12; startYear -= 1; }
-    }
-
-    // Safety: never look back more than 60 months even if enrolled_at is ancient
-    {
-      const totalMonths = (curYear - startYear) * 12 + (curMonth - startMonth);
-      if (totalMonths > 60) {
-        const maxBack = 59;
-        startYear  = curYear;
-        startMonth = curMonth - maxBack;
-        while (startMonth <= 0) { startMonth += 12; startYear -= 1; }
-      }
-    }
-
-    // Sum payments per Shamsi month
-    const paidByMonth = {};
+    // Aggregate per (year, month). Carried-forward marker rows count as the
+    // month being closed (no balance owed), so we track them separately.
+    const paidByMonth    = {};
+    const carriedMonths  = new Set();
+    let debtPaidTotal    = 0;
     payments.rows.forEach(p => {
+      if (p.is_previous_debt) {
+        debtPaidTotal += parseFloat(p.amount || 0);
+        return;
+      }
+      if (p.payment_year == null || p.payment_month == null) return;
       const key = `${p.payment_year}-${p.payment_month}`;
-      paidByMonth[key] = (paidByMonth[key] || 0) + parseFloat(p.amount || 0);
+      if (p.carried_forward) {
+        carriedMonths.add(key);
+      } else {
+        paidByMonth[key] = (paidByMonth[key] || 0) + parseFloat(p.amount || 0);
+      }
     });
 
-    // Walk forward from enrollment to now, building the outstanding list
-    // (only unpaid + partial; fully paid months are still visible via the
-    // payment history block on the same page).
+    // Auto-walk Shamsi months from enrolled_at → now
+    const { startY, startM, curY, curM } = walkStart(s.enrolled_at);
     const outstanding = [];
-    let y = startYear, m = startMonth;
-    while (y < curYear || (y === curYear && m <= curMonth)) {
-      const key  = `${y}-${m}`;
-      const paid = +(paidByMonth[key] || 0).toFixed(2);
-      const balance = Math.max(0, +(effectiveFee - paid).toFixed(2));
-      if (balance > 0) {
-        outstanding.push({
-          year:    y,
-          month:   m,
-          amount:  effectiveFee,    // what was owed for this month
-          paid:    paid,            // how much paid so far
-          balance: balance,         // still owed
-          partial: paid > 0,        // true if some money has come in, but not full
-          status:  paid > 0 ? 'partial' : 'unpaid',
-        });
+    if (startY < curY || (startY === curY && startM <= curM)) {
+      let y = startY, m = startM;
+      while (y < curY || (y === curY && m <= curM)) {
+        const key = `${y}-${m}`;
+        if (!carriedMonths.has(key)) {
+          const paid    = +(paidByMonth[key] || 0).toFixed(2);
+          const balance = Math.max(0, +(fee - paid).toFixed(2));
+          if (balance > 0) {
+            outstanding.push({
+              year: y, month: m,
+              amount:  fee,
+              paid,
+              balance,
+              partial: paid > 0,
+              status:  paid > 0 ? 'partial' : 'unpaid',
+            });
+          }
+        }
+        m++; if (m > 12) { m = 1; y++; }
       }
-      m++; if (m > 12) { m = 1; y++; }
     }
-    // Newest first so the current month surfaces at the top
-    outstanding.reverse();
+    outstanding.sort((a, b) => (b.year - a.year) || (b.month - a.month));
 
-    // ─── Previous (legacy) debt — carry-forward from before enrollment ───
-    // Sum payments flagged as legacy via is_previous_debt
-    const prevDebtOriginal = Math.max(0, parseFloat(s.previous_debt) || 0);
-    const prevDebtPaid     = payments.rows
-      .filter(p => p.is_previous_debt === true)
-      .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
-    const prevDebtBalance  = Math.max(0, +(prevDebtOriginal - prevDebtPaid).toFixed(2));
+    // Total Due running balance = students.previous_debt − sum of debt payments
+    const totalDueOriginal = Math.max(0, parseFloat(s.previous_debt) || 0);
+    const totalDue         = Math.max(0, +(totalDueOriginal - debtPaidTotal).toFixed(2));
 
     res.json({
-      student:        s,
-      effective_fee:  effectiveFee,
-      payments:       payments.rows,
-      outstanding,                                                  // all unpaid + partial back to enrollment
-      total_paid:     payments.rows.reduce((sum, p) => sum + parseFloat(p.amount), 0),
-      total_balance:  outstanding.reduce((sum, o) => sum + o.balance, 0) + prevDebtBalance,
-      previous_debt:         prevDebtOriginal,    // original legacy debt on the student record
-      previous_debt_paid:    prevDebtPaid,         // sum of payments tagged as legacy
-      previous_debt_balance: prevDebtBalance,      // what's still owed from before enrollment
+      student:       s,
+      effective_fee: fee,
+      payments:      payments.rows,
+      outstanding,
+      total_due:           totalDue,         // running debt balance
+      total_due_original:  totalDueOriginal, // raw students.previous_debt
+      total_due_paid:      debtPaidTotal,    // sum of is_previous_debt payments
+      total_paid: payments.rows
+        .filter(p => !p.carried_forward)
+        .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0),
+      // Total exposure: pending monthly + running debt
+      total_balance: +(outstanding.reduce((sum, o) => sum + o.balance, 0) + totalDue).toFixed(2),
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ── POST record a payment ─────────────────────────────────────
+// Body shapes:
+//   { student_id, amount, payment_method, notes, is_previous_debt:true }
+//     → single payment against the student's Total Due.
+//   { student_id, amount, months_paid:[{year,month}, …],
+//     payment_method, notes, apply_excess_to_debt:bool }
+//     → split `amount` across months. If amount > Σ(monthly_fee × len),
+//       the excess either applies to Total Due (apply_excess_to_debt=true)
+//       or piles onto the LAST listed month (false).
 router.post('/', async (req, res) => {
   try {
     const {
       student_id, amount, payment_month, payment_year,
       payment_method, notes, months_paid, is_previous_debt,
+      apply_excess_to_debt,
     } = req.body;
 
-    if (!student_id || !amount) return res.status(400).json({ error: 'Student and amount are required' });
+    if (!student_id || !amount) {
+      return res.status(400).json({ error: 'Student and amount are required' });
+    }
 
-    // ── Legacy-debt payment: not tied to a specific month ──
+    // ── Debt payment (no month) ──
     if (is_previous_debt) {
       const r = await pool.query(`
         INSERT INTO fee_payments
-          (student_id, amount, amount_paid, payment_month, payment_year, payment_method, notes, payment_date, is_previous_debt)
-        VALUES ($1, $2, $2, NULL, NULL, $3, $4, NOW(), TRUE)
+          (student_id, amount, amount_paid, original_fee,
+           payment_month, payment_year, payment_method, notes,
+           payment_date, is_previous_debt)
+        VALUES ($1, $2, $2, $2, NULL, NULL, $3, $4, NOW(), TRUE)
         RETURNING *
-      `, [student_id, parseFloat(amount), payment_method||'cash', notes||null]);
+      `, [student_id, parseFloat(amount), payment_method || 'cash', notes || null]);
       return res.status(201).json({ success: true, payments: [r.rows[0]] });
     }
 
-    // Pay one or more Shamsi months. Multiple partial payments to the SAME
-    // month are allowed — they accumulate on the student's monthly balance.
-    const monthsList = months_paid || [{ month: payment_month, year: payment_year }];
+    // ── Monthly payment(s). Optional excess routing to debt. ──
+    const monthsList = (Array.isArray(months_paid) && months_paid.length)
+      ? months_paid
+      : [{ month: payment_month, year: payment_year }];
+
+    // Compute the effective monthly fee so we know what counts as "excess"
+    const stuRes = await pool.query(
+      `SELECT monthly_fee, discount_type, discount_value FROM students WHERE id = $1`,
+      [student_id]
+    );
+    if (!stuRes.rows.length) return res.status(404).json({ error: 'Student not found' });
+    const fee = effectiveFeeOf(stuRes.rows[0]);
+
+    const total       = parseFloat(amount);
+    const expected    = +(fee * monthsList.length).toFixed(2);
+    const excess      = +(total - expected).toFixed(2);
+
     const results = [];
 
-    // If multiple months are selected, split the amount evenly across them.
-    // (For partial payments on a single month, the admin just selects 1 month
-    // and types the partial amount — that goes in as-is.)
-    const total       = parseFloat(amount);
-    const perMonth    = monthsList.length > 0 ? (total / monthsList.length) : total;
-    const perMonthAmt = Math.round(perMonth * 100) / 100;
-
-    for (const m of monthsList) {
-      const r = await pool.query(`
+    if (excess > 0 && apply_excess_to_debt) {
+      // Pay each selected month at its full fee, then apply leftover to debt.
+      for (const m of monthsList) {
+        const r = await pool.query(`
+          INSERT INTO fee_payments
+            (student_id, amount, amount_paid, original_fee,
+             payment_month, payment_year, payment_method, notes, payment_date)
+          VALUES ($1,$2,$2,$2,$3,$4,$5,$6,NOW())
+          RETURNING *
+        `, [student_id, fee, m.month, m.year, payment_method || 'cash', notes || null]);
+        results.push(r.rows[0]);
+      }
+      const d = await pool.query(`
         INSERT INTO fee_payments
-          (student_id, amount, amount_paid, payment_month, payment_year, payment_method, notes, payment_date)
-        VALUES ($1,$2,$2,$3,$4,$5,$6,NOW())
+          (student_id, amount, amount_paid, original_fee,
+           payment_month, payment_year, payment_method, notes,
+           payment_date, is_previous_debt)
+        VALUES ($1, $2, $2, $2, NULL, NULL, $3, $4, NOW(), TRUE)
         RETURNING *
-      `, [student_id, perMonthAmt, m.month, m.year, payment_method||'cash', notes||null]);
-      results.push(r.rows[0]);
+      `, [student_id, excess, payment_method || 'cash',
+          (notes ? notes + ' — ' : '') + 'excess applied to debt']);
+      results.push(d.rows[0]);
+    } else {
+      // No excess routing → split evenly across the selected months.
+      const perMonth = monthsList.length > 0 ? (total / monthsList.length) : total;
+      const perMonthAmt = Math.round(perMonth * 100) / 100;
+      for (const m of monthsList) {
+        const r = await pool.query(`
+          INSERT INTO fee_payments
+            (student_id, amount, amount_paid, original_fee,
+             payment_month, payment_year, payment_method, notes, payment_date)
+          VALUES ($1,$2,$2,$2,$3,$4,$5,$6,NOW())
+          RETURNING *
+        `, [student_id, perMonthAmt, m.month, m.year,
+            payment_method || 'cash', notes || null]);
+        results.push(r.rows[0]);
+      }
     }
 
-    res.status(201).json({ success: true, payments: results });
+    res.status(201).json({ success: true, payments: results, excess });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── POST carry forward an unpaid month into Total Due ────────
+// Adds students.previous_debt += effective_fee AND inserts a marker payment
+// (carried_forward = TRUE) so the month no longer shows as outstanding.
+router.post('/carry-forward', async (req, res) => {
+  try {
+    const { student_id, year, month } = req.body;
+    if (!student_id || !year || !month) {
+      return res.status(400).json({ error: 'student_id, year and month are required' });
+    }
+
+    const stuRes = await pool.query(
+      `SELECT monthly_fee, discount_type, discount_value, previous_debt
+         FROM students WHERE id = $1`,
+      [student_id]
+    );
+    if (!stuRes.rows.length) return res.status(404).json({ error: 'Student not found' });
+    const fee = effectiveFeeOf(stuRes.rows[0]);
+
+    // What's still owed for that month — only that portion rolls into debt.
+    const paidRow = await pool.query(`
+      SELECT COALESCE(SUM(amount), 0) AS paid
+        FROM fee_payments
+       WHERE student_id = $1 AND payment_year = $2 AND payment_month = $3
+         AND COALESCE(is_previous_debt, FALSE) = FALSE
+         AND COALESCE(carried_forward,  FALSE) = FALSE
+    `, [student_id, year, month]);
+    const alreadyPaid = parseFloat(paidRow.rows[0].paid) || 0;
+    const remaining   = Math.max(0, +(fee - alreadyPaid).toFixed(2));
+
+    if (remaining <= 0) {
+      return res.status(400).json({ error: 'Month is already fully paid' });
+    }
+
+    // Marker payment so the month is closed
+    await pool.query(`
+      INSERT INTO fee_payments
+        (student_id, amount, amount_paid, original_fee,
+         payment_month, payment_year, payment_method, notes,
+         payment_date, carried_forward)
+      VALUES ($1, 0, 0, $2, $3, $4, 'carry', $5, NOW(), TRUE)
+    `, [student_id, fee, month, year, `Carried ${remaining} AFN forward to Total Due`]);
+
+    // Grow the student's Total Due
+    await pool.query(
+      `UPDATE students SET previous_debt = COALESCE(previous_debt, 0) + $1 WHERE id = $2`,
+      [remaining, student_id]
+    );
+
+    res.json({ success: true, carried: remaining });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── POST close a month — bulk carry-forward ──────────────────
+// For every active student that still owes for (year, month), roll the
+// remaining balance into their Total Due and mark the month closed. Used by
+// the "Close Month" button at the end of each Shamsi month.
+router.post('/close-month', async (req, res) => {
+  try {
+    const year  = parseInt(req.body.year);
+    const month = parseInt(req.body.month);
+    if (!year || !month) {
+      return res.status(400).json({ error: 'year and month are required' });
+    }
+
+    const students = await pool.query(`
+      SELECT id, monthly_fee, discount_type, discount_value, enrolled_at
+        FROM students WHERE is_active = true
+    `);
+
+    let closed = 0;
+    let totalCarried = 0;
+
+    for (const s of students.rows) {
+      const fee = effectiveFeeOf(s);
+      if (fee <= 0) continue;
+
+      // Skip students who weren't expected to pay yet (enrolled after this month)
+      const { startY, startM } = walkStart(s.enrolled_at);
+      if (year < startY || (year === startY && month < startM)) continue;
+
+      // Already carried for this month?
+      const already = await pool.query(`
+        SELECT 1 FROM fee_payments
+         WHERE student_id = $1 AND payment_year = $2 AND payment_month = $3
+           AND carried_forward = TRUE LIMIT 1
+      `, [s.id, year, month]);
+      if (already.rows.length) continue;
+
+      const paidRow = await pool.query(`
+        SELECT COALESCE(SUM(amount), 0) AS paid FROM fee_payments
+         WHERE student_id = $1 AND payment_year = $2 AND payment_month = $3
+           AND COALESCE(is_previous_debt, FALSE) = FALSE
+           AND COALESCE(carried_forward,  FALSE) = FALSE
+      `, [s.id, year, month]);
+      const paid      = parseFloat(paidRow.rows[0].paid) || 0;
+      const remaining = Math.max(0, +(fee - paid).toFixed(2));
+      if (remaining <= 0) continue;
+
+      await pool.query(`
+        INSERT INTO fee_payments
+          (student_id, amount, amount_paid, original_fee,
+           payment_month, payment_year, payment_method, notes,
+           payment_date, carried_forward)
+        VALUES ($1, 0, 0, $2, $3, $4, 'carry', $5, NOW(), TRUE)
+      `, [s.id, fee, month, year, `Carried ${remaining} AFN forward to Total Due`]);
+
+      await pool.query(
+        `UPDATE students SET previous_debt = COALESCE(previous_debt, 0) + $1 WHERE id = $2`,
+        [remaining, s.id]
+      );
+      closed++;
+      totalCarried += remaining;
+    }
+
+    res.json({
+      success:         true,
+      students_closed: closed,
+      total_carried:   +totalCarried.toFixed(2),
+    });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -202,6 +381,108 @@ router.delete('/:id', async (req, res) => {
   try {
     await pool.query('DELETE FROM fee_payments WHERE id = $1', [req.params.id]);
     res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── GET per-student cumulative balances ───────────────────────
+router.get('/balances', async (req, res) => {
+  try {
+    const periodYear  = parseInt(req.query.year);
+    const periodMonth = parseInt(req.query.month);
+
+    const now = new Date();
+    const cur = toShamsi(now.getFullYear(), now.getMonth() + 1, now.getDate());
+
+    const students = await pool.query(`
+      SELECT id, monthly_fee, discount_type, discount_value, enrolled_at,
+             COALESCE(previous_debt, 0) AS previous_debt
+        FROM students WHERE is_active = true
+    `);
+
+    // Aggregate non-debt, non-carried payments per (student, year, month)
+    const paid = await pool.query(`
+      SELECT student_id, payment_year, payment_month, SUM(amount) AS paid
+        FROM fee_payments
+       WHERE payment_year IS NOT NULL AND payment_month IS NOT NULL
+         AND COALESCE(is_previous_debt, FALSE) = FALSE
+         AND COALESCE(carried_forward,  FALSE) = FALSE
+       GROUP BY student_id, payment_year, payment_month
+    `);
+    const paidMap = new Map();
+    paid.rows.forEach(p => {
+      paidMap.set(`${p.student_id}-${p.payment_year}-${p.payment_month}`,
+                  parseFloat(p.paid || 0));
+    });
+
+    // Carried-forward markers — these months are closed
+    const carried = await pool.query(`
+      SELECT student_id, payment_year, payment_month
+        FROM fee_payments
+       WHERE carried_forward = TRUE
+         AND payment_year IS NOT NULL AND payment_month IS NOT NULL
+    `);
+    const carriedSet = new Set();
+    carried.rows.forEach(c =>
+      carriedSet.add(`${c.student_id}-${c.payment_year}-${c.payment_month}`));
+
+    // Debt payments per student (reduce Total Due running balance)
+    const debtPaid = await pool.query(`
+      SELECT student_id, SUM(amount) AS paid
+        FROM fee_payments
+       WHERE is_previous_debt = TRUE
+       GROUP BY student_id
+    `);
+    const debtPaidMap = new Map();
+    debtPaid.rows.forEach(d =>
+      debtPaidMap.set(d.student_id, parseFloat(d.paid || 0)));
+
+    const out = students.rows.map(s => {
+      const fee = effectiveFeeOf(s);
+      const { startY, startM } = walkStart(s.enrolled_at);
+
+      let totalBalance = 0;
+      let unpaidMonths = 0;
+      let y = startY, m = startM;
+      while (y < cur.year || (y === cur.year && m <= cur.month)) {
+        const key = `${s.id}-${y}-${m}`;
+        if (!carriedSet.has(key)) {
+          const pd  = paidMap.get(key) || 0;
+          const bal = Math.max(0, +(fee - pd).toFixed(2));
+          if (bal > 0) { totalBalance += bal; unpaidMonths++; }
+        }
+        m++; if (m > 12) { m = 1; y++; }
+      }
+
+      // Total Due running balance contributes to total exposure
+      const totalDue = Math.max(0, +(s.previous_debt - (debtPaidMap.get(s.id) || 0)).toFixed(2));
+      totalBalance += totalDue;
+
+      const periodPaid = (periodYear && periodMonth)
+        ? (paidMap.get(`${s.id}-${periodYear}-${periodMonth}`) || 0)
+        : 0;
+
+      // Period is "expected" if it falls within the auto-walk range
+      let periodExpected = false;
+      if (periodYear && periodMonth) {
+        const inRange = (
+          (periodYear > startY || (periodYear === startY && periodMonth >= startM)) &&
+          (periodYear < cur.year || (periodYear === cur.year && periodMonth <= cur.month))
+        );
+        periodExpected = inRange && !carriedSet.has(`${s.id}-${periodYear}-${periodMonth}`);
+      }
+
+      return {
+        student_id:      s.id,
+        total_balance:   +totalBalance.toFixed(2),
+        unpaid_months:   unpaidMonths,
+        total_due:       totalDue,
+        period_paid:     periodPaid,
+        period_due:      fee,
+        period_expected: periodExpected,
+      };
+    });
+
+    res.json(out);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -218,6 +499,7 @@ router.get('/summary/monthly', async (req, res) => {
         SUM(amount)   AS total_amount
       FROM fee_payments
       WHERE payment_year = $1
+        AND COALESCE(carried_forward, FALSE) = FALSE
       GROUP BY payment_month, payment_year
       ORDER BY payment_month
     `, [y]);
