@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login — Taif School System</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:'Manrope',sans-serif;-webkit-font-smoothing:antialiased;}
+
+body{
+  min-height:100vh;
+  display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,#eef5fc 0%,#e2eef8 50%,#edf4fb 100%);
+  position:relative;overflow:hidden;
+}
+body::before{
+  content:'';position:fixed;inset:0;z-index:0;
+  background:
+    radial-gradient(ellipse 70% 60% at 10% 5%,rgba(47,95,152,.18) 0%,transparent 60%),
+    radial-gradient(ellipse 50% 40% at 90% 90%,rgba(88,184,169,.14) 0%,transparent 55%);
+  pointer-events:none;
+}
+
+.card{
+  position:relative;z-index:1;
+  width:420px;max-width:calc(100vw - 40px);
+  background:rgba(255,255,255,.82);
+  backdrop-filter:blur(24px);
+  border:1px solid rgba(52,92,136,.13);
+  border-radius:22px;
+  box-shadow:0 24px 60px rgba(35,62,96,.13),0 4px 12px rgba(35,62,96,.07);
+  overflow:hidden;
+}
+
+.card-top{
+  padding:36px 36px 28px;
+  text-align:center;
+  border-bottom:1px solid rgba(52,92,136,.08);
+}
+.logo{
+  width:64px;height:64px;
+  background:linear-gradient(135deg,#3a7abf,#58b8a9);
+  border-radius:18px;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:#fff;
+  margin-bottom:16px;
+  box-shadow:0 10px 28px rgba(58,122,191,.28);
+}
+.logo-name{
+  font-family:'Syne',sans-serif;font-size:20px;font-weight:800;
+  color:#1a3a5c;margin-bottom:4px;
+}
+.logo-sub{font-size:12px;color:#7a90a8;font-weight:500;text-transform:uppercase;letter-spacing:.1em;}
+
+.card-body{padding:28px 36px 36px;}
+
+.field{margin-bottom:18px;}
+.field label{
+  display:block;font-size:11px;font-weight:700;
+  color:#587088;text-transform:uppercase;letter-spacing:.08em;
+  margin-bottom:7px;font-family:'Syne',sans-serif;
+}
+.input-wrap{position:relative;}
+.input-wrap i{
+  position:absolute;left:14px;top:50%;transform:translateY(-50%);
+  color:#8aa0b5;font-size:14px;pointer-events:none;
+}
+.field input{
+  width:100%;padding:12px 14px 12px 40px;
+  background:rgba(255,255,255,.7);
+  border:1.5px solid rgba(52,92,136,.15);
+  border-radius:10px;
+  font-family:'Manrope',sans-serif;font-size:14px;color:#1a3a5c;
+  outline:none;transition:.2s;
+}
+.field input:focus{
+  border-color:#3a7abf;
+  background:#fff;
+  box-shadow:0 0 0 3px rgba(58,122,191,.12);
+}
+.field input.error{border-color:#e05555;}
+
+.btn-login{
+  width:100%;padding:14px;
+  background:linear-gradient(135deg,#3a7abf,#2d6aad);
+  border:none;border-radius:10px;
+  font-family:'Syne',sans-serif;font-size:15px;font-weight:700;
+  color:#fff;cursor:pointer;
+  box-shadow:0 8px 24px rgba(58,122,191,.35);
+  transition:.2s;
+  display:flex;align-items:center;justify-content:center;gap:9px;
+  margin-top:6px;
+}
+.btn-login:hover{background:linear-gradient(135deg,#2d6aad,#245c9a);transform:translateY(-1px);}
+.btn-login:active{transform:translateY(0);}
+.btn-login:disabled{opacity:.6;cursor:not-allowed;transform:none;}
+
+.err-msg{
+  display:none;
+  align-items:center;gap:9px;
+  padding:11px 14px;
+  background:rgba(224,85,85,.1);
+  border:1px solid rgba(224,85,85,.25);
+  border-radius:8px;
+  font-size:13px;color:#c0392b;
+  margin-bottom:18px;
+}
+.err-msg i{font-size:14px;flex-shrink:0;}
+.err-msg.show{display:flex;}
+
+.hint{
+  text-align:center;font-size:11.5px;color:#8aa0b5;
+  margin-top:20px;padding-top:16px;
+  border-top:1px solid rgba(52,92,136,.08);
+}
+.hint strong{color:#587088;}
+
+.spinner{
+  width:16px;height:16px;border:2px solid rgba(255,255,255,.4);
+  border-top-color:#fff;border-radius:50%;
+  animation:spin .7s linear infinite;display:none;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="card-top">
+    <div class="logo" id="logo-badge">TS</div>
+    <div class="logo-name" id="school-name">Taif High School</div>
+    <div class="logo-sub">Management System</div>
+  </div>
+
+  <div class="card-body">
+    <div class="err-msg" id="err-msg">
+      <i class="fas fa-exclamation-circle"></i>
+      <span id="err-text">Invalid username or password.</span>
+    </div>
+
+    <form id="login-form" onsubmit="doLogin(event)">
+      <div class="field">
+        <label>Username</label>
+        <div class="input-wrap">
+          <i class="fas fa-user"></i>
+          <input id="username" type="text" placeholder="Enter username" autocomplete="username" required>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Password</label>
+        <div class="input-wrap">
+          <i class="fas fa-lock"></i>
+          <input id="password" type="password" placeholder="Enter password" autocomplete="current-password" required>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-login" id="login-btn">
+        <div class="spinner" id="spinner"></div>
+        <i class="fas fa-sign-in-alt" id="login-icon"></i>
+        <span id="login-text">Sign In</span>
+      </button>
+    </form>
+
+    <div class="hint">Default credentials: <strong>admin</strong> / <strong>admin123</strong></div>
+  </div>
+</div>
+
+<script>
+// Load school branding
+fetch('/api/config').then(r => r.json()).then(cfg => {
+  if (cfg.name)         document.getElementById('school-name').textContent  = cfg.name;
+  if (cfg.abbreviation) document.getElementById('logo-badge').textContent   = cfg.abbreviation;
+  if (cfg.logo) {
+    const b = document.getElementById('logo-badge');
+    b.innerHTML = `<img src="${cfg.logo}" style="width:100%;height:100%;object-fit:cover;border-radius:18px;">`;
+  }
+  document.title = `Login — ${cfg.name || 'School System'}`;
+}).catch(() => {});
+
+// If already logged in, redirect based on role
+if (localStorage.getItem('auth_token')) {
+  const u = JSON.parse(localStorage.getItem('auth_user') || '{}');
+  window.location.href = u.role === 'teacher' ? '/teacher' : '/admin';
+}
+
+async function doLogin(e) {
+  e.preventDefault();
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value;
+  const btn      = document.getElementById('login-btn');
+  const spinner  = document.getElementById('spinner');
+  const icon     = document.getElementById('login-icon');
+  const errMsg   = document.getElementById('err-msg');
+  const errText  = document.getElementById('err-text');
+
+  errMsg.classList.remove('show');
+  btn.disabled = true;
+  spinner.style.display = 'block';
+  icon.style.display    = 'none';
+  document.getElementById('login-text').textContent = 'Signing in...';
+
+  try {
+    const res  = await fetch('/api/auth/login', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ username, password }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      errText.textContent = data.error || 'Invalid username or password.';
+      errMsg.classList.add('show');
+      document.getElementById('password').classList.add('error');
+      return;
+    }
+
+    localStorage.setItem('auth_token', data.token);
+    localStorage.setItem('auth_user',  JSON.stringify(data.user));
+    window.location.href = data.user.role === 'teacher' ? '/teacher' : '/admin';
+
+  } catch {
+    errText.textContent = 'Cannot connect to server. Please try again.';
+    errMsg.classList.add('show');
+  } finally {
+    btn.disabled = false;
+    spinner.style.display = 'none';
+    icon.style.display    = '';
+    document.getElementById('login-text').textContent = 'Sign In';
+  }
+}
+
+document.getElementById('password').addEventListener('input', function() {
+  this.classList.remove('error');
+  document.getElementById('err-msg').classList.remove('show');
+});
+</script>
+</body>
+</html>

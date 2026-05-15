@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 480px; height: 320px;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: transparent;
+    overflow: hidden;
+    -webkit-app-region: drag;
+  }
+  .card {
+    width: 100%; height: 100%;
+    background: linear-gradient(135deg, #0d1f35 0%, #1A4A5C 50%, #0d2b3a 100%);
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,.6);
+    border: 1px solid rgba(93,202,165,.2);
+  }
+  .badge {
+    width: 72px; height: 72px;
+    background: linear-gradient(135deg, #5DCAA5, #3aaa85);
+    border-radius: 18px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; font-weight: 900; color: #060D18;
+    box-shadow: 0 0 30px rgba(93,202,165,.4);
+    margin-bottom: 18px;
+  }
+  .name {
+    font-size: 22px; font-weight: 700; color: #fff;
+    letter-spacing: -.02em; margin-bottom: 4px;
+  }
+  .sub {
+    font-size: 13px; color: rgba(255,255,255,.4);
+    text-transform: uppercase; letter-spacing: .12em;
+    margin-bottom: 32px;
+  }
+  .bar-wrap {
+    width: 200px; height: 4px;
+    background: rgba(255,255,255,.1);
+    border-radius: 4px; overflow: hidden;
+    margin-bottom: 14px;
+  }
+  .bar {
+    height: 100%;
+    background: linear-gradient(90deg, #5DCAA5, #3aaa85);
+    border-radius: 4px;
+    animation: load 3s ease-in-out infinite;
+    box-shadow: 0 0 10px rgba(93,202,165,.6);
+  }
+  @keyframes load {
+    0%   { width: 0%; }
+    50%  { width: 70%; }
+    80%  { width: 90%; }
+    100% { width: 100%; }
+  }
+  .status {
+    font-size: 12px; color: rgba(93,202,165,.7);
+    animation: blink 1.5s ease-in-out infinite;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: .4; }
+  }
+  .version {
+    position: absolute; bottom: 16px;
+    font-size: 11px; color: rgba(255,255,255,.2);
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="badge">TS</div>
+  <div class="name">Taif High School</div>
+  <div class="sub">Management System</div>
+  <div class="bar-wrap"><div class="bar"></div></div>
+  <div class="status">Starting server...</div>
+  <div class="version">v1.0.0 — Jalalabad, Afghanistan</div>
+</div>
+</body>
+</html>
