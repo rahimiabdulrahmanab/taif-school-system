@@ -164,8 +164,8 @@ router.post('/', async (req, res) => {
     if (is_previous_debt) {
       const r = await pool.query(`
         INSERT INTO fee_payments
-          (student_id, amount, payment_month, payment_year, payment_method, notes, payment_date, is_previous_debt)
-        VALUES ($1, $2, NULL, NULL, $3, $4, NOW(), TRUE)
+          (student_id, amount, amount_paid, payment_month, payment_year, payment_method, notes, payment_date, is_previous_debt)
+        VALUES ($1, $2, $2, NULL, NULL, $3, $4, NOW(), TRUE)
         RETURNING *
       `, [student_id, parseFloat(amount), payment_method||'cash', notes||null]);
       return res.status(201).json({ success: true, payments: [r.rows[0]] });
@@ -186,8 +186,8 @@ router.post('/', async (req, res) => {
     for (const m of monthsList) {
       const r = await pool.query(`
         INSERT INTO fee_payments
-          (student_id, amount, payment_month, payment_year, payment_method, notes, payment_date)
-        VALUES ($1,$2,$3,$4,$5,$6,NOW())
+          (student_id, amount, amount_paid, payment_month, payment_year, payment_method, notes, payment_date)
+        VALUES ($1,$2,$2,$3,$4,$5,$6,NOW())
         RETURNING *
       `, [student_id, perMonthAmt, m.month, m.year, payment_method||'cash', notes||null]);
       results.push(r.rows[0]);

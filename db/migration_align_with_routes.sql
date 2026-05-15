@@ -19,6 +19,19 @@ UPDATE fee_payments
  WHERE amount IS NULL
    AND amount_paid IS NOT NULL;
 
+-- The legacy `amount_paid` column was NOT NULL. The app now writes `amount`
+-- only, so drop the NOT NULL so new inserts don't fail. (Safe if the column
+-- was already dropped or never existed — wrapped in a DO block.)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'fee_payments' AND column_name = 'amount_paid'
+  ) THEN
+    EXECUTE 'ALTER TABLE fee_payments ALTER COLUMN amount_paid DROP NOT NULL';
+  END IF;
+END $$;
+
 -- ── office_expenses: routes/UI display `paid_to`
 ALTER TABLE office_expenses
   ADD COLUMN IF NOT EXISTS paid_to VARCHAR(200),
