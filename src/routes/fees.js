@@ -1,6 +1,7 @@
 const express = require('express');
 const pool    = require('../db.js');
 const CONFIG  = require('../../school-config.js');
+const { toShamsi } = require('../shamsi.js');
 const router  = express.Router();
 
 // ── GET all payments (with filters) ──────────────────────────
@@ -57,29 +58,83 @@ router.get('/student/:student_id', async (req, res) => {
       [student_id]
     );
 
-    // Calculate outstanding months
-    const currentYear  = new Date().getFullYear();
-    const currentMonth = new Date().getMonth() + 1;
-    const paidSet = new Set(payments.rows.map(p => `${p.payment_year}-${p.payment_month}`));
+    // ─── Outstanding months (with partial-payment tracking) ───────────
+    // payment_year/payment_month in the DB are Shamsi values.
+    // For each Shamsi month from enrollment → now we compute:
+    //   amount  = effective monthly fee
+    //   paid    = SUM of all payments tagged with that year-month
+    //   balance = max(0, amount − paid)
+    //   status  = 'paid' | 'partial' | 'unpaid'
+    // The `outstanding` list returned to the UI keeps only partial + unpaid.
 
-    // Check last 12 months for outstanding
-    const outstanding = [];
-    for (let i = 0; i < 12; i++) {
-      let m = currentMonth - i;
-      let y = currentYear;
-      if (m <= 0) { m += 12; y -= 1; }
-      const key = `${y}-${m}`;
-      if (!paidSet.has(key)) {
-        outstanding.push({ year: y, month: m, amount: effectiveFee });
+    // Today in Shamsi
+    const now = new Date();
+    const cur = toShamsi(now.getFullYear(), now.getMonth() + 1, now.getDate());
+    const curYear  = cur.year;    // e.g. 1405
+    const curMonth = cur.month;   // e.g. 2 (ثور)
+
+    // Enrollment in Shamsi (fallback: 12 months back if enrolled_at is missing)
+    let startYear, startMonth;
+    if (s.enrolled_at) {
+      const e = new Date(s.enrolled_at);
+      const eShamsi = toShamsi(e.getFullYear(), e.getMonth() + 1, e.getDate());
+      startYear  = eShamsi.year;
+      startMonth = eShamsi.month;
+    } else {
+      startYear = curYear; startMonth = curMonth - 11;
+      if (startMonth <= 0) { startMonth += 12; startYear -= 1; }
+    }
+
+    // Safety: never look back more than 60 months even if enrolled_at is ancient
+    {
+      const totalMonths = (curYear - startYear) * 12 + (curMonth - startMonth);
+      if (totalMonths > 60) {
+        const maxBack = 59;
+        startYear  = curYear;
+        startMonth = curMonth - maxBack;
+        while (startMonth <= 0) { startMonth += 12; startYear -= 1; }
       }
     }
 
+    // Sum payments per Shamsi month
+    const paidByMonth = {};
+    payments.rows.forEach(p => {
+      const key = `${p.payment_year}-${p.payment_month}`;
+      paidByMonth[key] = (paidByMonth[key] || 0) + parseFloat(p.amount || 0);
+    });
+
+    // Walk forward from enrollment to now, building the outstanding list
+    // (only unpaid + partial; fully paid months are still visible via the
+    // payment history block on the same page).
+    const outstanding = [];
+    let y = startYear, m = startMonth;
+    while (y < curYear || (y === curYear && m <= curMonth)) {
+      const key  = `${y}-${m}`;
+      const paid = +(paidByMonth[key] || 0).toFixed(2);
+      const balance = Math.max(0, +(effectiveFee - paid).toFixed(2));
+      if (balance > 0) {
+        outstanding.push({
+          year:    y,
+          month:   m,
+          amount:  effectiveFee,    // what was owed for this month
+          paid:    paid,            // how much paid so far
+          balance: balance,         // still owed
+          partial: paid > 0,        // true if some money has come in, but not full
+          status:  paid > 0 ? 'partial' : 'unpaid',
+        });
+      }
+      m++; if (m > 12) { m = 1; y++; }
+    }
+    // Newest first so the current month surfaces at the top
+    outstanding.reverse();
+
     res.json({
-      student:      s,
-      effective_fee: effectiveFee,
-      payments:     payments.rows,
-      outstanding:  outstanding.slice(0, 6), // show max 6 months outstanding
-      total_paid:   payments.rows.reduce((sum, p) => sum + parseFloat(p.amount), 0),
+      student:        s,
+      effective_fee:  effectiveFee,
+      payments:       payments.rows,
+      outstanding,                                                  // all unpaid + partial back to enrollment
+      total_paid:     payments.rows.reduce((sum, p) => sum + parseFloat(p.amount), 0),
+      total_balance:  outstanding.reduce((sum, o) => sum + o.balance, 0),
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -94,24 +149,25 @@ router.post('/', async (req, res) => {
 
     if (!student_id || !amount) return res.status(400).json({ error: 'Student and amount are required' });
 
-    // If paying multiple months at once
+    // Pay one or more Shamsi months. Multiple partial payments to the SAME
+    // month are allowed — they accumulate on the student's monthly balance.
     const monthsList = months_paid || [{ month: payment_month, year: payment_year }];
     const results = [];
 
-    for (const m of monthsList) {
-      // Check not already paid
-      const exists = await pool.query(
-        `SELECT id FROM fee_payments WHERE student_id=$1 AND payment_month=$2 AND payment_year=$3`,
-        [student_id, m.month, m.year]
-      );
-      if (exists.rows.length) continue; // skip already paid months
+    // If multiple months are selected, split the amount evenly across them.
+    // (For partial payments on a single month, the admin just selects 1 month
+    // and types the partial amount — that goes in as-is.)
+    const total       = parseFloat(amount);
+    const perMonth    = monthsList.length > 0 ? (total / monthsList.length) : total;
+    const perMonthAmt = Math.round(perMonth * 100) / 100;
 
+    for (const m of monthsList) {
       const r = await pool.query(`
         INSERT INTO fee_payments
           (student_id, amount, payment_month, payment_year, payment_method, notes, payment_date)
         VALUES ($1,$2,$3,$4,$5,$6,NOW())
         RETURNING *
-      `, [student_id, amount, m.month, m.year, payment_method||'cash', notes||null]);
+      `, [student_id, perMonthAmt, m.month, m.year, payment_method||'cash', notes||null]);
       results.push(r.rows[0]);
     }
 
