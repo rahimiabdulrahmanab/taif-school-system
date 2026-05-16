@@ -67,6 +67,13 @@ CREATE TABLE IF NOT EXISTS class_teachers (
 CREATE INDEX IF NOT EXISTS idx_class_teachers_class
   ON class_teachers (class_id);
 
+-- ── subjects: the grades route does INSERT ... ON CONFLICT (class_id, name),
+--    which needs a unique constraint on exactly those columns. The original
+--    schema only had UNIQUE(name, class_id, academic_year). Add a matching
+--    unique index so adding/updating a subject works.
+CREATE UNIQUE INDEX IF NOT EXISTS subjects_class_name_uniq
+  ON subjects (class_id, name);
+
 -- ── Helpful indexes for the new query patterns
 CREATE INDEX IF NOT EXISTS idx_fee_payments_month_year
   ON fee_payments (payment_year, payment_month);
