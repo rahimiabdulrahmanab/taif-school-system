@@ -37,10 +37,26 @@ router.post('/wipe', async (req, res) => {
     const tables = existing.rows.map(r => r.table_name);
 
     if (tables.length) {
-      // RESTART IDENTITY resets SERIAL counters; CASCADE clears any dependent
-      // rows in tables not listed above.
+      // Snapshot admin_users first — admin_users has a FK to teachers, so
+      // TRUNCATE ... CASCADE on teachers wipes admin_users too. We restore
+      // them right after so the school can still log in.
+      const admins = await pool.query(`SELECT * FROM admin_users`);
+      const adminCols = admins.fields.map(f => f.name);
+
       const list = tables.map(t => `"${t}"`).join(', ');
       await pool.query(`TRUNCATE TABLE ${list} RESTART IDENTITY CASCADE`);
+
+      // Restore admins (without their teacher_id since teachers were wiped)
+      for (const row of admins.rows) {
+        const fields = adminCols.filter(c => c !== 'id' && c !== 'teacher_id' && row[c] != null);
+        const vals   = fields.map(c => row[c]);
+        const phs    = vals.map((_, i) => `$${i + 1}`).join(',');
+        await pool.query(
+          `INSERT INTO admin_users (${fields.join(',')}) VALUES (${phs})
+           ON CONFLICT (username) DO NOTHING`,
+          vals
+        );
+      }
     }
 
     res.json({ success: true, wiped: tables });
