@@ -54,6 +54,19 @@ BEGIN
   END IF;
 END $$;
 
+-- ── class_teachers: the classes route reads/writes this join table, but the
+--    original schema never created it. Without it, loading classes fails.
+CREATE TABLE IF NOT EXISTS class_teachers (
+  id          SERIAL PRIMARY KEY,
+  class_id    INTEGER NOT NULL REFERENCES classes(id)  ON DELETE CASCADE,
+  teacher_id  INTEGER NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+  subject     VARCHAR(100),
+  created_at  TIMESTAMP DEFAULT NOW(),
+  UNIQUE (class_id, teacher_id)
+);
+CREATE INDEX IF NOT EXISTS idx_class_teachers_class
+  ON class_teachers (class_id);
+
 -- ── Helpful indexes for the new query patterns
 CREATE INDEX IF NOT EXISTS idx_fee_payments_month_year
   ON fee_payments (payment_year, payment_month);
