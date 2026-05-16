@@ -12,11 +12,20 @@ router.get('/', async (req, res) => {
       const countRes = await pool.query(
         `SELECT COUNT(*)::integer AS cnt FROM students WHERE class_id = $1`, [c.id]
       );
+      // A class's teachers come from TWO places: directly assigned via the
+      // class_teachers join table, AND teachers attached to a subject of this
+      // class. Union both, dedupe by teacher, aggregate their subjects.
       const teachersRes = await pool.query(`
-        SELECT t.id, t.first_name, t.last_name, ct.subject
-        FROM class_teachers ct
-        JOIN teachers t ON t.id = ct.teacher_id
-        WHERE ct.class_id = $1
+        SELECT t.id, t.first_name, t.last_name,
+               STRING_AGG(DISTINCT src.subject, ', ') AS subject
+        FROM (
+          SELECT teacher_id, subject     FROM class_teachers WHERE class_id = $1
+          UNION ALL
+          SELECT teacher_id, name AS subject FROM subjects
+           WHERE class_id = $1 AND teacher_id IS NOT NULL
+        ) src
+        JOIN teachers t ON t.id = src.teacher_id
+        GROUP BY t.id, t.first_name, t.last_name
         ORDER BY t.first_name
       `, [c.id]);
 
@@ -47,10 +56,16 @@ router.get('/:id', async (req, res) => {
     );
 
     const teachers = await pool.query(`
-      SELECT t.id, t.first_name, t.last_name, t.photo, ct.subject
-      FROM class_teachers ct
-      JOIN teachers t ON t.id = ct.teacher_id
-      WHERE ct.class_id = $1
+      SELECT t.id, t.first_name, t.last_name, t.photo,
+             STRING_AGG(DISTINCT src.subject, ', ') AS subject
+      FROM (
+        SELECT teacher_id, subject     FROM class_teachers WHERE class_id = $1
+        UNION ALL
+        SELECT teacher_id, name AS subject FROM subjects
+         WHERE class_id = $1 AND teacher_id IS NOT NULL
+      ) src
+      JOIN teachers t ON t.id = src.teacher_id
+      GROUP BY t.id, t.first_name, t.last_name, t.photo
       ORDER BY t.first_name
     `, [req.params.id]);
 
