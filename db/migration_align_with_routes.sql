@@ -39,6 +39,21 @@ ALTER TABLE office_expenses
   ADD COLUMN IF NOT EXISTS paid_to VARCHAR(200),
   ADD COLUMN IF NOT EXISTS notes   TEXT;
 
+-- ── classes: the route uses `grade_level` and `description`, but the original
+--    schema had `grade` (NOT NULL) and `room`. Add the columns the route needs
+--    and drop NOT NULL on the legacy `grade` column so inserts don't fail.
+ALTER TABLE classes
+  ADD COLUMN IF NOT EXISTS grade_level VARCHAR(30),
+  ADD COLUMN IF NOT EXISTS description TEXT;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_name = 'classes' AND column_name = 'grade') THEN
+    EXECUTE 'ALTER TABLE classes ALTER COLUMN grade DROP NOT NULL';
+  END IF;
+END $$;
+
 -- ── Helpful indexes for the new query patterns
 CREATE INDEX IF NOT EXISTS idx_fee_payments_month_year
   ON fee_payments (payment_year, payment_month);
