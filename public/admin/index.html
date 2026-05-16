@@ -4015,6 +4015,10 @@ button[style*="background:linear-gradient"]{
         localStorage.removeItem('auth_token');
         localStorage.removeItem('auth_user');
         window.location.replace('/login');
+        // Halt the caller — the page is navigating to /login, so don't let
+        // page code run on with a 401 error body (it would crash on .reduce
+        // etc.). A never-resolving promise stops the chain cleanly.
+        return new Promise(function() {});
       }
       return res;
     });
@@ -6760,9 +6764,9 @@ async function loadClasses() {
       fetch('/api/teachers').then(r => r.json()),
       fetch('/api/students').then(r => r.json()),
     ]);
-    allClasses       = clsData;
-    allTeachersList  = tchData;
-    unassignedStudents = stuData;
+    allClasses         = Array.isArray(clsData) ? clsData : [];
+    allTeachersList    = Array.isArray(tchData) ? tchData : [];
+    unassignedStudents = Array.isArray(stuData) ? stuData : [];
     renderClasses(allClasses);
   } catch(e) { console.error('loadClasses error:', e); }
 }
