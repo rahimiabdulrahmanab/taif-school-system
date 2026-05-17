@@ -5110,9 +5110,8 @@ function shamsiYearOptions(selected) {
   const cur = getCurrentShamsi().year;
   let html = '';
   // Newest first so the current year is at the top of the dropdown.
-  // Range: 10 years ahead → 20 years back (covers a school's full history
-  // and any plausible student age, without an unwieldy list).
-  for (let y = cur + 10; y >= cur - 20; y--) {
+  // Range: 10 years ahead → 30 years back (oldest = 1375 when cur = 1405).
+  for (let y = cur + 10; y >= cur - 30; y--) {
     html += `<option value="${y}"${y === selected ? ' selected' : ''}>${y}</option>`;
   }
   return html;
@@ -5322,7 +5321,7 @@ function _initShamsiField(prefix, targetId) {
   const dSel=document.getElementById(`${prefix}-day`);
   if (!ySel||ySel.options.length>1) return;
   const now=new Date(),cur=toShamsi(now.getFullYear(),now.getMonth()+1,now.getDate());
-  for (let y=cur.year+10;y>=cur.year-20;y--){const o=document.createElement('option');o.value=y;o.textContent=y;ySel.appendChild(o);}
+  for (let y=cur.year+10;y>=cur.year-30;y--){const o=document.createElement('option');o.value=y;o.textContent=y;ySel.appendChild(o);}
   ySel.value=cur.year;
   const ph=document.createElement('option');ph.value='';ph.textContent='—';dSel.appendChild(ph);
   for (let d=1;d<=31;d++){const o=document.createElement('option');o.value=d;o.textContent=d;dSel.appendChild(o);}
