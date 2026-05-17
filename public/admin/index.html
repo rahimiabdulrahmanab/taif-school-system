@@ -3700,8 +3700,8 @@ button[style*="background:linear-gradient"]{
     </div>
 
     <div style="grid-column:1 / -1;border-top:1px dashed var(--glass-border);padding-top:14px;margin-top:4px;">
-      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;" data-i18n="lbl_install_cutoff">System Install Cutoff (Shamsi)</label>
-      <div style="font-size:10.5px;color:var(--text-dim);margin-bottom:10px;line-height:1.5;" data-i18n="hint_install_cutoff">Months from this Shamsi year/month onward are auto-tracked as expected fees. Earlier months only appear if added in a student's Previously Unpaid Months list.</div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;" data-i18n="lbl_install_cutoff">Fee Billing Starts From (Shamsi)</label>
+      <div style="font-size:10.5px;color:var(--text-dim);margin-bottom:10px;line-height:1.5;" data-i18n="hint_install_cutoff">From this Shamsi month onward, every student is automatically billed their monthly fee. Earlier months still show in each student's statement for history, but with 0 due — unless you click "Set Due" on a specific old month a student actually didn't pay.</div>
       <div style="display:flex;gap:8px;direction:rtl;">
         <select id="set-install-month" style="flex:2;padding:9px 6px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;">
           <option value="1">حمل</option><option value="2">ثور</option><option value="3">جوزا</option>
@@ -4230,8 +4230,8 @@ const LANG = {
     confirm_close_month_title:'Close {month}?',
     confirm_close_month_msg:'Every student who still owes for {month} will have that balance moved into their Total Due. The month is then closed and no longer shown as outstanding.',
     msg_month_closed:'{n} student(s) carried forward — {total} AFN moved to Total Due.',
-    lbl_install_cutoff:'System Install Cutoff (Shamsi)',
-    hint_install_cutoff:"Months from this Shamsi year/month onward are auto-tracked as expected fees. Earlier months only appear if added in a student's Previously Unpaid Months list.",
+    lbl_install_cutoff:'Fee Billing Starts From (Shamsi)',
+    hint_install_cutoff:"From this Shamsi month onward, every student is automatically billed their monthly fee. Earlier months still show in each student's statement for history, but with 0 due — unless you click \"Set Due\" on a specific old month a student actually didn't pay.",
     lbl_month_singular:'month',
     lbl_months_plural:'months',
     hint_period_untracked:"This month isn't tracked for this student — add it to Previously Unpaid Months, or change the install cutoff in Settings.",
@@ -4617,8 +4617,8 @@ const LANG = {
     confirm_close_month_title:'{month} بنده کړو؟',
     confirm_close_month_msg:'هر هغه زده‌کوونکی چې د {month} لپاره لاهم پور لري، باقي به یې ټول پور ته ولېږدول شي. بیا میاشت بنده کیږي او نور د باقي‌دارۍ په توګه نه ښکاري.',
     msg_month_closed:'{n} زده‌کوونکي ولېږدول شول — {total} افغانۍ ټول پور ته واچول شوې.',
-    lbl_install_cutoff:'د سیسټم د نصبیدو پیل (شمسي)',
-    hint_install_cutoff:'له دې شمسي کال/میاشت څخه وروسته میاشتې په خپلکار توګه د تمې وړ فیسونو په توګه څارل کیږي. مخکینۍ میاشتې یوازې هغه وخت ښکاري چې د زده‌کوونکي په پخوانیو نه‌تادیه شویو لیست کې اضافه شي.',
+    lbl_install_cutoff:'د فیس بیلونه له دې میاشتې پیلیږي (شمسي)',
+    hint_install_cutoff:'له دې شمسي میاشتې وروسته، هر زده‌کوونکی په اتومات ډول د خپل میاشتني فیس بیله ورکول کیږي. مخکینۍ میاشتې لاهم د تاریخچې لپاره ښکاري خو پور یې صفر دی — مګر دا چې تاسو د یوې ځانګړې پخوانۍ نه‌تادیه شوې میاشتې لپاره "تادیه وټاکئ" کلیک وکړئ.',
     lbl_month_singular:'میاشت',
     lbl_months_plural:'میاشتې',
     hint_period_untracked:'دا میاشت د دې زده‌کوونکي لپاره نه ده څارل شوې — په پخوانیو نه‌تادیه شویو میاشتو کې یې اضافه کړئ، یا د سیسټم د نصب نېټه په تنظیماتو کې بدله کړئ.',

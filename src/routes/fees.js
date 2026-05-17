@@ -432,12 +432,28 @@ router.get('/statement/:student_id', async (req, res) => {
       d.rows.forEach(r => { dueByKey[`${r.payment_year}-${r.payment_month}`] = r; });
     } catch (_) { /* table not migrated yet */ }
 
+    // Billing-start cutoff. Months on/after it auto-bill the monthly fee;
+    // earlier months show in the statement for history but Due = 0 unless
+    // the admin explicitly set a due (the "this old month is unpaid" case).
+    let cutY = cur.year, cutM = cur.month;
+    try {
+      const cs = await pool.query(
+        `SELECT key, value FROM settings WHERE key IN ('install_year','install_month')`);
+      cs.rows.forEach(r => {
+        if (r.key === 'install_year'  && parseInt(r.value)) cutY = parseInt(r.value);
+        if (r.key === 'install_month' && parseInt(r.value)) cutM = parseInt(r.value);
+      });
+    } catch (_) {}
+    const atOrAfterCutoff = (yy, mm) =>
+      (yy > cutY) || (yy === cutY && mm >= cutM);
+
     const byYear = {};
     let y = cur.year, m = cur.month;
     while (y > sy || (y === sy && m >= sm)) {
       const k = `${y}-${m}`;
       const ov  = dueByKey[k];
-      const due = ov ? parseFloat(ov.amount_due) : fee;
+      const due = ov ? parseFloat(ov.amount_due)
+                     : (atOrAfterCutoff(y, m) ? fee : 0);
       const pays = payByKey[k] || [];
       const paid = +pays.reduce((t, p) => t + parseFloat(p.amount || 0), 0).toFixed(2);
       const balance = +(due - paid).toFixed(2);
@@ -595,6 +611,29 @@ router.get('/balances', async (req, res) => {
     debtPaid.rows.forEach(d =>
       debtPaidMap.set(d.student_id, parseFloat(d.paid || 0)));
 
+    // Per-month due overrides
+    const dueMap = new Map();
+    try {
+      const dm = await pool.query(
+        `SELECT student_id, payment_year, payment_month, amount_due
+           FROM student_month_due`);
+      dm.rows.forEach(r =>
+        dueMap.set(`${r.student_id}-${r.payment_year}-${r.payment_month}`,
+                   parseFloat(r.amount_due) || 0));
+    } catch (_) {}
+
+    // Billing-start cutoff (same rule the statement uses)
+    let cutY = cur.year, cutM = cur.month;
+    try {
+      const cs = await pool.query(
+        `SELECT key, value FROM settings WHERE key IN ('install_year','install_month')`);
+      cs.rows.forEach(r => {
+        if (r.key === 'install_year'  && parseInt(r.value)) cutY = parseInt(r.value);
+        if (r.key === 'install_month' && parseInt(r.value)) cutM = parseInt(r.value);
+      });
+    } catch (_) {}
+    const atOrAfterCutoff = (yy, mm) => (yy > cutY) || (yy === cutY && mm >= cutM);
+
     const out = students.rows.map(s => {
       const fee = effectiveFeeOf(s);
       const { startY, startM } = walkStart(s.enrolled_at);
@@ -605,8 +644,10 @@ router.get('/balances', async (req, res) => {
       while (y < cur.year || (y === cur.year && m <= cur.month)) {
         const key = `${s.id}-${y}-${m}`;
         if (!carriedSet.has(key)) {
+          const ov  = dueMap.get(key);
+          const due = (ov !== undefined) ? ov : (atOrAfterCutoff(y, m) ? fee : 0);
           const pd  = paidMap.get(key) || 0;
-          const bal = Math.max(0, +(fee - pd).toFixed(2));
+          const bal = Math.max(0, +(due - pd).toFixed(2));
           if (bal > 0) { totalBalance += bal; unpaidMonths++; }
         }
         m++; if (m > 12) { m = 1; y++; }
