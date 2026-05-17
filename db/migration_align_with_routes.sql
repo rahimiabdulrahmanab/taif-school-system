@@ -148,3 +148,21 @@ INSERT INTO settings (key, value)
 INSERT INTO settings (key, value)
   VALUES ('install_month', '3')
   ON CONFLICT (key) DO NOTHING;
+
+-- ── Per-month fee-due override (account-statement model).
+--    Every Shamsi month from enrollment → today shows in a student's
+--    statement with due = effective monthly fee BY DEFAULT. A row here
+--    overrides the due for one specific month (e.g. the fee was different
+--    in Jawza 1398, or a one-off discount). Sparse — only exceptions.
+CREATE TABLE IF NOT EXISTS student_month_due (
+  id            SERIAL PRIMARY KEY,
+  student_id    INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  payment_year  INTEGER NOT NULL,
+  payment_month INTEGER NOT NULL,
+  amount_due    NUMERIC(10,2) NOT NULL DEFAULT 0,
+  notes         TEXT,
+  updated_at    TIMESTAMP DEFAULT NOW(),
+  UNIQUE (student_id, payment_year, payment_month)
+);
+CREATE INDEX IF NOT EXISTS idx_month_due_student
+  ON student_month_due (student_id);

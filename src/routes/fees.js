@@ -376,6 +376,144 @@ router.post('/close-month', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ══════════════════════════════════════════════════════════════
+//  ACCOUNT-STATEMENT MODEL  (the per-student "bank account")
+// ══════════════════════════════════════════════════════════════
+
+// GET /api/fees/statement/:student_id
+// Every Shamsi month from enrollment → today, grouped by year
+// (newest first), each with due / paid / balance and its payments.
+router.get('/statement/:student_id', async (req, res) => {
+  try {
+    const { student_id } = req.params;
+    const sres = await pool.query(
+      `SELECT s.*, c.name AS class_name FROM students s
+         LEFT JOIN classes c ON c.id = s.class_id WHERE s.id = $1`,
+      [student_id]
+    );
+    if (!sres.rows.length) return res.status(404).json({ error: 'Student not found' });
+    const s   = sres.rows[0];
+    const fee = effectiveFeeOf(s);
+
+    const now = new Date();
+    const cur = toShamsi(now.getFullYear(), now.getMonth() + 1, now.getDate());
+    let sy = cur.year, sm = cur.month;
+    if (s.enrolled_at) {
+      const e = new Date(s.enrolled_at);
+      if (!isNaN(e)) {
+        const es = toShamsi(e.getFullYear(), e.getMonth() + 1, e.getDate());
+        sy = es.year; sm = es.month;
+      }
+    }
+    // Safety cap: 240 months (20 years)
+    const span = (cur.year - sy) * 12 + (cur.month - sm);
+    if (span > 240) { sy = cur.year; sm = cur.month - 239; while (sm <= 0) { sm += 12; sy -= 1; } }
+
+    const pres = await pool.query(
+      `SELECT id, amount, payment_year, payment_month, payment_method, notes, payment_date
+         FROM fee_payments
+        WHERE student_id = $1 AND payment_year IS NOT NULL AND payment_month IS NOT NULL
+          AND COALESCE(is_previous_debt,FALSE)=FALSE
+          AND COALESCE(carried_forward,FALSE)=FALSE
+        ORDER BY payment_date`,
+      [student_id]
+    );
+    const payByKey = {};
+    pres.rows.forEach(p => {
+      const k = `${p.payment_year}-${p.payment_month}`;
+      (payByKey[k] = payByKey[k] || []).push(p);
+    });
+
+    const dueByKey = {};
+    try {
+      const d = await pool.query(
+        `SELECT payment_year, payment_month, amount_due, notes
+           FROM student_month_due WHERE student_id = $1`, [student_id]);
+      d.rows.forEach(r => { dueByKey[`${r.payment_year}-${r.payment_month}`] = r; });
+    } catch (_) { /* table not migrated yet */ }
+
+    const byYear = {};
+    let y = cur.year, m = cur.month;
+    while (y > sy || (y === sy && m >= sm)) {
+      const k = `${y}-${m}`;
+      const ov  = dueByKey[k];
+      const due = ov ? parseFloat(ov.amount_due) : fee;
+      const pays = payByKey[k] || [];
+      const paid = +pays.reduce((t, p) => t + parseFloat(p.amount || 0), 0).toFixed(2);
+      const balance = +(due - paid).toFixed(2);
+      (byYear[y] = byYear[y] || []).push({
+        year: y, month: m, due, paid, balance,
+        status: paid <= 0 ? 'unpaid' : (balance > 0 ? 'partial' : 'paid'),
+        due_overridden: !!ov,
+        due_note: ov ? ov.notes : null,
+        payments: pays,
+      });
+      m--; if (m < 1) { m = 12; y--; }
+    }
+
+    const years = Object.keys(byYear).map(Number).sort((a, b) => b - a).map(yr => {
+      const months = byYear[yr];
+      const td = months.reduce((t, x) => t + x.due,  0);
+      const tp = months.reduce((t, x) => t + x.paid, 0);
+      return { year: yr, months,
+               total_due: +td.toFixed(2), total_paid: +tp.toFixed(2),
+               balance: +(td - tp).toFixed(2) };
+    });
+    const gd = years.reduce((t, y) => t + y.total_due,  0);
+    const gp = years.reduce((t, y) => t + y.total_paid, 0);
+
+    res.json({
+      student: s,
+      effective_fee: fee,
+      years,
+      grand_total_due:  +gd.toFixed(2),
+      grand_total_paid: +gp.toFixed(2),
+      grand_balance:    +(gd - gp).toFixed(2),
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/fees/due — set/override a single month's due amount
+router.post('/due', async (req, res) => {
+  try {
+    const { student_id, year, month, amount_due, notes } = req.body;
+    if (!student_id || !year || !month)
+      return res.status(400).json({ error: 'student_id, year and month are required' });
+    const r = await pool.query(`
+      INSERT INTO student_month_due
+        (student_id, payment_year, payment_month, amount_due, notes, updated_at)
+      VALUES ($1,$2,$3,$4,$5,NOW())
+      ON CONFLICT (student_id, payment_year, payment_month)
+      DO UPDATE SET amount_due = EXCLUDED.amount_due,
+                    notes      = EXCLUDED.notes,
+                    updated_at = NOW()
+      RETURNING *`,
+      [student_id, parseInt(year), parseInt(month),
+       Math.max(0, parseFloat(amount_due) || 0), notes || null]);
+    res.json({ success: true, due: r.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PUT /api/fees/:id — edit an existing payment
+router.put('/:id', async (req, res) => {
+  try {
+    const { amount, payment_method, notes, payment_date } = req.body;
+    const amt = (amount != null && amount !== '') ? parseFloat(amount) : null;
+    const r = await pool.query(`
+      UPDATE fee_payments SET
+        amount         = COALESCE($1, amount),
+        amount_paid    = COALESCE($1, amount_paid),
+        payment_method = COALESCE($2, payment_method),
+        notes          = COALESCE($3, notes),
+        payment_date   = COALESCE($4::date, payment_date)
+      WHERE id = $5
+      RETURNING *`,
+      [amt, payment_method || null, notes || null, payment_date || null, req.params.id]);
+    if (!r.rows.length) return res.status(404).json({ error: 'Payment not found' });
+    res.json({ success: true, payment: r.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ── DELETE a payment ──────────────────────────────────────────
 router.delete('/:id', async (req, res) => {
   try {
