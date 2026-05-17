@@ -4242,6 +4242,7 @@ const LANG = {
     lbl_original:'Original', lbl_paid:'Paid',
     lbl_total_billed:'Total Billed', lbl_total_paid:'Total Paid', lbl_balance:'Balance',
     lbl_account_statement:'Account Statement', lbl_due:'Due',
+    lbl_opening_balance:'Opening Balance (before joining)',
     status_partial:'Partial', status_unpaid:'Unpaid',
     btn_set_due:'Set Due', btn_add_payment:'Add Payment',
     lbl_edit_payment:'Edit Payment Amount',
@@ -4628,6 +4629,7 @@ const LANG = {
     lbl_original:'اصلي', lbl_paid:'ورکړل شوی',
     lbl_total_billed:'ټوله بیله', lbl_total_paid:'ټوله تادیه', lbl_balance:'پاتې',
     lbl_account_statement:'د حساب وضعیت', lbl_due:'وړ تادیه',
+    lbl_opening_balance:'پخوانی پاتې پور (د شاملیدو دمخه)',
     status_partial:'جزوي', status_unpaid:'نه دی ورکړل شوی',
     btn_set_due:'تادیه وټاکئ', btn_add_payment:'تادیه زیاته کړئ',
     lbl_edit_payment:'د تادیې مبلغ سمول',
@@ -8000,9 +8002,55 @@ function _statusPill(st) {
 function renderFeeStatement() {
   const host = document.getElementById('fee-statement');
   const d = feeStatementData;
-  if (!d || !d.years.length) { host.innerHTML = `<div style="font-size:13px;color:var(--text-dim);padding:8px;">—</div>`; return; }
+  if (!d) { host.innerHTML = `<div style="font-size:13px;color:var(--text-dim);padding:8px;">—</div>`; return; }
 
-  host.innerHTML = d.years.map(yr => {
+  // Opening balance card (what the student owed before joining)
+  let openingHtml = '';
+  if (d.opening && d.opening.due > 0) {
+    const o = d.opening;
+    const st = o.paid <= 0 ? 'unpaid' : (o.balance > 0 ? 'partial' : 'paid');
+    const exp = _feeOpenMonth === '_opening';
+    const oPays = o.payments.map(p => `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;background:rgba(255,255,255,.55);border-radius:6px;margin-top:4px;font-size:11.5px;">
+        <span style="color:var(--text-mid);">${p.payment_method||'cash'} · <span style="direction:rtl;">${shamsiDate(p.payment_date)}</span>${p.notes?` · ${String(p.notes).replace(/</g,'&lt;')}`:''}</span>
+        <span style="display:flex;align-items:center;gap:6px;">
+          <span style="font-family:var(--font-mono);font-weight:700;color:#178f4f;">${Number(p.amount).toLocaleString()}</span>
+          <button onclick="feeEditPayment(${p.id},${Number(p.amount)})" title="${t('btn_edit')||'Edit'}" style="width:22px;height:22px;border-radius:5px;background:var(--glass);border:1px solid var(--glass-border);color:#1a4fa0;cursor:pointer;font-size:10px;"><i class="fas fa-pen"></i></button>
+          <button onclick="feeDeletePayment(${p.id})" title="${t('btn_remove')||'Delete'}" style="width:22px;height:22px;border-radius:5px;background:var(--glass);border:1px solid var(--glass-border);color:#dc4f4c;cursor:pointer;font-size:10px;"><i class="fas fa-trash"></i></button>
+        </span>
+      </div>`).join('');
+    openingHtml = `
+      <div style="border:1px solid rgba(220,79,76,.30);border-radius:12px;overflow:hidden;background:linear-gradient(135deg,rgba(220,79,76,.07),rgba(180,40,40,.03));">
+        <div onclick="feeToggleMonth('_opening')" style="display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;">
+          <i class="fas fa-clock-rotate-left" style="font-size:12px;color:#dc4f4c;"></i>
+          <div style="flex:1;min-width:0;">
+            <span style="font-family:var(--font-head);font-weight:800;font-size:13px;color:#b13333;" data-i18n="lbl_opening_balance">Opening Balance (before joining)</span>
+            ${_statusPill(st)}
+          </div>
+          <div style="text-align:right;font-family:var(--font-mono);font-size:11.5px;line-height:1.5;">
+            <div style="color:var(--text-dim);">${t('lbl_due')||'Due'}: <b style="color:var(--text);">${Math.round(o.due).toLocaleString()}</b></div>
+            <div style="color:var(--text-dim);">${t('lbl_paid')||'Paid'}: <b style="color:#178f4f;">${Math.round(o.paid).toLocaleString()}</b> · ${t('lbl_balance')||'Bal'}: <b style="color:${o.balance>0?'#dc4f4c':'#178f4f'};">${Math.round(o.balance).toLocaleString()}</b></div>
+          </div>
+          <i class="fas fa-chevron-${exp?'up':'down'}" style="font-size:11px;color:var(--text-dim);"></i>
+        </div>
+        ${exp?`
+        <div style="padding:10px 12px;border-top:1px dashed rgba(220,79,76,.3);">
+          ${oPays}
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed rgba(220,79,76,.3);">
+            <input id="open-pay-amt" type="text" inputmode="numeric" placeholder="${t('lbl_amount_afn')||'Amount'}" value="${o.balance>0?Math.round(o.balance):''}" style="width:90px;padding:6px 8px;background:#fff;border:1px solid var(--glass-border);border-radius:6px;font-family:var(--font-mono);font-size:12px;font-weight:700;color:#0C1526;" oninput="this.value=toWesternDigits(this.value).replace(/[^0-9.]/g,'')">
+            <select id="open-pay-mtd" style="padding:6px 8px;background:#fff;border:1px solid var(--glass-border);border-radius:6px;font-size:12px;color:#0C1526;">
+              <option value="cash">${t('opt_cash')||'Cash'}</option>
+              <option value="bank">${t('opt_bank')||'Bank'}</option>
+              <option value="online">${t('opt_mobile')||'Online'}</option>
+            </select>
+            <button onclick="feeAddOpeningPayment()" style="padding:6px 12px;background:linear-gradient(135deg,#dc4f4c,#b13333);border:none;border-radius:6px;color:#fff;font-family:var(--font-head);font-size:11px;font-weight:800;cursor:pointer;"><i class="fas fa-plus"></i> ${t('btn_add_payment')||'Add Payment'}</button>
+          </div>
+        </div>`:''}
+      </div>`;
+  }
+  if (!d.years.length) { host.innerHTML = openingHtml || `<div style="font-size:13px;color:var(--text-dim);padding:8px;">—</div>`; return; }
+
+  host.innerHTML = openingHtml + d.years.map(yr => {
     const open = !!_feeOpenYears[yr.year];
     const monthsHtml = !open ? '' : yr.months.map(mn => {
       const key = `${mn.year}-${mn.month}`;
@@ -8104,6 +8152,25 @@ async function feeAddPayment(year, month) {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ student_id: parseInt(sid), amount: amt, payment_method: mtd,
                              months_paid: [{ year, month }] }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Failed');
+    showAlert({ title:t('alert_title_saved'), message:`${amt.toLocaleString()} AFN — ${t('msg_payment_ok')||'Recorded'}`, type:'success' });
+    _feeRefresh();
+  } catch(e) { showAlert({ title:t('alert_title_error'), message:e.message, type:'error' }); }
+}
+
+// Pay against the opening balance (debt from before joining)
+async function feeAddOpeningPayment() {
+  const sid = document.getElementById('fee-student-id').value;
+  const amt = parseFloat(document.getElementById('open-pay-amt').value);
+  const mtd = document.getElementById('open-pay-mtd').value;
+  if (!(amt > 0)) { showAlert({ title:t('alert_title_invalid'), message:t('msg_invalid_amount'), type:'warning' }); return; }
+  try {
+    const r = await fetch('/api/fees', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ student_id: parseInt(sid), amount: amt, payment_method: mtd,
+                             notes: 'Opening balance payment', is_previous_debt: true }),
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || 'Failed');

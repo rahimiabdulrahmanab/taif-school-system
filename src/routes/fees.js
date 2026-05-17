@@ -459,12 +459,33 @@ router.get('/statement/:student_id', async (req, res) => {
                total_due: +td.toFixed(2), total_paid: +tp.toFixed(2),
                balance: +(td - tp).toFixed(2) };
     });
-    const gd = years.reduce((t, y) => t + y.total_due,  0);
-    const gp = years.reduce((t, y) => t + y.total_paid, 0);
+
+    // Opening balance — what the student owed BEFORE joining (the
+    // "Previous Total Due" entered at registration). Payments tagged
+    // is_previous_debt pay it down. Shown as the statement's first line.
+    const openingDue = Math.max(0, parseFloat(s.previous_debt) || 0);
+    const opres = await pool.query(
+      `SELECT id, amount, payment_method, notes, payment_date
+         FROM fee_payments
+        WHERE student_id = $1 AND COALESCE(is_previous_debt,FALSE)=TRUE
+        ORDER BY payment_date`,
+      [student_id]
+    );
+    const openingPaid = +opres.rows.reduce((t, p) => t + parseFloat(p.amount || 0), 0).toFixed(2);
+    const opening = {
+      due:      openingDue,
+      paid:     openingPaid,
+      balance:  +(openingDue - openingPaid).toFixed(2),
+      payments: opres.rows,
+    };
+
+    const gd = years.reduce((t, y) => t + y.total_due,  0) + openingDue;
+    const gp = years.reduce((t, y) => t + y.total_paid, 0) + openingPaid;
 
     res.json({
       student: s,
       effective_fee: fee,
+      opening,
       years,
       grand_total_due:  +gd.toFixed(2),
       grand_total_paid: +gp.toFixed(2),
