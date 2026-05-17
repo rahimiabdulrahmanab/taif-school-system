@@ -288,6 +288,51 @@ router.delete('/advance/:id', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ── GET full advance history for one person (all months) ──────
+// Every advance this teacher/staff has ever taken, oldest → newest,
+// with a running cumulative total. Lets the school see old advances
+// and how much is still being carried (e.g. a 10,000 advance on a
+// 3,000 salary = several months of recovery ahead).
+router.get('/advance-history', async (req, res) => {
+  try {
+    const { person_type, person_id } = req.query;
+    if (!person_type || !person_id) {
+      return res.status(400).json({ error: 'person_type and person_id are required' });
+    }
+
+    const personTbl = person_type === 'teacher' ? 'teachers' : 'staff';
+    const pres = await pool.query(
+      `SELECT first_name, last_name, COALESCE(monthly_salary,0) AS salary
+         FROM ${personTbl} WHERE id = $1`, [person_id]);
+    const person = pres.rows[0] || { first_name: '', last_name: '', salary: 0 };
+
+    const adv = await pool.query(
+      `SELECT id, amount, pay_month, notes, advance_date, created_at
+         FROM payroll_advances
+        WHERE person_type = $1 AND person_id = $2
+        ORDER BY advance_date ASC NULLS LAST, id ASC`,
+      [person_type, person_id]
+    );
+
+    let running = 0;
+    const rows = adv.rows.map(a => {
+      running += parseFloat(a.amount || 0);
+      return { ...a, amount: parseFloat(a.amount || 0), running_total: +running.toFixed(2) };
+    });
+
+    res.json({
+      person:        { first_name: person.first_name, last_name: person.last_name },
+      monthly_salary: parseFloat(person.salary) || 0,
+      total_taken:    +running.toFixed(2),
+      count:          rows.length,
+      advances:       rows,
+    });
+  } catch (err) {
+    console.error('GET /api/payroll/advance-history error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── GET tax report for a Shamsi month/year ────────────────────
 // Per-employee tax breakdown the school files with the government.
 router.get('/tax-report', async (req, res) => {

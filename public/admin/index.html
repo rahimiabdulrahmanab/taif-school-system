@@ -4299,6 +4299,8 @@ const LANG = {
     stat_pending_lbl:'Pending', stat_total_payroll:'Total Payroll',
     ttl_salary_register:'Salary Register', ttl_advance:'Mid-Month Advance',
     lbl_advance_amount:'Advance Amount (AFN)', ph_advance_reason:'Reason for advance...',
+    lbl_advance_history:'Advance History', lbl_no_advances:'No advances taken.',
+    lbl_total_taken:'Total Taken', lbl_months_salary:'Months of Salary', lbl_close:'Close',
     btn_save_advance:'Save Advance',
     // ── Payroll: stat strip + table cells + actions (added for redesigned UI) ──
     stat_advances_given:'Advances Given', stat_net_to_pay:'Net To Pay', stat_paid_progress:'Salaries Paid',
@@ -4686,6 +4688,8 @@ const LANG = {
     stat_pending_lbl:'پاتې', stat_total_payroll:'ټول معاش',
     ttl_salary_register:'د معاش ثبت', ttl_advance:'د میاشتې مخکې معاش',
     lbl_advance_amount:'د پیش معاش مقدار (افغاني)', ph_advance_reason:'د پیش معاش دلیل...',
+    lbl_advance_history:'د پیش معاش تاریخچه', lbl_no_advances:'هیڅ پیش معاش نه دی اخیستل شوی.',
+    lbl_total_taken:'ټول اخیستل شوی', lbl_months_salary:'د معاش میاشتې', lbl_close:'بندول',
     btn_save_advance:'پیش معاش خوندي کول',
     // ── Payroll: stat strip + table cells + actions (Pashto) ──
     stat_advances_given:'ورکړل شوي پیش معاش', stat_net_to_pay:'د ورکړې لپاره خالص', stat_paid_progress:'ورکړل شوي معاشونه',
@@ -5106,9 +5110,9 @@ function shamsiYearOptions(selected) {
   const cur = getCurrentShamsi().year;
   let html = '';
   // Newest first so the current year is at the top of the dropdown.
-  // Range covers ~25 years back — long enough for schools that have been
-  // operating for two decades to inspect historical unpaid_history entries.
-  for (let y = cur + 2; y >= cur - 25; y--) {
+  // Range: 10 years ahead → 20 years back (covers a school's full history
+  // and any plausible student age, without an unwieldy list).
+  for (let y = cur + 10; y >= cur - 20; y--) {
     html += `<option value="${y}"${y === selected ? ' selected' : ''}>${y}</option>`;
   }
   return html;
@@ -5318,7 +5322,7 @@ function _initShamsiField(prefix, targetId) {
   const dSel=document.getElementById(`${prefix}-day`);
   if (!ySel||ySel.options.length>1) return;
   const now=new Date(),cur=toShamsi(now.getFullYear(),now.getMonth()+1,now.getDate());
-  for (let y=1350;y<=cur.year+2;y++){const o=document.createElement('option');o.value=y;o.textContent=y;ySel.appendChild(o);}
+  for (let y=cur.year+10;y>=cur.year-20;y--){const o=document.createElement('option');o.value=y;o.textContent=y;ySel.appendChild(o);}
   ySel.value=cur.year;
   const ph=document.createElement('option');ph.value='';ph.textContent='—';dSel.appendChild(ph);
   for (let d=1;d<=31;d++){const o=document.createElement('option');o.value=d;o.textContent=d;dSel.appendChild(o);}
@@ -10318,6 +10322,7 @@ function renderPayrollRow(p, idx) {
           <div style="display:flex;align-items:center;gap:6px;margin-top:3px;">
             <span style="font-size:11px;color:#94a3b8;font-family:var(--font-mono);">${p.code || '—'}</span>
             ${typeChip}
+            <button onclick="event.stopPropagation();showAdvanceHistory('${p.person_type}',${p.id})" title="${t('lbl_advance_history')||'Advance history'}" style="padding:1px 8px;background:rgba(91,158,247,.10);border:1px solid rgba(91,158,247,.25);border-radius:10px;color:#1a4fa0;font-size:10px;font-weight:700;font-family:var(--font-head);cursor:pointer;display:inline-flex;align-items:center;gap:4px;"><i class="fas fa-clock-rotate-left" style="font-size:9px;"></i> ${t('lbl_advances')||'Advances'}</button>
           </div>
         </div>
       </div>
@@ -10444,6 +10449,54 @@ function reprintSalaryReceipt(idx) {
   const person = payrollData[idx];
   if (!person || !person.is_paid) return;
   printSalaryReceipt(person);
+}
+
+// Full advance history for one teacher/staff — every advance ever taken
+// (old + ongoing), with a running total and how many months of salary it
+// represents (the 10,000-on-3,000-salary case).
+async function showAdvanceHistory(personType, personId) {
+  try {
+    const r = await fetch(`/api/payroll/advance-history?person_type=${personType}&person_id=${personId}`);
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Failed');
+
+    const sal = d.monthly_salary || 0;
+    const monthsWorth = sal > 0 ? (d.total_taken / sal) : 0;
+    const rowsHtml = d.advances.length ? d.advances.map(a => `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid rgba(20,40,80,.06);font-size:12px;">
+        <span style="color:#475569;direction:rtl;">${a.advance_date ? shamsiDariPD(a.advance_date) : (a.pay_month||'—')}${a.notes?` · <span style="color:#94a3b8;">${String(a.notes).replace(/</g,'&lt;')}</span>`:''}</span>
+        <span style="display:flex;align-items:center;gap:12px;">
+          <span style="font-family:var(--font-mono);font-weight:700;color:#8b5a0e;">${Number(a.amount).toLocaleString()}</span>
+          <span style="font-family:var(--font-mono);font-size:11px;color:#94a3b8;">Σ ${Number(a.running_total).toLocaleString()}</span>
+        </span>
+      </div>`).join('') : `<div style="padding:14px;text-align:center;color:#94a3b8;font-size:12px;">${t('lbl_no_advances')||'No advances taken.'}</div>`;
+
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'position:fixed;inset:0;background:rgba(15,40,69,.55);backdrop-filter:blur(8px);z-index:10000;display:flex;align-items:center;justify-content:center;';
+    wrap.innerHTML = `
+      <div style="background:#fff;border-radius:18px;max-width:440px;width:92%;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(20,40,80,.20);">
+        <div style="padding:18px 22px;border-bottom:1px solid rgba(20,40,80,.08);">
+          <div style="font-family:var(--font-head);font-size:16px;font-weight:800;color:#0f2845;">${d.person.first_name} ${d.person.last_name}</div>
+          <div style="font-size:12px;color:#6a7c93;margin-top:2px;">${t('lbl_advance_history')||'Advance History'}</div>
+        </div>
+        <div style="display:flex;gap:10px;padding:14px 22px;">
+          <div style="flex:1;text-align:center;background:rgba(255,170,61,.08);border:1px solid rgba(255,170,61,.22);border-radius:10px;padding:10px;">
+            <div style="font-family:var(--font-mono);font-size:15px;font-weight:800;color:#8b5a0e;">${Number(d.total_taken).toLocaleString()}</div>
+            <div style="font-size:9.5px;color:#8b5a0e;text-transform:uppercase;font-weight:700;margin-top:3px;">${t('lbl_total_taken')||'Total Taken'}</div>
+          </div>
+          <div style="flex:1;text-align:center;background:var(--glass);border:1px solid rgba(20,40,80,.06);border-radius:10px;padding:10px;">
+            <div style="font-family:var(--font-mono);font-size:15px;font-weight:800;color:#0f2845;">${monthsWorth.toFixed(1)}×</div>
+            <div style="font-size:9.5px;color:#6a7c93;text-transform:uppercase;font-weight:700;margin-top:3px;">${t('lbl_months_salary')||'Months of Salary'}</div>
+          </div>
+        </div>
+        <div style="overflow-y:auto;border-top:1px solid rgba(20,40,80,.06);">${rowsHtml}</div>
+        <div style="padding:14px 22px;border-top:1px solid rgba(20,40,80,.08);">
+          <button onclick="this.closest('div[style*=fixed]').remove()" style="width:100%;padding:11px;background:linear-gradient(135deg,#5DCAA5,#3aaa85);border:none;border-radius:10px;color:#0a1f1a;font-family:var(--font-head);font-size:13px;font-weight:800;cursor:pointer;">${t('lbl_close')||t('btn_cancel')||'Close'}</button>
+        </div>
+      </div>`;
+    wrap.addEventListener('click', e => { if (e.target === wrap) wrap.remove(); });
+    document.body.appendChild(wrap);
+  } catch (e) { showAlert({ title:t('alert_title_error'), message:e.message, type:'error' }); }
 }
 
 function toggleAdvanceDetail(idx) {
