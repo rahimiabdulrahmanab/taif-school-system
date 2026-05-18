@@ -62,11 +62,17 @@ router.get('/', async (req, res) => {
     // ── Attendance → absence calculation ────────────────────────────
     // The pay month (m, y) is Shamsi; attendance scan_date is Gregorian.
     const range = shamsiMonthRange(y, m);                 // {start,end,startISO,endISO}
-    const workingDaysInMonth = workingDaysBetween(range.start, range.end);
+    // Client rule: salary is always calculated over a FIXED 30-day month,
+    // counting every day INCLUDING Fridays. Per-day rate = salary / 30 and
+    // absence is measured against 30 days.
+    const MS_DAY = 86400000;
+    const workingDaysInMonth = 30;
     // Only count days that have actually elapsed (current/future month safe)
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const elapsedEnd = today < range.end ? today : range.end;
-    const elapsedWorkingDays = today < range.start ? 0 : workingDaysBetween(range.start, elapsedEnd);
+    const elapsedWorkingDays = today < range.start
+      ? 0
+      : Math.min(30, Math.floor((elapsedEnd - range.start) / MS_DAY) + 1);
 
     // One query: distinct days each teacher/staff scanned in during the month
     const attRes = await pool.query(
@@ -129,7 +135,7 @@ router.get('/', async (req, res) => {
       else if (noAttendanceData) absentDays = 0;
       else                      absentDays = Math.max(0, elapsedWorkingDays - scannedDays);
 
-      const dailyRate    = workingDaysInMonth > 0 ? (salary / workingDaysInMonth) : 0;
+      const dailyRate    = salary / 30;   // fixed 30-day month (Fridays included)
       const absenceDeduction = payroll
         ? parseFloat(payroll.deduction_amount || 0)
         : Math.round(dailyRate * absentDays);
