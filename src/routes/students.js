@@ -434,4 +434,54 @@ router.post('/promote', async (req, res) => {
   }
 });
 
+// ══════════════════════════════════════════════════════════════
+//  GET /api/students/graduates  — all archived/graduated students
+// ══════════════════════════════════════════════════════════════
+router.get('/list/graduates', async (req, res) => {
+  try {
+    let q;
+    try {
+      q = await pool.query(`
+        SELECT s.id, s.first_name, s.last_name, s.parent_name, s.student_code,
+               s.photo, s.graduated_at, c.name AS class_name
+          FROM students s
+          LEFT JOIN classes c ON c.id = s.class_id
+         WHERE s.graduated = TRUE
+         ORDER BY s.graduated_at DESC NULLS LAST, s.last_name, s.first_name
+      `);
+    } catch (e) {
+      // graduated column missing → fall back to inactive students
+      if (/graduated/.test(e.message)) {
+        q = await pool.query(`
+          SELECT s.id, s.first_name, s.last_name, s.parent_name, s.student_code,
+                 s.photo, NULL::date AS graduated_at, c.name AS class_name
+            FROM students s
+            LEFT JOIN classes c ON c.id = s.class_id
+           WHERE s.is_active = FALSE
+           ORDER BY s.last_name, s.first_name
+        `);
+      } else { throw e; }
+    }
+    res.json(q.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  POST /api/students/:id/restore  — un-graduate a student
+// ══════════════════════════════════════════════════════════════
+router.post('/:id/restore', async (req, res) => {
+  try {
+    try {
+      await pool.query(
+        `UPDATE students SET graduated = FALSE, graduated_at = NULL, is_active = TRUE WHERE id = $1`,
+        [req.params.id]);
+    } catch (e) {
+      if (/graduated/.test(e.message)) {
+        await pool.query('UPDATE students SET is_active = TRUE WHERE id = $1', [req.params.id]);
+      } else { throw e; }
+    }
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 module.exports = router;

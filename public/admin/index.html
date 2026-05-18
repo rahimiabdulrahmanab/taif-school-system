@@ -1285,6 +1285,9 @@ button[style*="background:linear-gradient"]{
 <div class="nav-link" onclick="go('scholarships',this)" data-nav="scholarships">
   <span class="nav-icon"><i class="fas fa-award"></i></span><span class="nav-label" data-i18n="nav_scholarships">Scholarships</span>
 </div>
+<div class="nav-link" onclick="go('graduates',this)" data-nav="graduates">
+  <span class="nav-icon"><i class="fas fa-user-graduate"></i></span><span class="nav-label" data-i18n="nav_graduates">Graduates</span>
+</div>
 
 <div class="nav-section" data-nav-sec="finance">Finance</div>
 <div class="nav-link" onclick="go('fees',this)" data-nav="fees">
@@ -2749,6 +2752,50 @@ button[style*="background:linear-gradient"]{
 
 </div>
 
+<!-- ═════════════════════════════════════════════════════════
+     GRADUATES PAGE — archived students (graduated = TRUE)
+     ═════════════════════════════════════════════════════════ -->
+<div class="page" id="pg-graduates">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;gap:16px;flex-wrap:wrap;">
+    <div>
+      <h2 style="font-family:var(--font-head);font-size:20px;font-weight:800;color:var(--text);" data-i18n="nav_graduates">Graduates</h2>
+      <span style="font-size:12px;color:var(--text-mid);" data-i18n="sub_graduates">Archived students who have graduated — full records retained</span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <input id="grad-search" type="text" placeholder="Search…" data-ph="ph_search_student" oninput="renderGraduates()" style="padding:9px 14px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;min-width:180px;">
+      <select id="grad-year-filter" onchange="renderGraduates()" style="padding:9px 12px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;">
+        <option value="">All years</option>
+      </select>
+      <button onclick="printGraduatesAll()" style="padding:9px 18px;background:linear-gradient(135deg,#178f4f,#22c571);border:none;border-radius:var(--radius-sm);color:#fff;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 6px 18px rgba(34,197,113,.30);">
+        <i class="fas fa-print"></i> <span data-i18n="btn_print">Print</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="dash-card">
+    <div class="dash-card-hdr">
+      <h4><span class="icon-pill" style="background:rgba(34,197,113,.15);color:#178f4f;"><i class="fas fa-user-graduate"></i></span><span data-i18n="grad_list">Graduate List</span></h4>
+      <span class="meta" id="grad-meta">—</span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="scan-tbl-clean" style="min-width:820px;">
+        <thead><tr>
+          <th style="width:50px;text-align:center;" data-i18n="sch_th_no">#</th>
+          <th data-i18n="sch_th_student">Student Name</th>
+          <th data-i18n="sch_th_father">Father Name</th>
+          <th data-i18n="sch_th_class">Class</th>
+          <th data-i18n="lbl_student_code">Code</th>
+          <th data-i18n="grad_th_date">Graduation Date</th>
+          <th style="text-align:center;" data-i18n="th_actions">Actions</th>
+        </tr></thead>
+        <tbody id="grad-tbody">
+          <tr><td colspan="7"><div class="empty"><i class="fas fa-user-graduate"></i><p data-i18n="grad_empty">No graduates yet.</p></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <div class="page" id="pg-fees">
 
 <!-- Header -->
@@ -4102,6 +4149,12 @@ const LANG = {
     nav_dashboard:'Dashboard', nav_students:'Students', nav_teachers:'Teachers', nav_staff:'Staff',
     nav_classes:'Classes', nav_attendance:'Attendance', nav_grades:'Grades & Marks',
     nav_scholarships:'Scholarships',
+    nav_graduates:'Graduates', sub_graduates:'Archived students who have graduated — full records retained',
+    grad_list:'Graduate List', grad_empty:'No graduates yet.', grad_th_date:'Graduation Date',
+    btn_restore:'Restore', opt_all_years:'All years',
+    confirm_restore_title:'Restore student?',
+    confirm_restore_msg:'Bring {name} back from Graduated to Active? They will reappear in active lists.',
+    msg_restored:'Student restored.',
     sub_scholarships:'Students receiving scholarships or fee discounts — printable for government reports',
     sch_all_types:'All Discount Types', sch_type_percent:'Percentage', sch_type_amount:'Fixed Amount',
     sch_total_recipients:'Total Recipients', sch_percentage_based:'Percentage-Based',
@@ -4509,6 +4562,12 @@ const LANG = {
     nav_dashboard:'داشبورد', nav_students:'زده کوونکي', nav_teachers:'ښوونکي', nav_staff:'کارکوونکي',
     nav_classes:'ټولګي', nav_attendance:'حاضري', nav_grades:'نمرې او درجې',
     nav_scholarships:'بورسونه',
+    nav_graduates:'فارغان', sub_graduates:'فارغ شوي زده‌کوونکي چې آرشیف شوي — بشپړ ریکارډونه ساتل شوي',
+    grad_list:'د فارغانو لیست', grad_empty:'لا فارغان نشته.', grad_th_date:'د فراغت نېټه',
+    btn_restore:'بیرته راګرځول', opt_all_years:'ټول کلونه',
+    confirm_restore_title:'زده‌کوونکی بیرته راګرځول؟',
+    confirm_restore_msg:'{name} له فارغ څخه فعال ته بیرته راوغړوو؟ په فعالو لیستونو کې به بیا ښکاره شي.',
+    msg_restored:'زده‌کوونکی بیرته فعال شو.',
     sub_scholarships:'هغه زده‌کوونکي چې بورس یا د فیس تخفیف ترلاسه کوي — د چاپ او دولت ته د سپارلو وړ',
     sch_all_types:'ټول ډولونه', sch_type_percent:'فیصدي', sch_type_amount:'ټاکلې اندازه',
     sch_total_recipients:'ټول ترلاسه‌کوونکي', sch_percentage_based:'په فیصدي',
@@ -6434,7 +6493,110 @@ window.go = function(id, el) {
   origGoForClasses(id, el);
   if (id === 'classes')      loadClasses();
   if (id === 'scholarships') loadScholarships();
+  if (id === 'graduates')    loadGraduates();
 };
+
+// ── Graduates page ───────────────────────────────────────────
+let _allGraduates = [];
+
+async function loadGraduates() {
+  try {
+    const r = await fetch('/api/students/list/graduates');
+    const data = await r.json();
+    _allGraduates = Array.isArray(data) ? data : [];
+    // Year filter — distinct Shamsi years from graduated_at
+    const yrSel = document.getElementById('grad-year-filter');
+    const years = Array.from(new Set(_allGraduates.map(g => {
+      if (!g.graduated_at) return null;
+      const d = new Date(g.graduated_at);
+      if (isNaN(d)) return null;
+      return toShamsi(d.getFullYear(), d.getMonth()+1, d.getDate()).year;
+    }).filter(Boolean))).sort((a,b) => b - a);
+    yrSel.innerHTML = `<option value="">${t('opt_all_years')||'All years'}</option>` +
+      years.map(y => `<option value="${y}">${toPersianDigits(y)}</option>`).join('');
+    renderGraduates();
+  } catch(e) { console.error('loadGraduates error:', e); }
+}
+
+function renderGraduates() {
+  const q  = (document.getElementById('grad-search').value || '').toLowerCase().trim();
+  const yf = document.getElementById('grad-year-filter').value;
+  let list = _allGraduates.slice();
+  if (q) {
+    list = list.filter(g =>
+      ((g.first_name||'') + ' ' + (g.last_name||'') + ' ' + (g.parent_name||'') + ' ' + (g.student_code||'') + ' ' + (g.class_name||''))
+        .toLowerCase().includes(q));
+  }
+  if (yf) {
+    list = list.filter(g => {
+      if (!g.graduated_at) return false;
+      const d = new Date(g.graduated_at);
+      return toShamsi(d.getFullYear(), d.getMonth()+1, d.getDate()).year === parseInt(yf);
+    });
+  }
+  document.getElementById('grad-meta').textContent = `${list.length} ${list.length===1 ? (t('lbl_student')||'student') : (t('dash_students_lbl')||'students')}`;
+
+  const tb = document.getElementById('grad-tbody');
+  if (!list.length) {
+    tb.innerHTML = `<tr><td colspan="7"><div class="empty"><i class="fas fa-user-graduate"></i><p>${t('grad_empty')||'No graduates yet.'}</p></div></td></tr>`;
+    return;
+  }
+  tb.innerHTML = list.map((g, i) => {
+    const ini   = ((g.first_name||'?')[0] + ((g.last_name||'')[0]||'')).toUpperCase();
+    const photo = g.photo
+      ? `<img src="/uploads/students/${g.photo}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:1.5px solid var(--glass-border);">`
+      : `<div style="width:32px;height:32px;border-radius:50%;background:rgba(34,197,113,.12);border:1.5px solid rgba(34,197,113,.30);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#178f4f;font-family:var(--font-head);">${ini}</div>`;
+    const dShamsi = g.graduated_at ? shamsiDariPD(g.graduated_at) : '—';
+    return `<tr>
+      <td style="text-align:center;color:#6a7c93;font-family:var(--font-mono);font-size:12px;">${i+1}</td>
+      <td><div style="display:flex;align-items:center;gap:10px;">${photo}<span style="font-weight:700;color:#0f2845;">${g.first_name||''} ${g.last_name||''}</span></div></td>
+      <td style="color:#334155;">${g.parent_name || '—'}</td>
+      <td style="font-weight:600;direction:rtl;text-align:right;">${g.class_name || '—'}</td>
+      <td style="font-family:var(--font-mono);font-size:11.5px;color:#475569;">${g.student_code || '—'}</td>
+      <td style="font-family:var(--font-mono);font-size:12px;color:#475569;direction:rtl;">${dShamsi}</td>
+      <td style="text-align:center;">
+        <button onclick="restoreGraduate(${g.id},'${(g.first_name||'').replace(/'/g,"\\'")} ${(g.last_name||'').replace(/'/g,"\\'")}')" title="${t('btn_restore')||'Restore'}" style="padding:6px 11px;background:rgba(91,158,247,.12);border:1px solid rgba(91,158,247,.30);border-radius:20px;color:#1a4fa0;font-size:11px;font-weight:700;font-family:var(--font-head);cursor:pointer;"><i class="fas fa-rotate-left"></i> ${t('btn_restore')||'Restore'}</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function restoreGraduate(id, name) {
+  showConfirm({
+    title:   t('confirm_restore_title') || 'Restore student?',
+    message: (t('confirm_restore_msg') || 'Bring {name} back from Graduated to Active? They will reappear in active lists.').replace('{name}', name),
+    confirmText: t('btn_restore') || 'Restore',
+    type: 'info',
+    onConfirm: async () => {
+      try {
+        const r = await fetch(`/api/students/${id}/restore`, { method:'POST' });
+        if (!r.ok) throw new Error('Failed');
+        await loadGraduates();
+        showAlert({ title: t('alert_title_saved')||'Done', message: t('msg_restored')||'Student restored.', type:'success' });
+      } catch(e) { showAlert({ title:t('alert_title_error'), message:e.message, type:'error' }); }
+    },
+  });
+}
+
+function printGraduatesAll() {
+  const q  = (document.getElementById('grad-search').value || '').toLowerCase().trim();
+  const yf = document.getElementById('grad-year-filter').value;
+  let list = _allGraduates.slice();
+  if (q) list = list.filter(g => ((g.first_name||'') + ' ' + (g.last_name||'') + ' ' + (g.parent_name||'')).toLowerCase().includes(q));
+  if (yf) list = list.filter(g => {
+    if (!g.graduated_at) return false;
+    const d = new Date(g.graduated_at);
+    return toShamsi(d.getFullYear(), d.getMonth()+1, d.getDate()).year === parseInt(yf);
+  });
+  if (!list.length) { showAlert({ title:t('alert_title_missing')||'Empty', message:t('grad_empty')||'No graduates to print.', type:'warning' }); return; }
+  const rows = list.map(g => ({
+    name: `${g.first_name||''} ${g.last_name||''}`,
+    father_name: g.parent_name || '',
+    class_name: g.class_name || '—',
+    student_code: g.student_code || '',
+  }));
+  printGraduateList(t('lbl_graduates') || 'Graduates', rows);
+}
 
 // ═══════════════════════════════════════════════════
 //  SCHOLARSHIPS PAGE
