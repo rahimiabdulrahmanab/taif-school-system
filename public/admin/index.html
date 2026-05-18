@@ -2109,9 +2109,14 @@ button[style*="background:linear-gradient"]{
     <h2 style="font-family:var(--font-head);font-size:24px;font-weight:800;color:#0f2845;letter-spacing:-.02em;" data-i18n="nav_classes">Classes</h2>
     <span style="font-size:13px;color:#6a7c93;" data-i18n="sub_classes">Create class sections and assign students</span>
   </div>
-  <button onclick="openClassForm()" style="display:inline-flex;align-items:center;gap:9px;padding:11px 22px;background:linear-gradient(135deg,#9b6eff,#6e3fdb);border:none;border-radius:12px;color:#fff;font-family:var(--font-head);font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 8px 24px rgba(155,110,255,.35);transition:transform .2s ease;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
-    <i class="fas fa-plus"></i> <span data-i18n="btn_add_class">Add Class</span>
-  </button>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <button onclick="promoteYearEnd()" style="display:inline-flex;align-items:center;gap:9px;padding:11px 20px;background:linear-gradient(135deg,#22c571,#178f4f);border:none;border-radius:12px;color:#fff;font-family:var(--font-head);font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 8px 24px rgba(34,197,113,.30);transition:transform .2s ease;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+      <i class="fas fa-arrow-up-right-dots"></i> <span data-i18n="btn_promote_year">Promote / End of Year</span>
+    </button>
+    <button onclick="openClassForm()" style="display:inline-flex;align-items:center;gap:9px;padding:11px 22px;background:linear-gradient(135deg,#9b6eff,#6e3fdb);border:none;border-radius:12px;color:#fff;font-family:var(--font-head);font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 8px 24px rgba(155,110,255,.35);transition:transform .2s ease;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+      <i class="fas fa-plus"></i> <span data-i18n="btn_add_class">Add Class</span>
+    </button>
+  </div>
 </div>
 
 <!-- Stat strip -->
@@ -4132,7 +4137,11 @@ const LANG = {
     stf_stat_total:'Total Staff', stf_stat_payroll:'Monthly Payroll (AFN)',
     cls_stat_total:'Total Classes', cls_stat_students:'Enrolled Students', cls_stat_subjects:'Subjects Configured',
     cls_empty_title:'No Classes Yet', btn_manage_class:'Manage Class',
-    btn_graduate:'Graduate',
+    btn_graduate:'Graduate', btn_promote_year:'Promote / End of Year',
+    lbl_graduates:'Graduates',
+    confirm_promote_title:'Promote everyone one grade?',
+    confirm_promote_msg:'Every active student moves up one grade (Grade 1→2, … 11→12). Grade-12 students graduate and are archived (records kept). Section is preserved. A printable graduate list will open. This affects all students — do it only at year-end.',
+    msg_promoted:'{p} promoted, {g} graduated{s}.',
     confirm_graduate_title:'Graduate {name}?',
     confirm_graduate_msg:'All active students in {name} will be marked Graduated and removed from active lists. Their records are kept and this can be reversed. A printable graduate list will open.',
     msg_graduated:'{n} student(s) graduated from {c}.',
@@ -4535,7 +4544,11 @@ const LANG = {
     stf_stat_total:'ټول کارکوونکي', stf_stat_payroll:'میاشتنۍ معاشات (افغانۍ)',
     cls_stat_total:'ټول ټولګي', cls_stat_students:'نوم لیکل شوي زده‌کوونکي', cls_stat_subjects:'تنظیم شوي مضامين',
     cls_empty_title:'لا ټولګي نشته', btn_manage_class:'د ټولګي اداره',
-    btn_graduate:'فراغت',
+    btn_graduate:'فراغت', btn_promote_year:'پورته کول / د کال پای',
+    lbl_graduates:'فارغان',
+    confirm_promote_title:'ټول یوه درجه پورته کړو؟',
+    confirm_promote_msg:'هر فعال زده‌کوونکی یوه درجه پورته ځي (۱→۲ ... ۱۱→۱۲). د ۱۲ ټولګي زده‌کوونکي فارغ او آرشیف کیږي (ریکارډونه ساتل کیږي). برخه خوندي پاتې کیږي. د چاپ وړ د فارغانو لیست به پرانیستل شي. دا ټولو زده‌کوونکو اغیزه کوي — یوازې د کال پای کې یې وکړئ.',
+    msg_promoted:'{p} پورته شول، {g} فارغ شول{s}.',
     confirm_graduate_title:'{name} فارغ کړو؟',
     confirm_graduate_msg:'د {name} ټول فعال زده‌کوونکي به د فارغ په توګه ونښل شي او له فعالو لیستونو لرې شي. ریکارډونه یې ساتل کیږي او بیرته کیدای شي. د چاپ وړ د فارغانو لیست به پرانیستل شي.',
     msg_graduated:'{n} زده‌کوونکي له {c} فارغ شول.',
@@ -6941,6 +6954,40 @@ async function saveClass() {
     if (typeof loadStudents === 'function') await loadStudents();
   } catch(e) { showAlert({ title:t('alert_title_failed'), message:e.message, type:'error' }); }
   finally { btn.innerHTML = `<i class="fas fa-save"></i> ${t('btn_save_class')}`; btn.disabled = false; }
+}
+
+// Year-end promotion — every student moves up one grade; grade-12
+// (دولسم) students graduate. Section preserved. One click.
+function promoteYearEnd() {
+  showConfirm({
+    title:   t('confirm_promote_title') || 'Promote everyone one grade?',
+    message: t('confirm_promote_msg') || 'Every active student moves up one grade (Grade 1→2, … 11→12). Grade-12 students graduate and are archived (records kept). Section is preserved. A printable graduate list will open. This affects all students — do it only at year-end.',
+    confirmText: t('btn_promote_year') || 'Promote',
+    type: 'warning',
+    onConfirm: async () => {
+      try {
+        const r = await fetch('/api/students/promote', {
+          method:'POST', headers:{'Content-Type':'application/json'}, body:'{}',
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Failed');
+        const movesTxt = (d.moves||[]).map(m => `${m.label}: ${m.count}`).join(' · ');
+        showAlert({
+          title: t('alert_title_saved') || 'Done',
+          message: (t('msg_promoted') || '{p} promoted, {g} graduated{s}.')
+                     .replace('{p}', d.promoted)
+                     .replace('{g}', d.graduated)
+                     .replace('{s}', d.skipped ? `, ${d.skipped} skipped (class has no grade set)` : '')
+                   + (movesTxt ? ' — ' + movesTxt : ''),
+          type: 'success',
+        });
+        if (d.graduate_list && d.graduate_list.length) {
+          printGraduateList(t('lbl_graduates') || 'Graduates', d.graduate_list);
+        }
+        await loadClasses();
+      } catch(e) { showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' }); }
+    },
+  });
 }
 
 // Graduate a whole class — archive its students as Graduated and

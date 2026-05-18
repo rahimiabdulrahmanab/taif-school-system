@@ -342,4 +342,96 @@ router.post('/graduate', async (req, res) => {
   }
 });
 
+// ══════════════════════════════════════════════════════════════
+//  POST /api/students/promote  — year-end promotion
+//  Every active student moves up one grade (class.grade_level is a
+//  fixed Dari ordinal اول…دولسم = 1…12). Grade-12 (دولسم) students
+//  graduate (archived). Section is preserved when a matching class
+//  exists. Snapshot-based so order can't double-move anyone.
+// ══════════════════════════════════════════════════════════════
+const GRADE_ORDER = ['اول','دوهم','دریم','څلورم','پنځم','شپږم',
+                     'اووم','اتم','نهم','لسم','یوولسم','دولسم'];
+
+router.post('/promote', async (req, res) => {
+  try {
+    const classesRes = await pool.query(
+      'SELECT id, name, grade_level, section FROM classes');
+    const classes = classesRes.rows;
+    const byId = {};
+    classes.forEach(c => { byId[c.id] = c; });
+
+    // Find the destination class for a given target grade + section.
+    // Prefer the same section; otherwise any class at that grade.
+    const findDest = (grade, section) => {
+      const sameSection = classes.find(c =>
+        c.grade_level === grade && (c.section || '') === (section || ''));
+      if (sameSection) return sameSection;
+      return classes.find(c => c.grade_level === grade) || null;
+    };
+
+    const studentsRes = await pool.query(
+      `SELECT id, first_name, last_name, student_code, parent_name, class_id
+         FROM students WHERE is_active = TRUE`);
+
+    const moves = {};          // "fromName→toName" → count
+    const promoteUpdates = []; // { studentId, destId }
+    const graduateIds = [];
+    const graduateRows = [];
+    let skipped = 0;
+
+    for (const s of studentsRes.rows) {
+      const cls = byId[s.class_id];
+      if (!cls || !cls.grade_level) { skipped++; continue; }
+      const gi = GRADE_ORDER.indexOf(cls.grade_level);
+      if (gi === -1) { skipped++; continue; }
+
+      if (gi === GRADE_ORDER.length - 1) {            // دولسم → graduate
+        graduateIds.push(s.id);
+        graduateRows.push({
+          name: `${s.first_name} ${s.last_name}`,
+          father_name: s.parent_name || '',
+          class_name: cls.name,
+          student_code: s.student_code || '',
+        });
+        continue;
+      }
+      const dest = findDest(GRADE_ORDER[gi + 1], cls.section);
+      if (!dest) { skipped++; continue; }              // no class for next grade
+      promoteUpdates.push({ studentId: s.id, destId: dest.id });
+      const k = `${cls.name} → ${dest.name}`;
+      moves[k] = (moves[k] || 0) + 1;
+    }
+
+    // Apply promotions
+    for (const u of promoteUpdates) {
+      await pool.query('UPDATE students SET class_id = $1 WHERE id = $2',
+        [u.destId, u.studentId]);
+    }
+    // Graduate the final grade (archive — kept in DB, off active lists)
+    if (graduateIds.length) {
+      try {
+        await pool.query(`
+          UPDATE students
+             SET graduated = TRUE, graduated_at = CURRENT_DATE, is_active = FALSE
+           WHERE id = ANY($1)`, [graduateIds]);
+      } catch (e) {
+        if (/graduated/.test(e.message)) {
+          await pool.query('UPDATE students SET is_active = FALSE WHERE id = ANY($1)', [graduateIds]);
+        } else { throw e; }
+      }
+    }
+
+    res.json({
+      success:        true,
+      promoted:       promoteUpdates.length,
+      graduated:      graduateIds.length,
+      skipped,
+      moves:          Object.entries(moves).map(([label, count]) => ({ label, count })),
+      graduate_list:  graduateRows,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
