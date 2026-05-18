@@ -2766,6 +2766,9 @@ button[style*="background:linear-gradient"]{
       <select id="grad-year-filter" onchange="renderGraduates()" style="padding:9px 12px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;">
         <option value="">All years</option>
       </select>
+      <select id="grad-section-filter" onchange="renderGraduates()" style="padding:9px 12px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;">
+        <option value="">All sections</option>
+      </select>
       <button onclick="printGraduatesAll()" style="padding:9px 18px;background:linear-gradient(135deg,#178f4f,#22c571);border:none;border-radius:var(--radius-sm);color:#fff;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 6px 18px rgba(34,197,113,.30);">
         <i class="fas fa-print"></i> <span data-i18n="btn_print">Print</span>
       </button>
@@ -4152,7 +4155,7 @@ const LANG = {
     nav_graduates:'Graduates', sub_graduates:'Archived students who have graduated — full records retained',
     grad_list:'Graduate List', grad_empty:'No graduates yet.', grad_th_date:'Graduation Date',
     grad_batch:'Graduate Batch', lbl_year:'Year', lbl_student:'student',
-    btn_restore:'Restore', opt_all_years:'All years',
+    btn_restore:'Restore', opt_all_years:'All years', opt_all_sections:'All sections',
     confirm_restore_title:'Restore student?',
     confirm_restore_msg:'Bring {name} back from Graduated to Active? They will reappear in active lists.',
     msg_restored:'Student restored.',
@@ -4566,7 +4569,7 @@ const LANG = {
     nav_graduates:'فارغان', sub_graduates:'فارغ شوي زده‌کوونکي چې آرشیف شوي — بشپړ ریکارډونه ساتل شوي',
     grad_list:'د فارغانو لیست', grad_empty:'لا فارغان نشته.', grad_th_date:'د فراغت نېټه',
     grad_batch:'د فارغانو ډله', lbl_year:'کال', lbl_student:'زده‌کوونکی',
-    btn_restore:'بیرته راګرځول', opt_all_years:'ټول کلونه',
+    btn_restore:'بیرته راګرځول', opt_all_years:'ټول کلونه', opt_all_sections:'ټولې برخې',
     confirm_restore_title:'زده‌کوونکی بیرته راګرځول؟',
     confirm_restore_msg:'{name} له فارغ څخه فعال ته بیرته راوغړوو؟ په فعالو لیستونو کې به بیا ښکاره شي.',
     msg_restored:'زده‌کوونکی بیرته فعال شو.',
@@ -6516,6 +6519,12 @@ async function loadGraduates() {
     }).filter(Boolean))).sort((a,b) => b - a);
     yrSel.innerHTML = `<option value="">${t('opt_all_years')||'All years'}</option>` +
       years.map(y => `<option value="${y}">${toPersianDigits(y)}</option>`).join('');
+
+    // Distinct sections present in the graduates list
+    const secSel = document.getElementById('grad-section-filter');
+    const sections = Array.from(new Set(_allGraduates.map(g => (g.section || '').trim()).filter(Boolean))).sort();
+    secSel.innerHTML = `<option value="">${t('opt_all_sections')||'All sections'}</option>` +
+      sections.map(s => `<option value="${s}">${s}</option>`).join('');
     renderGraduates();
   } catch(e) { console.error('loadGraduates error:', e); }
 }
@@ -6529,16 +6538,24 @@ function _gradShamsiYear(g) {
   return toShamsi(d.getFullYear(), d.getMonth()+1, d.getDate()).year;
 }
 
+function _gradClassLabel(g) {
+  const c = (g.class_name || '').trim();
+  const s = (g.section || '').trim();
+  return c ? (s ? `${c} — ${s}` : c) : '—';
+}
+
 function renderGraduates() {
   const q  = (document.getElementById('grad-search').value || '').toLowerCase().trim();
   const yf = document.getElementById('grad-year-filter').value;
+  const sf = (document.getElementById('grad-section-filter').value || '').trim();
   let list = _allGraduates.slice();
   if (q) {
     list = list.filter(g =>
-      ((g.first_name||'') + ' ' + (g.last_name||'') + ' ' + (g.parent_name||'') + ' ' + (g.student_code||'') + ' ' + (g.class_name||''))
+      ((g.first_name||'') + ' ' + (g.last_name||'') + ' ' + (g.parent_name||'') + ' ' + (g.student_code||'') + ' ' + (g.class_name||'') + ' ' + (g.section||''))
         .toLowerCase().includes(q));
   }
   if (yf) list = list.filter(g => _gradShamsiYear(g) === parseInt(yf));
+  if (sf) list = list.filter(g => (g.section || '') === sf);
 
   document.getElementById('grad-meta').textContent = `${list.length} ${list.length===1 ? (t('lbl_student')||'student') : (t('dash_students_lbl')||'students')}`;
 
@@ -6595,7 +6612,7 @@ function renderGraduates() {
         <td style="text-align:center;color:#6a7c93;font-family:var(--font-mono);font-size:12px;">${counter}</td>
         <td><div style="display:flex;align-items:center;gap:10px;">${photo}<span style="font-weight:700;color:#0f2845;">${g.first_name||''} ${g.last_name||''}</span></div></td>
         <td style="color:#334155;">${g.parent_name || '—'}</td>
-        <td style="font-weight:600;direction:rtl;text-align:right;">${g.class_name || '—'}</td>
+        <td style="font-weight:600;direction:rtl;text-align:right;">${_gradClassLabel(g)}</td>
         <td style="font-family:var(--font-mono);font-size:11.5px;color:#475569;">${g.student_code || '—'}</td>
         <td style="font-family:var(--font-mono);font-size:12px;color:#475569;direction:rtl;">${dShamsi}</td>
         <td style="text-align:center;">
@@ -6613,15 +6630,18 @@ function gradToggleYear(yr) {
 }
 
 function gradPrintBatch(yr) {
-  const cohort = _allGraduates.filter(g => _gradShamsiYear(g) === yr);
+  const sf = (document.getElementById('grad-section-filter').value || '').trim();
+  let cohort = _allGraduates.filter(g => _gradShamsiYear(g) === yr);
+  if (sf) cohort = cohort.filter(g => (g.section || '') === sf);
   if (!cohort.length) return;
   const rows = cohort.map(g => ({
     name: `${g.first_name||''} ${g.last_name||''}`,
     father_name: g.parent_name || '',
-    class_name: g.class_name || '—',
+    class_name: _gradClassLabel(g),
     student_code: g.student_code || '',
   }));
-  const title = `${toPersianDigits(yr)} — ${t('grad_batch')||'Graduate Batch'}`;
+  const sectionPart = sf ? ` — ${sf}` : '';
+  const title = `${toPersianDigits(yr)}${sectionPart} — ${t('grad_batch')||'Graduate Batch'}`;
   printGraduateList(title, rows);
 }
 
@@ -6645,21 +6665,23 @@ function restoreGraduate(id, name) {
 function printGraduatesAll() {
   const q  = (document.getElementById('grad-search').value || '').toLowerCase().trim();
   const yf = document.getElementById('grad-year-filter').value;
+  const sf = (document.getElementById('grad-section-filter').value || '').trim();
   let list = _allGraduates.slice();
   if (q) list = list.filter(g => ((g.first_name||'') + ' ' + (g.last_name||'') + ' ' + (g.parent_name||'')).toLowerCase().includes(q));
-  if (yf) list = list.filter(g => {
-    if (!g.graduated_at) return false;
-    const d = new Date(g.graduated_at);
-    return toShamsi(d.getFullYear(), d.getMonth()+1, d.getDate()).year === parseInt(yf);
-  });
+  if (yf) list = list.filter(g => _gradShamsiYear(g) === parseInt(yf));
+  if (sf) list = list.filter(g => (g.section || '') === sf);
   if (!list.length) { showAlert({ title:t('alert_title_missing')||'Empty', message:t('grad_empty')||'No graduates to print.', type:'warning' }); return; }
   const rows = list.map(g => ({
     name: `${g.first_name||''} ${g.last_name||''}`,
     father_name: g.parent_name || '',
-    class_name: g.class_name || '—',
+    class_name: _gradClassLabel(g),
     student_code: g.student_code || '',
   }));
-  printGraduateList(t('lbl_graduates') || 'Graduates', rows);
+  const parts = [];
+  if (yf) parts.push(toPersianDigits(yf));
+  if (sf) parts.push(sf);
+  const title = (parts.length ? parts.join(' — ') + ' — ' : '') + (t('lbl_graduates') || 'Graduates');
+  printGraduateList(title, rows);
 }
 
 // ═══════════════════════════════════════════════════
@@ -7208,7 +7230,12 @@ function promoteYearEnd() {
           type: 'success',
         });
         if (d.graduate_list && d.graduate_list.length) {
-          printGraduateList(t('lbl_graduates') || 'Graduates', d.graduate_list);
+          // Combine class + section in the printed Class column
+          const rows = d.graduate_list.map(r => ({
+            ...r,
+            class_name: (r.class_name || '') + (r.section ? ` — ${r.section}` : ''),
+          }));
+          printGraduateList(t('lbl_graduates') || 'Graduates', rows);
         }
         await loadClasses();
       } catch(e) { showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' }); }
@@ -7238,7 +7265,13 @@ function graduateClass(classId, className) {
                      .replace('{n}', d.count).replace('{c}', d.class_name || className),
           type: 'success',
         });
-        if (d.students && d.students.length) printGraduateList(d.class_name || className, d.students);
+        if (d.students && d.students.length) {
+          const rows = d.students.map(r => ({
+            ...r,
+            class_name: (r.class_name || '') + (r.section ? ` — ${r.section}` : ''),
+          }));
+          printGraduateList(d.class_name || className, rows);
+        }
         await loadClasses();
       } catch(e) { showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' }); }
     },

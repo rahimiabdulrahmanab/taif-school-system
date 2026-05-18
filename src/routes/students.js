@@ -300,8 +300,9 @@ router.post('/graduate', async (req, res) => {
     const { class_id } = req.body;
     if (!class_id) return res.status(400).json({ error: 'class_id is required' });
 
-    const cls = await pool.query('SELECT name FROM classes WHERE id = $1', [class_id]);
+    const cls = await pool.query('SELECT name, section FROM classes WHERE id = $1', [class_id]);
     const className = cls.rows.length ? cls.rows[0].name : '';
+    const classSection = cls.rows.length ? (cls.rows[0].section || '') : '';
 
     let graduated = [];
     try {
@@ -334,6 +335,7 @@ router.post('/graduate', async (req, res) => {
         name:        `${s.first_name} ${s.last_name}`,
         father_name: s.parent_name || '',
         class_name:  className,
+        section:     classSection,
         student_code: s.student_code || '',
       })),
     });
@@ -391,6 +393,7 @@ router.post('/promote', async (req, res) => {
           name: `${s.first_name} ${s.last_name}`,
           father_name: s.parent_name || '',
           class_name: cls.name,
+          section: cls.section || '',
           student_code: s.student_code || '',
         });
         continue;
@@ -443,18 +446,19 @@ router.get('/list/graduates', async (req, res) => {
     try {
       q = await pool.query(`
         SELECT s.id, s.first_name, s.last_name, s.parent_name, s.student_code,
-               s.photo, s.graduated_at, c.name AS class_name
+               s.photo, s.graduated_at,
+               c.name AS class_name, c.section, c.grade_level
           FROM students s
           LEFT JOIN classes c ON c.id = s.class_id
          WHERE s.graduated = TRUE
          ORDER BY s.graduated_at DESC NULLS LAST, s.last_name, s.first_name
       `);
     } catch (e) {
-      // graduated column missing → fall back to inactive students
       if (/graduated/.test(e.message)) {
         q = await pool.query(`
           SELECT s.id, s.first_name, s.last_name, s.parent_name, s.student_code,
-                 s.photo, NULL::date AS graduated_at, c.name AS class_name
+                 s.photo, NULL::date AS graduated_at,
+                 c.name AS class_name, c.section, c.grade_level
             FROM students s
             LEFT JOIN classes c ON c.id = s.class_id
            WHERE s.is_active = FALSE
