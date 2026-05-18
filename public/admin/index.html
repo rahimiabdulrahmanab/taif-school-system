@@ -6877,9 +6877,9 @@ async function renderClasses(list) {
           <button onclick="openStudentsDrawer(${c.id},'${(c.name||'').replace(/'/g,"\\'")}')" style="flex:1;padding:10px;background:linear-gradient(135deg,${p.from},${p.to});border:none;border-radius:10px;color:#fff;font-size:12.5px;font-family:var(--font-head);font-weight:800;cursor:pointer;box-shadow:0 4px 12px ${p.from}44;transition:transform .15s ease;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
             <i class="fas fa-users-cog"></i> ${t('btn_manage_class') || 'Manage Class'}
           </button>
-          <button onclick="graduateClass(${c.id},'${(c.name||'').replace(/'/g,"\\'")}')" title="${t('btn_graduate')||'Graduate class'}" style="width:38px;height:38px;background:rgba(34,197,113,.10);border:1px solid rgba(34,197,113,.25);border-radius:10px;color:#178f4f;cursor:pointer;font-size:13px;transition:transform .15s ease;" onmouseover="this.style.transform='scale(1.08)';this.style.background='rgba(34,197,113,.18)'" onmouseout="this.style.transform='scale(1)';this.style.background='rgba(34,197,113,.10)'">
+          ${c.grade_level === 'دولسم' ? `<button onclick="graduateClass(${c.id},'${(c.name||'').replace(/'/g,"\\'")}')" title="${t('btn_graduate')||'Graduate class'}" style="width:38px;height:38px;background:rgba(34,197,113,.10);border:1px solid rgba(34,197,113,.25);border-radius:10px;color:#178f4f;cursor:pointer;font-size:13px;transition:transform .15s ease;" onmouseover="this.style.transform='scale(1.08)';this.style.background='rgba(34,197,113,.18)'" onmouseout="this.style.transform='scale(1)';this.style.background='rgba(34,197,113,.10)'">
             <i class="fas fa-user-graduate"></i>
-          </button>
+          </button>` : ''}
           <button onclick="openClassForm(${c.id})" title="Edit" style="width:38px;height:38px;background:rgba(91,158,247,.10);border:1px solid rgba(91,158,247,.22);border-radius:10px;color:#3a7abf;cursor:pointer;font-size:13px;transition:transform .15s ease;" onmouseover="this.style.transform='scale(1.08)';this.style.background='rgba(91,158,247,.18)'" onmouseout="this.style.transform='scale(1)';this.style.background='rgba(91,158,247,.10)'">
             <i class="fas fa-edit"></i>
           </button>
