@@ -4313,6 +4313,7 @@ const LANG = {
     stat_advances_given:'Advances Given', stat_net_to_pay:'Net To Pay', stat_paid_progress:'Salaries Paid',
     lbl_employees:'employees', lbl_entries:'entries', lbl_pending:'pending',
     lbl_overtime:'Overtime', lbl_hours:'Hours', btn_add:'Add',
+    lbl_amount_afn:'Amount', lbl_notes_opt:'Note',
     lbl_no_overtime:'No overtime entries this month.',
     lbl_edit_overtime:'Edit Overtime Amount',
     msg_edit_overtime:'Enter the corrected overtime amount (AFN).',
@@ -4715,6 +4716,7 @@ const LANG = {
     stat_advances_given:'ورکړل شوي پیش معاش', stat_net_to_pay:'د ورکړې لپاره خالص', stat_paid_progress:'ورکړل شوي معاشونه',
     lbl_employees:'کارمندان', lbl_entries:'ثبت شوي', lbl_pending:'پاتې',
     lbl_overtime:'اضافه‌کاري', lbl_hours:'ساعتونه', btn_add:'زیاتول',
+    lbl_amount_afn:'مبلغ', lbl_notes_opt:'یادداښت',
     lbl_no_overtime:'پدې میاشت کې اضافه‌کاري نشته.',
     lbl_edit_overtime:'د اضافه‌کارۍ مبلغ سمول',
     msg_edit_overtime:'د اضافه‌کارۍ سم شوی مبلغ ولیکئ (افغاني).',
@@ -10592,6 +10594,13 @@ function openOvertimeModal(idx) {
     month:      parseInt(document.getElementById('payroll-month').value),
     year:       parseInt(document.getElementById('payroll-year').value),
   };
+  // Today's Shamsi date — the add form defaults to it (office logs daily)
+  const _n  = new Date();
+  const _cs = toShamsi(_n.getFullYear(), _n.getMonth() + 1, _n.getDate());
+  const _dayOpts = Array.from({length:31}, (_,i)=>`<option value="${i+1}"${i+1===_cs.day?' selected':''}>${toPersianDigits(i+1)}</option>`).join('');
+  const _monOpts = Array.from({length:12}, (_,i)=>`<option value="${i+1}"${i+1===_cs.month?' selected':''}>${SHAMSI_MONTHS_DARI[i+1]}</option>`).join('');
+  const _yrOpts  = [ _cs.year-1, _cs.year, _cs.year+1 ].map(y=>`<option value="${y}"${y===_cs.year?' selected':''}>${toPersianDigits(y)}</option>`).join('');
+
   const old = document.getElementById('ot-modal'); if (old) old.remove();
   const wrap = document.createElement('div');
   wrap.id = 'ot-modal';
@@ -10604,6 +10613,11 @@ function openOvertimeModal(idx) {
       </div>
       <div id="ot-list" style="overflow-y:auto;flex:1;padding:8px 18px;"></div>
       <div style="padding:14px 18px;border-top:1px solid rgba(20,40,80,.08);background:#f8fafc;">
+        <div style="display:flex;gap:8px;margin-bottom:8px;direction:rtl;">
+          <select id="ot-add-day"   style="flex:1;min-width:0;padding:9px 4px;border:1px solid #cbd5e1;border-radius:8px;font-size:12.5px;outline:none;">${_dayOpts}</select>
+          <select id="ot-add-month" style="flex:1.4;min-width:0;padding:9px 4px;border:1px solid #cbd5e1;border-radius:8px;font-size:12.5px;outline:none;">${_monOpts}</select>
+          <select id="ot-add-year"  style="flex:1.2;min-width:0;padding:9px 4px;border:1px solid #cbd5e1;border-radius:8px;font-size:12.5px;outline:none;">${_yrOpts}</select>
+        </div>
         <div style="display:flex;gap:8px;margin-bottom:8px;">
           <input id="ot-add-hours" type="text" inputmode="decimal" placeholder="${t('lbl_hours')||'Hours'}" style="flex:1;min-width:0;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-family:var(--font-mono);font-size:13px;text-align:center;outline:none;" oninput="this.value=toWesternDigits(this.value).replace(/[^0-9.]/g,'')">
           <input id="ot-add-amount" type="text" inputmode="numeric" placeholder="${t('lbl_amount_afn')||'Amount'}" style="flex:1.2;min-width:0;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-family:var(--font-mono);font-size:13px;font-weight:700;text-align:center;outline:none;" oninput="this.value=toWesternDigits(this.value).replace(/[^0-9.]/g,'')">
@@ -10665,10 +10679,19 @@ async function otAddEntry() {
     showAlert({ title:t('alert_title_invalid'), message:t('msg_invalid_amount')||'Enter hours or an amount.', type:'warning' });
     return;
   }
+  // Shamsi date → Gregorian ISO for storage
+  const sy = parseInt(document.getElementById('ot-add-year').value);
+  const sm = parseInt(document.getElementById('ot-add-month').value);
+  const sd = parseInt(document.getElementById('ot-add-day').value);
+  let overtime_date = null;
+  if (sy && sm && sd) {
+    const g = fromShamsi(sy, sm, sd);
+    overtime_date = `${g.year}-${String(g.month).padStart(2,'0')}-${String(g.day).padStart(2,'0')}`;
+  }
   try {
     const r = await fetch('/api/payroll/overtime', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ person_id:c.personId, person_type:c.personType, month:c.month, year:c.year, hours, amount, notes }),
+      body: JSON.stringify({ person_id:c.personId, person_type:c.personType, month:c.month, year:c.year, hours, amount, notes, overtime_date }),
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || 'Failed');
