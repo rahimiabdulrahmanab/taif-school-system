@@ -4151,6 +4151,7 @@ const LANG = {
     nav_scholarships:'Scholarships',
     nav_graduates:'Graduates', sub_graduates:'Archived students who have graduated — full records retained',
     grad_list:'Graduate List', grad_empty:'No graduates yet.', grad_th_date:'Graduation Date',
+    grad_batch:'Graduate Batch', lbl_year:'Year', lbl_student:'student',
     btn_restore:'Restore', opt_all_years:'All years',
     confirm_restore_title:'Restore student?',
     confirm_restore_msg:'Bring {name} back from Graduated to Active? They will reappear in active lists.',
@@ -4564,6 +4565,7 @@ const LANG = {
     nav_scholarships:'بورسونه',
     nav_graduates:'فارغان', sub_graduates:'فارغ شوي زده‌کوونکي چې آرشیف شوي — بشپړ ریکارډونه ساتل شوي',
     grad_list:'د فارغانو لیست', grad_empty:'لا فارغان نشته.', grad_th_date:'د فراغت نېټه',
+    grad_batch:'د فارغانو ډله', lbl_year:'کال', lbl_student:'زده‌کوونکی',
     btn_restore:'بیرته راګرځول', opt_all_years:'ټول کلونه',
     confirm_restore_title:'زده‌کوونکی بیرته راګرځول؟',
     confirm_restore_msg:'{name} له فارغ څخه فعال ته بیرته راوغړوو؟ په فعالو لیستونو کې به بیا ښکاره شي.',
@@ -6518,6 +6520,15 @@ async function loadGraduates() {
   } catch(e) { console.error('loadGraduates error:', e); }
 }
 
+const _gradYearOpen = {};   // { 1405: true } — expanded year sections
+
+function _gradShamsiYear(g) {
+  if (!g.graduated_at) return null;
+  const d = new Date(g.graduated_at);
+  if (isNaN(d)) return null;
+  return toShamsi(d.getFullYear(), d.getMonth()+1, d.getDate()).year;
+}
+
 function renderGraduates() {
   const q  = (document.getElementById('grad-search').value || '').toLowerCase().trim();
   const yf = document.getElementById('grad-year-filter').value;
@@ -6527,38 +6538,91 @@ function renderGraduates() {
       ((g.first_name||'') + ' ' + (g.last_name||'') + ' ' + (g.parent_name||'') + ' ' + (g.student_code||'') + ' ' + (g.class_name||''))
         .toLowerCase().includes(q));
   }
-  if (yf) {
-    list = list.filter(g => {
-      if (!g.graduated_at) return false;
-      const d = new Date(g.graduated_at);
-      return toShamsi(d.getFullYear(), d.getMonth()+1, d.getDate()).year === parseInt(yf);
-    });
-  }
+  if (yf) list = list.filter(g => _gradShamsiYear(g) === parseInt(yf));
+
   document.getElementById('grad-meta').textContent = `${list.length} ${list.length===1 ? (t('lbl_student')||'student') : (t('dash_students_lbl')||'students')}`;
+
+  // Group by Shamsi year (graduates_at). Null years go into "Unknown".
+  const byYear = {};
+  list.forEach(g => {
+    const y = _gradShamsiYear(g);
+    const k = y == null ? 0 : y;          // 0 = unknown bucket
+    (byYear[k] = byYear[k] || []).push(g);
+  });
+  const years = Object.keys(byYear).map(Number).sort((a,b) => b - a);
+
+  // First load: open the most recent year by default
+  if (years.length && Object.keys(_gradYearOpen).length === 0) {
+    _gradYearOpen[years[0]] = true;
+  }
 
   const tb = document.getElementById('grad-tbody');
   if (!list.length) {
     tb.innerHTML = `<tr><td colspan="7"><div class="empty"><i class="fas fa-user-graduate"></i><p>${t('grad_empty')||'No graduates yet.'}</p></div></td></tr>`;
     return;
   }
-  tb.innerHTML = list.map((g, i) => {
-    const ini   = ((g.first_name||'?')[0] + ((g.last_name||'')[0]||'')).toUpperCase();
-    const photo = g.photo
-      ? `<img src="/uploads/students/${g.photo}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:1.5px solid var(--glass-border);">`
-      : `<div style="width:32px;height:32px;border-radius:50%;background:rgba(34,197,113,.12);border:1.5px solid rgba(34,197,113,.30);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#178f4f;font-family:var(--font-head);">${ini}</div>`;
-    const dShamsi = g.graduated_at ? shamsiDariPD(g.graduated_at) : '—';
-    return `<tr>
-      <td style="text-align:center;color:#6a7c93;font-family:var(--font-mono);font-size:12px;">${i+1}</td>
-      <td><div style="display:flex;align-items:center;gap:10px;">${photo}<span style="font-weight:700;color:#0f2845;">${g.first_name||''} ${g.last_name||''}</span></div></td>
-      <td style="color:#334155;">${g.parent_name || '—'}</td>
-      <td style="font-weight:600;direction:rtl;text-align:right;">${g.class_name || '—'}</td>
-      <td style="font-family:var(--font-mono);font-size:11.5px;color:#475569;">${g.student_code || '—'}</td>
-      <td style="font-family:var(--font-mono);font-size:12px;color:#475569;direction:rtl;">${dShamsi}</td>
-      <td style="text-align:center;">
-        <button onclick="restoreGraduate(${g.id},'${(g.first_name||'').replace(/'/g,"\\'")} ${(g.last_name||'').replace(/'/g,"\\'")}')" title="${t('btn_restore')||'Restore'}" style="padding:6px 11px;background:rgba(91,158,247,.12);border:1px solid rgba(91,158,247,.30);border-radius:20px;color:#1a4fa0;font-size:11px;font-weight:700;font-family:var(--font-head);cursor:pointer;"><i class="fas fa-rotate-left"></i> ${t('btn_restore')||'Restore'}</button>
-      </td>
-    </tr>`;
+
+  let counter = 0;
+  tb.innerHTML = years.map(yr => {
+    const open  = !!_gradYearOpen[yr];
+    const cohort = byYear[yr];
+    const yrLabel = yr === 0 ? '—' : `${toPersianDigits(yr)} ${t('lbl_year')||'Year'}`;
+    // Year header row
+    const header = `
+      <tr class="grad-year-hdr" style="background:linear-gradient(90deg,rgba(34,197,113,.10),rgba(34,197,113,.02));border-top:2px solid rgba(34,197,113,.20);cursor:pointer;" onclick="gradToggleYear(${yr})">
+        <td colspan="7" style="padding:11px 14px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <i class="fas fa-chevron-${open?'down':'right'}" style="color:#178f4f;font-size:11px;width:11px;"></i>
+            <i class="fas fa-user-graduate" style="color:#178f4f;font-size:13px;"></i>
+            <span style="font-family:var(--font-head);font-weight:800;color:#178f4f;font-size:14px;direction:rtl;">${yrLabel} — ${t('grad_batch')||'Graduate Batch'}</span>
+            <span style="margin-left:auto;display:flex;align-items:center;gap:10px;">
+              <span style="font-family:var(--font-mono);font-size:11.5px;color:#178f4f;background:rgba(34,197,113,.12);border:1px solid rgba(34,197,113,.30);padding:2px 10px;border-radius:14px;font-weight:700;">${toPersianDigits(cohort.length)} ${cohort.length === 1 ? (t('lbl_student')||'student') : (t('dash_students_lbl')||'students')}</span>
+              <button onclick="event.stopPropagation();gradPrintBatch(${yr})" title="${t('btn_print')||'Print'}" style="padding:5px 11px;background:#178f4f;border:none;border-radius:14px;color:#fff;font-size:11px;font-weight:700;font-family:var(--font-head);cursor:pointer;"><i class="fas fa-print"></i> ${t('btn_print')||'Print'}</button>
+            </span>
+          </div>
+        </td>
+      </tr>`;
+    if (!open) return header;
+    // Cohort rows
+    const rows = cohort.map(g => {
+      counter += 1;
+      const ini   = ((g.first_name||'?')[0] + ((g.last_name||'')[0]||'')).toUpperCase();
+      const photo = g.photo
+        ? `<img src="/uploads/students/${g.photo}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:1.5px solid var(--glass-border);">`
+        : `<div style="width:32px;height:32px;border-radius:50%;background:rgba(34,197,113,.12);border:1.5px solid rgba(34,197,113,.30);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#178f4f;font-family:var(--font-head);">${ini}</div>`;
+      const dShamsi = g.graduated_at ? shamsiDariPD(g.graduated_at) : '—';
+      return `<tr>
+        <td style="text-align:center;color:#6a7c93;font-family:var(--font-mono);font-size:12px;">${counter}</td>
+        <td><div style="display:flex;align-items:center;gap:10px;">${photo}<span style="font-weight:700;color:#0f2845;">${g.first_name||''} ${g.last_name||''}</span></div></td>
+        <td style="color:#334155;">${g.parent_name || '—'}</td>
+        <td style="font-weight:600;direction:rtl;text-align:right;">${g.class_name || '—'}</td>
+        <td style="font-family:var(--font-mono);font-size:11.5px;color:#475569;">${g.student_code || '—'}</td>
+        <td style="font-family:var(--font-mono);font-size:12px;color:#475569;direction:rtl;">${dShamsi}</td>
+        <td style="text-align:center;">
+          <button onclick="restoreGraduate(${g.id},'${(g.first_name||'').replace(/'/g,"\\'")} ${(g.last_name||'').replace(/'/g,"\\'")}')" title="${t('btn_restore')||'Restore'}" style="padding:6px 11px;background:rgba(91,158,247,.12);border:1px solid rgba(91,158,247,.30);border-radius:20px;color:#1a4fa0;font-size:11px;font-weight:700;font-family:var(--font-head);cursor:pointer;"><i class="fas fa-rotate-left"></i> ${t('btn_restore')||'Restore'}</button>
+        </td>
+      </tr>`;
+    }).join('');
+    return header + rows;
   }).join('');
+}
+
+function gradToggleYear(yr) {
+  _gradYearOpen[yr] = !_gradYearOpen[yr];
+  renderGraduates();
+}
+
+function gradPrintBatch(yr) {
+  const cohort = _allGraduates.filter(g => _gradShamsiYear(g) === yr);
+  if (!cohort.length) return;
+  const rows = cohort.map(g => ({
+    name: `${g.first_name||''} ${g.last_name||''}`,
+    father_name: g.parent_name || '',
+    class_name: g.class_name || '—',
+    student_code: g.student_code || '',
+  }));
+  const title = `${toPersianDigits(yr)} — ${t('grad_batch')||'Graduate Batch'}`;
+  printGraduateList(title, rows);
 }
 
 function restoreGraduate(id, name) {
