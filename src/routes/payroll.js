@@ -286,6 +286,27 @@ router.post('/advance', async (req, res) => {
   }
 });
 
+// ── PUT edit an advance ───────────────────────────────────────
+router.put('/advance/:id', async (req, res) => {
+  try {
+    const { amount, notes, advance_date } = req.body;
+    const amt = (amount != null && amount !== '') ? parseFloat(amount) : null;
+    if (amt != null && !(amt >= 0)) {
+      return res.status(400).json({ error: 'Amount must be a positive number' });
+    }
+    const r = await pool.query(`
+      UPDATE payroll_advances SET
+        amount       = COALESCE($1, amount),
+        notes        = COALESCE($2, notes),
+        advance_date = COALESCE($3::date, advance_date)
+      WHERE id = $4
+      RETURNING *`,
+      [amt, (notes != null ? notes : null), advance_date || null, req.params.id]);
+    if (!r.rows.length) return res.status(404).json({ error: 'Advance not found' });
+    res.json({ success: true, advance: r.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ── DELETE remove advance ─────────────────────────────────────
 router.delete('/advance/:id', async (req, res) => {
   try {

@@ -4247,6 +4247,8 @@ const LANG = {
     btn_set_due:'Set Due', btn_add_payment:'Add Payment',
     lbl_edit_payment:'Edit Payment Amount',
     msg_edit_payment:'Enter the corrected amount for this payment.',
+    lbl_edit_advance:'Edit Advance Amount',
+    msg_edit_advance:'Enter the corrected advance amount.',
     btn_apply_to_legacy:'Apply to Previous',
     lbl_discount_type:'Discount Type', lbl_discount_amount:'Amount (AFN)',
     lbl_discount_reason:'Discount Reason',
@@ -4636,6 +4638,8 @@ const LANG = {
     btn_set_due:'تادیه وټاکئ', btn_add_payment:'تادیه زیاته کړئ',
     lbl_edit_payment:'د تادیې مبلغ سمول',
     msg_edit_payment:'د دې تادیې سم شوی مبلغ ولیکئ.',
+    lbl_edit_advance:'د پیش معاش مبلغ سمول',
+    msg_edit_advance:'د پیش معاش سم شوی مبلغ ولیکئ.',
     btn_apply_to_legacy:'پخواني ته ورکړه',
     lbl_discount_type:'د تخفیف ډول', lbl_discount_amount:'مبلغ (افغاني)',
     lbl_discount_reason:'د تخفیف لامل',
@@ -10418,7 +10422,8 @@ function renderAdvanceDetail(p, idx) {
       <span style="font-family:var(--font-mono);font-size:12px;color:#8b5a0e;direction:rtl;font-weight:700;min-width:130px;">${dShamsi}</span>
       <span style="font-family:var(--font-mono);font-size:13px;font-weight:800;color:#0f2845;">${amt} AFN</span>
       ${notes}
-      <button onclick="reprintAdvanceFromRow(${a.id},${idx})" title="${t('btn_print_receipt')||'Print receipt'}" style="margin-left:auto;width:26px;height:26px;border-radius:6px;background:rgba(91,158,247,.10);border:1px solid rgba(91,158,247,.22);color:#1a4fa0;cursor:pointer;font-size:11px;"><i class="fas fa-print"></i></button>
+      <button onclick="editAdvanceFromRow(${a.id},${idx},${Number(a.amount||0)})" title="${t('btn_edit')||'Edit'}" style="margin-left:auto;width:26px;height:26px;border-radius:6px;background:rgba(91,158,247,.10);border:1px solid rgba(91,158,247,.22);color:#1a4fa0;cursor:pointer;font-size:11px;"><i class="fas fa-pen"></i></button>
+      <button onclick="reprintAdvanceFromRow(${a.id},${idx})" title="${t('btn_print_receipt')||'Print receipt'}" style="width:26px;height:26px;border-radius:6px;background:rgba(91,158,247,.10);border:1px solid rgba(91,158,247,.22);color:#1a4fa0;cursor:pointer;font-size:11px;"><i class="fas fa-print"></i></button>
       <button onclick="deleteAdvanceFromRow(${a.id},${idx})" title="${t('btn_delete')||'Delete'}" style="width:26px;height:26px;border-radius:6px;background:rgba(255,120,117,.10);border:1px solid rgba(255,120,117,.22);color:#dc4f4c;cursor:pointer;font-size:11px;"><i class="fas fa-times"></i></button>
     </div>`;
   }).join('');
@@ -10505,6 +10510,30 @@ function toggleAdvanceDetail(idx) {
   const open = row.style.display === '';
   row.style.display = open ? 'none' : '';
   if (btn) btn.innerHTML = btn.innerHTML.replace(/[▾▴]/, open ? '▾' : '▴');
+}
+
+function editAdvanceFromRow(advId, idx, currentAmount) {
+  showConfirmInput({
+    title: t('lbl_edit_advance') || 'Edit Advance Amount',
+    message: t('msg_edit_advance') || 'Enter the corrected advance amount.',
+    value: Math.round(currentAmount || 0),
+    confirmText: t('btn_save') || 'Save',
+    onConfirm: async (val) => {
+      const amt = parseFloat(val);
+      if (!(amt >= 0)) { showAlert({ title:t('alert_title_invalid'), message:t('msg_invalid_amount'), type:'warning' }); return; }
+      try {
+        const r = await fetch(`/api/payroll/advance/${advId}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: amt }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Failed to update');
+        await loadPayroll();
+        const row = document.getElementById(`pr-adv-row-${idx}`);
+        if (row) row.style.display = '';
+      } catch(e) { showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' }); }
+    },
+  });
 }
 
 function deleteAdvanceFromRow(advId, idx) {
@@ -11388,6 +11417,7 @@ function renderAdvList() {
         </div>
         ${notes}
       </div>
+      <button onclick="editAdvanceFromModal(${a.id},${Number(a.amount||0)})" title="${t('btn_edit') || 'Edit'}" style="width:30px;height:30px;border-radius:6px;background:rgba(91,158,247,.12);border:1px solid rgba(91,158,247,.2);color:#1a4fa0;font-size:12px;cursor:pointer;flex-shrink:0;"><i class="fas fa-pen"></i></button>
       <button onclick="reprintAdvanceFromModal(${a.id})" title="${t('btn_print_receipt') || 'Print receipt'}" style="width:30px;height:30px;border-radius:6px;background:rgba(91,158,247,.12);border:1px solid rgba(91,158,247,.2);color:#1a4fa0;font-size:12px;cursor:pointer;flex-shrink:0;"><i class="fas fa-print"></i></button>
       <button onclick="deleteAdvance(${a.id})" title="${t('btn_delete') || 'Delete'}" style="width:30px;height:30px;border-radius:6px;background:rgba(255,120,117,.12);border:1px solid rgba(255,120,117,.2);color:#dc4f4c;font-size:12px;cursor:pointer;flex-shrink:0;"><i class="fas fa-times"></i></button>
     </div>`;
@@ -11493,6 +11523,32 @@ async function saveAdvance() {
       }
     }
   } catch(e) { showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' }); }
+}
+
+function editAdvanceFromModal(advId, currentAmount) {
+  showConfirmInput({
+    title: t('lbl_edit_advance') || 'Edit Advance Amount',
+    message: t('msg_edit_advance') || 'Enter the corrected advance amount.',
+    value: Math.round(currentAmount || 0),
+    confirmText: t('btn_save') || 'Save',
+    onConfirm: async (val) => {
+      const amt = parseFloat(val);
+      if (!(amt >= 0)) { showAlert({ title:t('alert_title_invalid'), message:t('msg_invalid_amount'), type:'warning' }); return; }
+      try {
+        const r = await fetch(`/api/payroll/advance/${advId}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: amt }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Failed to update');
+        const pid   = parseInt(document.getElementById('pr-adv-pid').value);
+        const ptype = document.getElementById('pr-adv-ptype').value;
+        await loadPayroll();
+        const newIdx = payrollData.findIndex(x => x.id === pid && x.person_type === ptype);
+        if (newIdx >= 0) { document.getElementById('pr-adv-idx').value = newIdx; renderAdvList(); }
+      } catch(e) { showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' }); }
+    },
+  });
 }
 
 function deleteAdvance(advId) {
