@@ -289,4 +289,57 @@ router.get('/qr/bulk', async (req, res) => {
   }
 });
 
+// ══════════════════════════════════════════════════════════════
+//  POST /api/students/graduate  — archive a class as Graduated
+//  Body: { class_id }. Marks every active student in the class
+//  graduated (kept in DB, dropped from active lists). Returns the
+//  graduate list (name, father, class) for printing.
+// ══════════════════════════════════════════════════════════════
+router.post('/graduate', async (req, res) => {
+  try {
+    const { class_id } = req.body;
+    if (!class_id) return res.status(400).json({ error: 'class_id is required' });
+
+    const cls = await pool.query('SELECT name FROM classes WHERE id = $1', [class_id]);
+    const className = cls.rows.length ? cls.rows[0].name : '';
+
+    let graduated = [];
+    try {
+      const r = await pool.query(`
+        UPDATE students
+           SET graduated = TRUE, graduated_at = CURRENT_DATE, is_active = FALSE
+         WHERE class_id = $1 AND is_active = TRUE
+         RETURNING id, first_name, last_name, student_code, parent_name`,
+        [class_id]
+      );
+      graduated = r.rows;
+    } catch (e) {
+      // graduated columns missing → degrade to just deactivating
+      if (/graduated/.test(e.message)) {
+        const r = await pool.query(`
+          UPDATE students SET is_active = FALSE
+           WHERE class_id = $1 AND is_active = TRUE
+           RETURNING id, first_name, last_name, student_code, parent_name`,
+          [class_id]
+        );
+        graduated = r.rows;
+      } else { throw e; }
+    }
+
+    res.json({
+      success:    true,
+      class_name: className,
+      count:      graduated.length,
+      students:   graduated.map(s => ({
+        name:        `${s.first_name} ${s.last_name}`,
+        father_name: s.parent_name || '',
+        class_name:  className,
+        student_code: s.student_code || '',
+      })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

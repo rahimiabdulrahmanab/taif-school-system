@@ -103,6 +103,22 @@ router.get('/', async (req, res) => {
       console.warn('[payroll] staff_monthly_attendance table missing — run migration_align_with_routes.sql to enable admin overrides.');
     }
 
+    // Overtime for this pay month (hours + AFN), added on top of net salary.
+    const overtimeMap = {};
+    try {
+      const otRes = await pool.query(
+        `SELECT person_id, person_type, hours, amount
+           FROM payroll_overtime WHERE pay_month = $1`,
+        [payMonth]
+      );
+      otRes.rows.forEach(r => {
+        overtimeMap[`${r.person_type}-${r.person_id}`] =
+          { hours: parseFloat(r.hours) || 0, amount: parseFloat(r.amount) || 0 };
+      });
+    } catch (e) {
+      if (!/payroll_overtime/.test(e.message || '')) throw e;
+    }
+
     const result = people.map(p => {
       const key      = `${p.person_type}-${p.id}`;
       const payroll  = payrollMap[key] || null;
@@ -140,10 +156,14 @@ router.get('/', async (req, res) => {
         ? parseFloat(payroll.deduction_amount || 0)
         : Math.round(dailyRate * absentDays);
 
+      // Overtime for this month (added on top of earned salary)
+      const ot       = overtimeMap[key] || { hours: 0, amount: 0 };
+      const otAmount = parseFloat(ot.amount) || 0;
+
       // Salary model:
-      //   net_payable = salary − tax − absence_deduction   (what the teacher earned, after tax)
+      //   net_payable = salary − tax − absence_deduction + overtime
       //   net_salary  = net_payable − advances             (what's still to hand over)
-      const netPayable = Math.max(0, salary - tax - absenceDeduction);
+      const netPayable = Math.max(0, salary - tax - absenceDeduction) + otAmount;
       const netSalary  = Math.max(0, netPayable - advTotal);
 
       return {
@@ -162,8 +182,11 @@ router.get('/', async (req, res) => {
         elapsed_working_days: elapsedWorkingDays,
         daily_rate:          Math.round(dailyRate),
         absence_deduction:   absenceDeduction,
+        // Overtime
+        overtime_hours:  ot.hours || 0,
+        overtime_amount: otAmount,
         // Net figures
-        net_payable:    netPayable,            // salary − tax − absence; advances draw from this
+        net_payable:    netPayable,            // salary − tax − absence + overtime; advances draw from this
         net_salary:     netSalary,             // final amount still to pay
         payroll_id:     payroll?.id || null,
         is_paid:        !!payroll,
@@ -282,6 +305,32 @@ router.post('/advance', async (req, res) => {
     res.status(201).json({ success: true, advance: r.rows[0] });
   } catch (err) {
     console.error('POST /api/payroll/advance error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST set/update overtime for a person in a Shamsi month ───
+router.post('/overtime', async (req, res) => {
+  try {
+    const { person_id, person_type, month, year, hours, amount, notes } = req.body;
+    if (!person_id || !person_type || !month || !year) {
+      return res.status(400).json({ error: 'person_id, person_type, month and year are required' });
+    }
+    const payMonth = `${year}-${String(month).padStart(2, '0')}`;
+    const h = Math.max(0, parseFloat(hours)  || 0);
+    const a = Math.max(0, parseFloat(amount) || 0);
+    const r = await pool.query(`
+      INSERT INTO payroll_overtime
+        (person_id, person_type, pay_month, hours, amount, notes, updated_at)
+      VALUES ($1,$2,$3,$4,$5,$6,NOW())
+      ON CONFLICT (person_type, person_id, pay_month)
+      DO UPDATE SET hours = EXCLUDED.hours, amount = EXCLUDED.amount,
+                    notes = EXCLUDED.notes, updated_at = NOW()
+      RETURNING *`,
+      [person_id, person_type, payMonth, h, a, notes || null]);
+    res.json({ success: true, overtime: r.rows[0] });
+  } catch (err) {
+    console.error('POST /api/payroll/overtime error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

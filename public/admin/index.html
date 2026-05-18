@@ -2724,6 +2724,7 @@ button[style*="background:linear-gradient"]{
     <table class="scan-tbl-clean" style="min-width:760px;">
       <thead>
         <tr>
+          <th style="width:36px;text-align:center;"><input type="checkbox" id="sch-select-all" onclick="schToggleAll(this)" title="Select all"></th>
           <th style="width:50px;text-align:center;" data-i18n="sch_th_no">#</th>
           <th data-i18n="sch_th_student">Student Name</th>
           <th data-i18n="sch_th_father">Father Name</th>
@@ -2735,7 +2736,7 @@ button[style*="background:linear-gradient"]{
         </tr>
       </thead>
       <tbody id="sch-tbody">
-        <tr><td colspan="8"><div class="empty"><i class="fas fa-award"></i><p data-i18n="sch_empty">No students with scholarships or discounts yet.</p></div></td></tr>
+        <tr><td colspan="9"><div class="empty"><i class="fas fa-award"></i><p data-i18n="sch_empty">No students with scholarships or discounts yet.</p></div></td></tr>
       </tbody>
     </table>
   </div>
@@ -4131,6 +4132,10 @@ const LANG = {
     stf_stat_total:'Total Staff', stf_stat_payroll:'Monthly Payroll (AFN)',
     cls_stat_total:'Total Classes', cls_stat_students:'Enrolled Students', cls_stat_subjects:'Subjects Configured',
     cls_empty_title:'No Classes Yet', btn_manage_class:'Manage Class',
+    btn_graduate:'Graduate',
+    confirm_graduate_title:'Graduate {name}?',
+    confirm_graduate_msg:'All active students in {name} will be marked Graduated and removed from active lists. Their records are kept and this can be reversed. A printable graduate list will open.',
+    msg_graduated:'{n} student(s) graduated from {c}.',
     sub_classes:'Create class sections and assign students',
     no_classes_hint:'No classes yet. Click Add Class to begin.',
     cls_count_total:'{n} class total', cls_count_total_pl:'{n} classes total',
@@ -4307,6 +4312,7 @@ const LANG = {
     // ── Payroll: stat strip + table cells + actions (added for redesigned UI) ──
     stat_advances_given:'Advances Given', stat_net_to_pay:'Net To Pay', stat_paid_progress:'Salaries Paid',
     lbl_employees:'employees', lbl_entries:'entries', lbl_pending:'pending',
+    lbl_overtime:'Overtime', lbl_hours:'Hours',
     lbl_base:'Base', lbl_advances:'Advances', lbl_tax:'Tax', lbl_net:'Net',
     lbl_net_payable:'Net Payable', lbl_net_salary:'Net Salary',
     lbl_tax_hint:'gov tax', lbl_advances_detail:'Advances breakdown',
@@ -4353,6 +4359,7 @@ const LANG = {
     btn_gov_report:'Scholarship',
     msg_gov_count_missing:'Please set the student count in Settings → Financial Settings → Gov. Scholarship Report first.',
     msg_no_students:'No students found.',
+    msg_sch_select:'Tick the students you want on the report first (the checkbox column).',
     // Expenses
     lbl_office_expenses:'Office Expenses', sub_expenses_for:'Expenses for',
     btn_add_expense:'Add Expense', stat_total_lbl:'Total',
@@ -4522,6 +4529,10 @@ const LANG = {
     stf_stat_total:'ټول کارکوونکي', stf_stat_payroll:'میاشتنۍ معاشات (افغانۍ)',
     cls_stat_total:'ټول ټولګي', cls_stat_students:'نوم لیکل شوي زده‌کوونکي', cls_stat_subjects:'تنظیم شوي مضامين',
     cls_empty_title:'لا ټولګي نشته', btn_manage_class:'د ټولګي اداره',
+    btn_graduate:'فراغت',
+    confirm_graduate_title:'{name} فارغ کړو؟',
+    confirm_graduate_msg:'د {name} ټول فعال زده‌کوونکي به د فارغ په توګه ونښل شي او له فعالو لیستونو لرې شي. ریکارډونه یې ساتل کیږي او بیرته کیدای شي. د چاپ وړ د فارغانو لیست به پرانیستل شي.',
+    msg_graduated:'{n} زده‌کوونکي له {c} فارغ شول.',
     sub_classes:'د ټولګیو برخې جوړ کړئ او زده کوونکي ورته ټاکئ',
     no_classes_hint:'لا هیڅ ټولګی نشته. د زیاتولو لپاره «ټولګی زیاتول» کلیک وکړئ.',
     cls_count_total:'{n} ټولګی', cls_count_total_pl:'{n} ټولګي',
@@ -4698,6 +4709,7 @@ const LANG = {
     // ── Payroll: stat strip + table cells + actions (Pashto) ──
     stat_advances_given:'ورکړل شوي پیش معاش', stat_net_to_pay:'د ورکړې لپاره خالص', stat_paid_progress:'ورکړل شوي معاشونه',
     lbl_employees:'کارمندان', lbl_entries:'ثبت شوي', lbl_pending:'پاتې',
+    lbl_overtime:'اضافه‌کاري', lbl_hours:'ساعتونه',
     lbl_base:'اصلي', lbl_advances:'پیش معاش', lbl_tax:'مالیه', lbl_net:'خالص',
     lbl_net_payable:'د ورکړې وړ خالص', lbl_net_salary:'خالص معاش',
     lbl_absence:'غیرحاضري', lbl_days:'ورځې', lbl_absence_deduction:'د غیرحاضرۍ کسر',
@@ -4744,6 +4756,7 @@ const LANG = {
     btn_gov_report:'بورس',
     msg_gov_count_missing:'مهرباني وکړئ لومړی په امستنو → مالي امستنې → دولتي بورس راپور کې د زده‌کوونکو شمیر وټاکئ.',
     msg_no_students:'هیڅ زده‌کوونکی ونه موندل شو.',
+    msg_sch_select:'لومړی هغه زده‌کوونکي په نښه کړئ چې غواړئ په راپور کې وي (د چک‌بکس کالم).',
     // Expenses
     lbl_office_expenses:'اداري لګښتونه', sub_expenses_for:'د دې میاشتې لګښتونه:',
     btn_add_expense:'لګښت زیاتول', stat_total_lbl:'ټول',
@@ -6440,6 +6453,10 @@ async function loadScholarships() {
   }
 }
 
+function schToggleAll(box) {
+  document.querySelectorAll('.sch-pick').forEach(c => { c.checked = box.checked; });
+}
+
 function renderScholarships() {
   const cf  = document.getElementById('sch-class-filter').value;
   const tf  = document.getElementById('sch-type-filter').value;
@@ -6462,9 +6479,10 @@ function renderScholarships() {
 
   const tb = document.getElementById('sch-tbody');
   if (!list.length) {
-    tb.innerHTML = `<tr><td colspan="8"><div class="empty"><i class="fas fa-award"></i><p>${t('sch_empty')}</p></div></td></tr>`;
+    tb.innerHTML = `<tr><td colspan="9"><div class="empty"><i class="fas fa-award"></i><p>${t('sch_empty')}</p></div></td></tr>`;
     return;
   }
+  const sa = document.getElementById('sch-select-all'); if (sa) sa.checked = false;
 
   tb.innerHTML = list.map((s, i) => {
     const fee  = parseFloat(s.monthly_fee) || 0;
@@ -6474,6 +6492,7 @@ function renderScholarships() {
     const discTxt = s.discount_type === 'percent' ? (dv + '%') : (dv.toLocaleString() + ' AFN');
     const dotColor = s.discount_type === 'percent' ? '#5b9ef7' : '#5DCAA5';
     return `<tr>
+      <td style="text-align:center;"><input type="checkbox" class="sch-pick" value="${s.id}"></td>
       <td style="text-align:center;color:#6a7c93;font-family:var(--font-mono);font-size:12px;">${i+1}</td>
       <td style="font-weight:700;color:#0f2845;">${s.first_name||''} ${s.last_name||''}</td>
       <td style="color:#334155;">${s.parent_name || '—'}</td>
@@ -6595,31 +6614,24 @@ function printScholarshipList() {
 // submission to the government. N comes from Settings → gov_scholarship_count.
 async function printGovScholarshipReport() {
   try {
-    // 1. Get the configured count
-    const settings = await fetch('/api/settings').then(r => r.json());
-    const requested = parseInt(settings.gov_scholarship_count, 10);
-    if (!requested || requested < 1) {
+    const settings = await fetch('/api/settings').then(r => r.json()).catch(() => ({}));
+
+    // Manual selection — only the students the admin ticked in the list
+    const ids = Array.from(document.querySelectorAll('.sch-pick:checked'))
+                     .map(c => parseInt(c.value));
+    if (!ids.length) {
       showAlert({
-        title: t('alert_title_missing') || 'Setting Required',
-        message: t('msg_gov_count_missing') || 'Please set the student count in Settings → Financial Settings → Gov. Scholarship Report first.',
-        type: 'warning',
+        title:   t('alert_title_missing') || 'No selection',
+        message: t('msg_sch_select') || 'Tick the students you want on the report first (the checkbox column).',
+        type:    'warning',
       });
       return;
     }
-
-    // 2. Get all students, shuffle, take N
-    const allStudents = await fetch('/api/students').then(r => r.json());
-    if (!Array.isArray(allStudents) || !allStudents.length) {
+    const picked = (_allScholarStudents || []).filter(s => ids.includes(s.id));
+    if (!picked.length) {
       showAlert({ title: t('alert_title_error') || 'Error', message: t('msg_no_students') || 'No students found.', type: 'error' });
       return;
     }
-    // Fisher-Yates shuffle
-    const pool = allStudents.slice();
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [pool[i], pool[j]] = [pool[j], pool[i]];
-    }
-    const picked = pool.slice(0, Math.min(requested, pool.length));
 
     // 3. School identity + date + the government office this is addressed to
     const schoolName  = window._cachedSchoolName  || document.getElementById('school-name')?.textContent || 'Taif High School';
@@ -6840,6 +6852,9 @@ async function renderClasses(list) {
           <button onclick="openStudentsDrawer(${c.id},'${(c.name||'').replace(/'/g,"\\'")}')" style="flex:1;padding:10px;background:linear-gradient(135deg,${p.from},${p.to});border:none;border-radius:10px;color:#fff;font-size:12.5px;font-family:var(--font-head);font-weight:800;cursor:pointer;box-shadow:0 4px 12px ${p.from}44;transition:transform .15s ease;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
             <i class="fas fa-users-cog"></i> ${t('btn_manage_class') || 'Manage Class'}
           </button>
+          <button onclick="graduateClass(${c.id},'${(c.name||'').replace(/'/g,"\\'")}')" title="${t('btn_graduate')||'Graduate class'}" style="width:38px;height:38px;background:rgba(34,197,113,.10);border:1px solid rgba(34,197,113,.25);border-radius:10px;color:#178f4f;cursor:pointer;font-size:13px;transition:transform .15s ease;" onmouseover="this.style.transform='scale(1.08)';this.style.background='rgba(34,197,113,.18)'" onmouseout="this.style.transform='scale(1)';this.style.background='rgba(34,197,113,.10)'">
+            <i class="fas fa-user-graduate"></i>
+          </button>
           <button onclick="openClassForm(${c.id})" title="Edit" style="width:38px;height:38px;background:rgba(91,158,247,.10);border:1px solid rgba(91,158,247,.22);border-radius:10px;color:#3a7abf;cursor:pointer;font-size:13px;transition:transform .15s ease;" onmouseover="this.style.transform='scale(1.08)';this.style.background='rgba(91,158,247,.18)'" onmouseout="this.style.transform='scale(1)';this.style.background='rgba(91,158,247,.10)'">
             <i class="fas fa-edit"></i>
           </button>
@@ -6914,6 +6929,87 @@ async function saveClass() {
     if (typeof loadStudents === 'function') await loadStudents();
   } catch(e) { showAlert({ title:t('alert_title_failed'), message:e.message, type:'error' }); }
   finally { btn.innerHTML = `<i class="fas fa-save"></i> ${t('btn_save_class')}`; btn.disabled = false; }
+}
+
+// Graduate a whole class — archive its students as Graduated and
+// open a printable bilingual graduate list (name, father, class).
+function graduateClass(classId, className) {
+  showConfirm({
+    title:   (t('confirm_graduate_title') || 'Graduate {name}?').replace('{name}', className),
+    message: (t('confirm_graduate_msg') || 'All active students in {name} will be marked Graduated and removed from active lists. Their records are kept and this can be reversed. A printable graduate list will open.').replace('{name}', className),
+    confirmText: t('btn_graduate') || 'Graduate',
+    type: 'warning',
+    onConfirm: async () => {
+      try {
+        const r = await fetch('/api/students/graduate', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ class_id: classId }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Failed');
+        showAlert({
+          title: t('alert_title_saved') || 'Done',
+          message: (t('msg_graduated') || '{n} student(s) graduated from {c}.')
+                     .replace('{n}', d.count).replace('{c}', d.class_name || className),
+          type: 'success',
+        });
+        if (d.students && d.students.length) printGraduateList(d.class_name || className, d.students);
+        await loadClasses();
+      } catch(e) { showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' }); }
+    },
+  });
+}
+
+function printGraduateList(className, students) {
+  const schoolName = window._cachedSchoolName || 'Taif High School';
+  const today = shamsiDariPD(new Date());
+  const rows = students.map((s, i) => `
+    <tr>
+      <td style="text-align:center;">${toPersianDigits(i + 1)}</td>
+      <td style="font-weight:700;">${s.name || ''}</td>
+      <td>${s.father_name || '—'}</td>
+      <td style="direction:rtl;text-align:right;">${s.class_name || className}</td>
+    </tr>`).join('');
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Graduate List — ${className}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;color:#1a2942;padding:34px 38px;}
+  .hdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #178f4f;padding-bottom:14px;margin-bottom:8px;}
+  .sname{font-size:21px;font-weight:800;color:#0f2845;}
+  .hdr-right{text-align:right;font-size:11px;color:#64748b;}
+  .hdr-right .d{direction:rtl;font-weight:700;color:#0f2845;font-size:13px;}
+  .title{text-align:center;margin:18px 0 4px;font-size:17px;font-weight:800;color:#178f4f;text-transform:uppercase;letter-spacing:.03em;}
+  .title-fa{text-align:center;font-size:15px;font-weight:700;color:#0f2845;direction:rtl;margin-bottom:6px;}
+  .sub{text-align:center;font-size:12px;color:#64748b;margin-bottom:18px;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  thead th{background:#178f4f;color:#fff;padding:9px 8px;font-size:11px;text-transform:uppercase;}
+  tbody td{padding:8px;border-bottom:1px solid #e2e8f0;}
+  tbody tr:nth-child(even){background:#f6fbf8;}
+  .sig{display:grid;grid-template-columns:1fr 1fr;gap:80px;margin-top:54px;}
+  .sig div{text-align:center;border-top:1px solid #94a3b8;padding-top:8px;font-size:12px;color:#475569;font-weight:600;}
+  .print-btn{position:fixed;top:14px;right:14px;padding:10px 16px;background:#178f4f;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;}
+  @media print{ body{padding:18px;} .no-print{display:none;} }
+</style></head><body>
+<button class="print-btn no-print" onclick="window.print()">🖨 Print / Save as PDF</button>
+<div class="hdr">
+  <div class="sname">${schoolName}</div>
+  <div class="hdr-right"><div>Date / نیټه</div><div class="d">${today}</div></div>
+</div>
+<div class="title">Graduate List — ${className}</div>
+<div class="title-fa">د فارغانو لیست — ${className}</div>
+<div class="sub">Total / ټول: ${toPersianDigits(students.length)} · ${today}</div>
+<table>
+  <thead><tr>
+    <th style="width:50px;">#</th><th>Student Name / د زده‌کوونکي نوم</th>
+    <th>Father Name / د پلار نوم</th><th>Class / ټولګی</th>
+  </tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+<div class="sig"><div>Principal / مدیر</div><div>Official Stamp / رسمي مهر</div></div>
+</body></html>`;
+  const w = window.open('', '_blank');
+  if (!w) { showAlert({ title:'Pop-up blocked', message:'Allow pop-ups to print the list.', type:'warning' }); return; }
+  w.document.write(html); w.document.close();
 }
 
 async function deleteClass(id, btn) {
@@ -9423,6 +9519,7 @@ async function loadExpenses() {
       return `<tr>
         <td>
           <div style="font-weight:600;font-size:13px;color:var(--text);">${e.description||e.title||'—'}</div>
+          ${e.notes ? `<div style="font-size:11px;color:var(--text-dim);margin-top:2px;font-style:italic;">${String(e.notes).replace(/</g,'&lt;')}</div>` : ''}
         </td>
         <td><span style="padding:4px 10px;background:${color}22;color:${color};border:1px solid ${color}44;border-radius:20px;font-size:11px;font-weight:700;font-family:var(--font-head);">${e.category}</span></td>
         <td>
@@ -10298,6 +10395,16 @@ function renderPayrollRow(p, idx) {
     </div>
     ${taxRow}
     ${absenceRow}
+    <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:2px 0;">
+      <span style="color:${(p.overtime_amount>0)?'#178f4f':'var(--text-dim)'};display:inline-flex;align-items:center;gap:6px;">
+        + ${t('lbl_overtime') || 'Overtime'}
+        ${(p.overtime_hours>0)?`<span style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);">${toPersianDigits(p.overtime_hours)} ${t('lbl_hours')||'h'}</span>`:''}
+        ${!p.is_paid?`<button onclick="event.stopPropagation();openOvertimeModal(${idx})" title="${t('lbl_overtime')||'Overtime'}" style="padding:1px 7px;background:rgba(34,197,113,.12);border:1px solid rgba(34,197,113,.28);border-radius:10px;color:#178f4f;font-size:10px;font-weight:700;font-family:var(--font-mono);cursor:pointer;"><i class="fas fa-pen" style="font-size:8px;"></i></button>`:''}
+      </span>
+      <span style="font-family:var(--font-mono);color:${(p.overtime_amount>0)?'#178f4f':'var(--text-dim)'};font-weight:700;">
+        ${(p.overtime_amount>0)?'+'+Number(p.overtime_amount).toLocaleString()+' AFN':'—'}
+      </span>
+    </div>
     <div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;padding:5px 0 3px;border-top:1px dashed rgba(26,74,92,.14);margin-top:3px;">
       <span style="font-weight:700;color:#1a4a5c;font-family:var(--font-head);">${t('lbl_net_payable') || 'Net Payable'}</span>
       <span id="pr-net-payable-${idx}" style="font-family:var(--font-mono);font-weight:700;color:#1a4a5c;">${netPayable.toLocaleString()} AFN</span>
@@ -10354,7 +10461,8 @@ function prAdjustAbsence(idx, input) {
   const deduction  = Math.round(rate * days);
   const tax        = p.tax_amount || 0;
   const adv        = p.advance_amount || 0;
-  const netPayable = Math.max(0, (p.salary || 0) - tax - deduction);
+  const overtime   = p.overtime_amount || 0;
+  const netPayable = Math.max(0, (p.salary || 0) - tax - deduction) + overtime;
   const netSalary  = Math.max(0, netPayable - adv);
 
   // Live-mutate the cached row so other code (Pay modal, receipts) sees consistent values
@@ -10458,6 +10566,55 @@ function reprintSalaryReceipt(idx) {
 // Full advance history for one teacher/staff — every advance ever taken
 // (old + ongoing), with a running total and how many months of salary it
 // represents (the 10,000-on-3,000-salary case).
+// Set/edit a person's overtime (hours + AFN) for the selected pay month.
+function openOvertimeModal(idx) {
+  const p = payrollData[idx];
+  if (!p) return;
+  const month = parseInt(document.getElementById('payroll-month').value);
+  const year  = parseInt(document.getElementById('payroll-year').value);
+  const old = document.getElementById('ot-modal'); if (old) old.remove();
+  const wrap = document.createElement('div');
+  wrap.id = 'ot-modal';
+  wrap.style.cssText = 'position:fixed;inset:0;background:rgba(15,40,69,.55);backdrop-filter:blur(8px);z-index:10000;display:flex;align-items:center;justify-content:center;';
+  wrap.innerHTML = `
+    <div style="background:#fff;border-radius:18px;padding:26px 24px 20px;max-width:380px;width:92%;box-shadow:0 30px 80px rgba(20,40,80,.20);">
+      <div style="font-family:var(--font-head);font-size:16px;font-weight:800;color:#0f2845;text-align:center;">${t('lbl_overtime')||'Overtime'}</div>
+      <div style="font-size:12px;color:#6a7c93;text-align:center;margin:4px 0 16px;">${p.first_name} ${p.last_name}</div>
+      <div style="display:flex;gap:10px;margin-bottom:14px;">
+        <div style="flex:1;">
+          <label style="font-size:10px;font-weight:700;color:#6a7c93;text-transform:uppercase;display:block;margin-bottom:4px;">${t('lbl_hours')||'Hours'}</label>
+          <input id="ot-hours" type="text" inputmode="decimal" value="${p.overtime_hours||''}" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px;font-family:var(--font-mono);font-size:14px;text-align:center;outline:none;" oninput="this.value=toWesternDigits(this.value).replace(/[^0-9.]/g,'')">
+        </div>
+        <div style="flex:1;">
+          <label style="font-size:10px;font-weight:700;color:#6a7c93;text-transform:uppercase;display:block;margin-bottom:4px;">${t('lbl_amount_afn')||'Amount'} (AFN)</label>
+          <input id="ot-amount" type="text" inputmode="numeric" value="${p.overtime_amount||''}" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px;font-family:var(--font-mono);font-size:14px;font-weight:700;text-align:center;outline:none;" oninput="this.value=toWesternDigits(this.value).replace(/[^0-9.]/g,'')">
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button id="ot-cancel" style="flex:1;padding:11px;background:#f5f9fc;border:1px solid rgba(20,40,80,.08);border-radius:10px;color:#6a7c93;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;">${t('lbl_cancel')||'Cancel'}</button>
+        <button id="ot-save" style="flex:1;padding:11px;background:linear-gradient(135deg,#22c571,#178f4f);border:none;border-radius:10px;color:#fff;font-family:var(--font-head);font-size:13px;font-weight:800;cursor:pointer;">${t('btn_save')||'Save'}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(wrap);
+  const close = () => wrap.remove();
+  wrap.querySelector('#ot-cancel').onclick = close;
+  wrap.addEventListener('click', e => { if (e.target === wrap) close(); });
+  wrap.querySelector('#ot-save').onclick = async () => {
+    const hours  = parseFloat(document.getElementById('ot-hours').value) || 0;
+    const amount = parseFloat(document.getElementById('ot-amount').value) || 0;
+    try {
+      const r = await fetch('/api/payroll/overtime', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ person_id: p.id, person_type: p.person_type, month, year, hours, amount }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Failed');
+      close();
+      await loadPayroll();
+    } catch(e) { showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' }); }
+  };
+}
+
 async function showAdvanceHistory(personType, personId) {
   try {
     const r = await fetch(`/api/payroll/advance-history?person_type=${personType}&person_id=${personId}`);
@@ -10631,7 +10788,8 @@ function recalcPayModal() {
   const base      = p.salary || 0;
   const tax       = p.tax_amount || 0;
   const adv       = p.advance_amount || 0;
-  const netPayable = Math.max(0, base - tax - deduction);
+  const overtime  = p.overtime_amount || 0;
+  const netPayable = Math.max(0, base - tax - deduction) + overtime;
   const netToPay   = Math.max(0, netPayable - adv);
 
   document.getElementById('pr-pay-absence-amt').textContent  = '−' + deduction.toLocaleString() + ' AFN';

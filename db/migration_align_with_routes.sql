@@ -166,3 +166,25 @@ CREATE TABLE IF NOT EXISTS student_month_due (
 );
 CREATE INDEX IF NOT EXISTS idx_month_due_student
   ON student_month_due (student_id);
+
+-- ── Graduation: mark a class's students as graduated (archived).
+--    They keep all records/history but drop out of active lists.
+ALTER TABLE students
+  ADD COLUMN IF NOT EXISTS graduated    BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS graduated_at DATE;
+
+-- ── Payroll overtime: per teacher/staff per Shamsi pay month. The
+--    overtime amount is added on top of net salary for that month.
+CREATE TABLE IF NOT EXISTS payroll_overtime (
+  id           SERIAL PRIMARY KEY,
+  person_type  VARCHAR(10)  NOT NULL,          -- teacher | staff
+  person_id    INTEGER      NOT NULL,
+  pay_month    VARCHAR(20)  NOT NULL,          -- Shamsi "YYYY-MM"
+  hours        NUMERIC(6,2) NOT NULL DEFAULT 0,
+  amount       NUMERIC(10,2) NOT NULL DEFAULT 0,
+  notes        TEXT,
+  updated_at   TIMESTAMP DEFAULT NOW(),
+  UNIQUE (person_type, person_id, pay_month)
+);
+CREATE INDEX IF NOT EXISTS idx_overtime_paymonth
+  ON payroll_overtime (pay_month);
