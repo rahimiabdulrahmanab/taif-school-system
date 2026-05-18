@@ -362,14 +362,14 @@ router.post('/promote', async (req, res) => {
     const byId = {};
     classes.forEach(c => { byId[c.id] = c; });
 
-    // Find the destination class for a given target grade + section.
-    // Prefer the same section; otherwise any class at that grade.
-    const findDest = (grade, section) => {
-      const sameSection = classes.find(c =>
-        c.grade_level === grade && (c.section || '') === (section || ''));
-      if (sameSection) return sameSection;
-      return classes.find(c => c.grade_level === grade) || null;
-    };
+    // Strict match: destination must share BOTH grade AND section.
+    // No fallback to "any class at that grade" — 7-الف must go to 8-الف,
+    // never to 8-ب. If the target class doesn't exist, those students
+    // are reported as skipped so the admin can create it first.
+    const findDest = (grade, section) =>
+      classes.find(c =>
+        c.grade_level === grade &&
+        (c.section || '').trim() === (section || '').trim()) || null;
 
     const studentsRes = await pool.query(
       `SELECT id, first_name, last_name, student_code, parent_name, class_id
@@ -379,13 +379,14 @@ router.post('/promote', async (req, res) => {
     const promoteUpdates = []; // { studentId, destId }
     const graduateIds = [];
     const graduateRows = [];
-    let skipped = 0;
+    const missingDest = {};    // "<grade> <section>" → count — destinations to create
+    let skippedUntracked = 0;  // students whose class has no grade set
 
     for (const s of studentsRes.rows) {
       const cls = byId[s.class_id];
-      if (!cls || !cls.grade_level) { skipped++; continue; }
+      if (!cls || !cls.grade_level) { skippedUntracked++; continue; }
       const gi = GRADE_ORDER.indexOf(cls.grade_level);
-      if (gi === -1) { skipped++; continue; }
+      if (gi === -1) { skippedUntracked++; continue; }
 
       if (gi === GRADE_ORDER.length - 1) {            // دولسم → graduate
         graduateIds.push(s.id);
@@ -398,10 +399,15 @@ router.post('/promote', async (req, res) => {
         });
         continue;
       }
-      const dest = findDest(GRADE_ORDER[gi + 1], cls.section);
-      if (!dest) { skipped++; continue; }              // no class for next grade
+      const nextGrade = GRADE_ORDER[gi + 1];
+      const dest = findDest(nextGrade, cls.section);
+      if (!dest) {
+        const k = `${nextGrade}${cls.section ? ' ' + cls.section : ''}`;
+        missingDest[k] = (missingDest[k] || 0) + 1;
+        continue;
+      }
       promoteUpdates.push({ studentId: s.id, destId: dest.id });
-      const k = `${cls.name} → ${dest.name}`;
+      const k = `${cls.name}${cls.section ? ' ' + cls.section : ''} → ${dest.name}${dest.section ? ' ' + dest.section : ''}`;
       moves[k] = (moves[k] || 0) + 1;
     }
 
@@ -424,11 +430,17 @@ router.post('/promote', async (req, res) => {
       }
     }
 
+    const missing = Object.entries(missingDest)
+      .map(([label, count]) => ({ label, count }));
+    const skipped = skippedUntracked + missing.reduce((s, m) => s + m.count, 0);
+
     res.json({
-      success:        true,
-      promoted:       promoteUpdates.length,
-      graduated:      graduateIds.length,
+      success:         true,
+      promoted:        promoteUpdates.length,
+      graduated:       graduateIds.length,
       skipped,
+      skipped_untracked: skippedUntracked,
+      missing_destinations: missing,
       moves:          Object.entries(moves).map(([label, count]) => ({ label, count })),
       graduate_list:  graduateRows,
     });

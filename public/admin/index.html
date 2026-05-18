@@ -4198,7 +4198,7 @@ const LANG = {
     lbl_graduates:'Graduates',
     confirm_promote_title:'Promote everyone one grade?',
     confirm_promote_msg:'Every active student moves up one grade (Grade 1→2, … 11→12). Grade-12 students graduate and are archived (records kept). Section is preserved. A printable graduate list will open. This affects all students — do it only at year-end.',
-    msg_promoted:'{p} promoted, {g} graduated{s}.',
+    msg_promoted:'{p} promoted, {g} graduated.',
     confirm_graduate_title:'Graduate {name}?',
     confirm_graduate_msg:'All active students in {name} will be marked Graduated and removed from active lists. Their records are kept and this can be reversed. A printable graduate list will open.',
     msg_graduated:'{n} student(s) graduated from {c}.',
@@ -4612,7 +4612,7 @@ const LANG = {
     lbl_graduates:'فارغان',
     confirm_promote_title:'ټول یوه درجه پورته کړو؟',
     confirm_promote_msg:'هر فعال زده‌کوونکی یوه درجه پورته ځي (۱→۲ ... ۱۱→۱۲). د ۱۲ ټولګي زده‌کوونکي فارغ او آرشیف کیږي (ریکارډونه ساتل کیږي). برخه خوندي پاتې کیږي. د چاپ وړ د فارغانو لیست به پرانیستل شي. دا ټولو زده‌کوونکو اغیزه کوي — یوازې د کال پای کې یې وکړئ.',
-    msg_promoted:'{p} پورته شول، {g} فارغ شول{s}.',
+    msg_promoted:'{p} پورته شول، {g} فارغ شول.',
     confirm_graduate_title:'{name} فارغ کړو؟',
     confirm_graduate_msg:'د {name} ټول فعال زده‌کوونکي به د فارغ په توګه ونښل شي او له فعالو لیستونو لرې شي. ریکارډونه یې ساتل کیږي او بیرته کیدای شي. د چاپ وړ د فارغانو لیست به پرانیستل شي.',
     msg_graduated:'{n} زده‌کوونکي له {c} فارغ شول.',
@@ -7209,7 +7209,7 @@ async function saveClass() {
 function promoteYearEnd() {
   showConfirm({
     title:   t('confirm_promote_title') || 'Promote everyone one grade?',
-    message: t('confirm_promote_msg') || 'Every active student moves up one grade (Grade 1→2, … 11→12). Grade-12 students graduate and are archived (records kept). Section is preserved. A printable graduate list will open. This affects all students — do it only at year-end.',
+    message: t('confirm_promote_msg') || 'Every active student moves up one grade with their section (7-الف → 8-الف, 7-ب → 8-ب, …). Grade-12 students graduate. If a destination class (e.g. 8-الف) does not exist, those students stay put and are reported as skipped — create the missing class first, then run Promote again. This affects all students — do it only at year-end.',
     confirmText: t('btn_promote_year') || 'Promote',
     type: 'warning',
     onConfirm: async () => {
@@ -7219,15 +7219,19 @@ function promoteYearEnd() {
         });
         const d = await r.json();
         if (!r.ok) throw new Error(d.error || 'Failed');
-        const movesTxt = (d.moves||[]).map(m => `${m.label}: ${m.count}`).join(' · ');
+        const movesTxt   = (d.moves||[]).map(m => `${m.label}: ${m.count}`).join(' · ');
+        const missingTxt = (d.missing_destinations||[]).map(m => `${m.label} (${m.count})`).join(', ');
+        const skipParts  = [];
+        if (missingTxt) skipParts.push(`missing destination class: ${missingTxt} — create then re-run`);
+        if (d.skipped_untracked) skipParts.push(`${d.skipped_untracked} students have no grade set on their class`);
+        const skipNote = skipParts.length ? `. Skipped: ${skipParts.join('; ')}` : '';
         showAlert({
-          title: t('alert_title_saved') || 'Done',
-          message: (t('msg_promoted') || '{p} promoted, {g} graduated{s}.')
-                     .replace('{p}', d.promoted)
-                     .replace('{g}', d.graduated)
-                     .replace('{s}', d.skipped ? `, ${d.skipped} skipped (class has no grade set)` : '')
+          title: missingTxt ? (t('alert_title_warning')||'Done with issues') : (t('alert_title_saved')||'Done'),
+          message: (t('msg_promoted') || '{p} promoted, {g} graduated.')
+                     .replace('{p}', d.promoted).replace('{g}', d.graduated)
+                   + skipNote
                    + (movesTxt ? ' — ' + movesTxt : ''),
-          type: 'success',
+          type: missingTxt ? 'warning' : 'success',
         });
         if (d.graduate_list && d.graduate_list.length) {
           // Combine class + section in the printed Class column
