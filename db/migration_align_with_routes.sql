@@ -175,16 +175,27 @@ ALTER TABLE students
 
 -- ── Payroll overtime: per teacher/staff per Shamsi pay month. The
 --    overtime amount is added on top of net salary for that month.
+--    Multiple entries per month allowed (the office logs overtime daily).
 CREATE TABLE IF NOT EXISTS payroll_overtime (
-  id           SERIAL PRIMARY KEY,
-  person_type  VARCHAR(10)  NOT NULL,          -- teacher | staff
-  person_id    INTEGER      NOT NULL,
-  pay_month    VARCHAR(20)  NOT NULL,          -- Shamsi "YYYY-MM"
-  hours        NUMERIC(6,2) NOT NULL DEFAULT 0,
-  amount       NUMERIC(10,2) NOT NULL DEFAULT 0,
-  notes        TEXT,
-  updated_at   TIMESTAMP DEFAULT NOW(),
-  UNIQUE (person_type, person_id, pay_month)
+  id            SERIAL PRIMARY KEY,
+  person_type   VARCHAR(10)  NOT NULL,          -- teacher | staff
+  person_id     INTEGER      NOT NULL,
+  pay_month     VARCHAR(20)  NOT NULL,          -- Shamsi "YYYY-MM"
+  hours         NUMERIC(6,2) NOT NULL DEFAULT 0,
+  amount        NUMERIC(10,2) NOT NULL DEFAULT 0,
+  notes         TEXT,
+  overtime_date DATE,
+  created_at    TIMESTAMP DEFAULT NOW(),
+  updated_at    TIMESTAMP DEFAULT NOW()
 );
+-- For DBs created by an earlier version that had the one-per-month UNIQUE
+-- constraint: drop it and add the per-entry date column. Safe to re-run.
+ALTER TABLE payroll_overtime
+  DROP CONSTRAINT IF EXISTS payroll_overtime_person_type_person_id_pay_month_key;
+ALTER TABLE payroll_overtime
+  ADD COLUMN IF NOT EXISTS overtime_date DATE,
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
 CREATE INDEX IF NOT EXISTS idx_overtime_paymonth
   ON payroll_overtime (pay_month);
+CREATE INDEX IF NOT EXISTS idx_overtime_person
+  ON payroll_overtime (person_type, person_id, pay_month);

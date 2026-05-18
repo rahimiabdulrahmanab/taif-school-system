@@ -4312,7 +4312,12 @@ const LANG = {
     // ── Payroll: stat strip + table cells + actions (added for redesigned UI) ──
     stat_advances_given:'Advances Given', stat_net_to_pay:'Net To Pay', stat_paid_progress:'Salaries Paid',
     lbl_employees:'employees', lbl_entries:'entries', lbl_pending:'pending',
-    lbl_overtime:'Overtime', lbl_hours:'Hours',
+    lbl_overtime:'Overtime', lbl_hours:'Hours', btn_add:'Add',
+    lbl_no_overtime:'No overtime entries this month.',
+    lbl_edit_overtime:'Edit Overtime Amount',
+    msg_edit_overtime:'Enter the corrected overtime amount (AFN).',
+    confirm_del_overtime_title:'Delete overtime entry?',
+    confirm_del_overtime:'This overtime entry will be permanently removed.',
     lbl_base:'Base', lbl_advances:'Advances', lbl_tax:'Tax', lbl_net:'Net',
     lbl_net_payable:'Net Payable', lbl_net_salary:'Net Salary',
     lbl_tax_hint:'gov tax', lbl_advances_detail:'Advances breakdown',
@@ -4709,7 +4714,12 @@ const LANG = {
     // ── Payroll: stat strip + table cells + actions (Pashto) ──
     stat_advances_given:'ورکړل شوي پیش معاش', stat_net_to_pay:'د ورکړې لپاره خالص', stat_paid_progress:'ورکړل شوي معاشونه',
     lbl_employees:'کارمندان', lbl_entries:'ثبت شوي', lbl_pending:'پاتې',
-    lbl_overtime:'اضافه‌کاري', lbl_hours:'ساعتونه',
+    lbl_overtime:'اضافه‌کاري', lbl_hours:'ساعتونه', btn_add:'زیاتول',
+    lbl_no_overtime:'پدې میاشت کې اضافه‌کاري نشته.',
+    lbl_edit_overtime:'د اضافه‌کارۍ مبلغ سمول',
+    msg_edit_overtime:'د اضافه‌کارۍ سم شوی مبلغ ولیکئ (افغاني).',
+    confirm_del_overtime_title:'د اضافه‌کارۍ دننه‌کول ړنګ کړو؟',
+    confirm_del_overtime:'دا د اضافه‌کارۍ دننه‌کول به د تل لپاره لرې شي.',
     lbl_base:'اصلي', lbl_advances:'پیش معاش', lbl_tax:'مالیه', lbl_net:'خالص',
     lbl_net_payable:'د ورکړې وړ خالص', lbl_net_salary:'خالص معاش',
     lbl_absence:'غیرحاضري', lbl_days:'ورځې', lbl_absence_deduction:'د غیرحاضرۍ کسر',
@@ -10567,52 +10577,140 @@ function reprintSalaryReceipt(idx) {
 // (old + ongoing), with a running total and how many months of salary it
 // represents (the 10,000-on-3,000-salary case).
 // Set/edit a person's overtime (hours + AFN) for the selected pay month.
+// Overtime manager — multiple entries per month (office logs daily).
+// List existing entries (date/hours/amount/notes) with edit & delete,
+// plus an add form. Totals update live in the payroll row.
+let _otModalCtx = null;   // { personId, personType, month, year }
+
 function openOvertimeModal(idx) {
   const p = payrollData[idx];
   if (!p) return;
-  const month = parseInt(document.getElementById('payroll-month').value);
-  const year  = parseInt(document.getElementById('payroll-year').value);
+  _otModalCtx = {
+    personId:   p.id,
+    personType: p.person_type,
+    name:       `${p.first_name} ${p.last_name}`,
+    month:      parseInt(document.getElementById('payroll-month').value),
+    year:       parseInt(document.getElementById('payroll-year').value),
+  };
   const old = document.getElementById('ot-modal'); if (old) old.remove();
   const wrap = document.createElement('div');
   wrap.id = 'ot-modal';
   wrap.style.cssText = 'position:fixed;inset:0;background:rgba(15,40,69,.55);backdrop-filter:blur(8px);z-index:10000;display:flex;align-items:center;justify-content:center;';
   wrap.innerHTML = `
-    <div style="background:#fff;border-radius:18px;padding:26px 24px 20px;max-width:380px;width:92%;box-shadow:0 30px 80px rgba(20,40,80,.20);">
-      <div style="font-family:var(--font-head);font-size:16px;font-weight:800;color:#0f2845;text-align:center;">${t('lbl_overtime')||'Overtime'}</div>
-      <div style="font-size:12px;color:#6a7c93;text-align:center;margin:4px 0 16px;">${p.first_name} ${p.last_name}</div>
-      <div style="display:flex;gap:10px;margin-bottom:14px;">
-        <div style="flex:1;">
-          <label style="font-size:10px;font-weight:700;color:#6a7c93;text-transform:uppercase;display:block;margin-bottom:4px;">${t('lbl_hours')||'Hours'}</label>
-          <input id="ot-hours" type="text" inputmode="decimal" value="${p.overtime_hours||''}" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px;font-family:var(--font-mono);font-size:14px;text-align:center;outline:none;" oninput="this.value=toWesternDigits(this.value).replace(/[^0-9.]/g,'')">
+    <div style="background:#fff;border-radius:18px;max-width:460px;width:94%;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(20,40,80,.20);">
+      <div style="padding:18px 22px;border-bottom:1px solid rgba(20,40,80,.08);">
+        <div style="font-family:var(--font-head);font-size:16px;font-weight:800;color:#0f2845;">${t('lbl_overtime')||'Overtime'}</div>
+        <div style="font-size:12px;color:#6a7c93;margin-top:2px;">${_otModalCtx.name} · <span id="ot-total">—</span></div>
+      </div>
+      <div id="ot-list" style="overflow-y:auto;flex:1;padding:8px 18px;"></div>
+      <div style="padding:14px 18px;border-top:1px solid rgba(20,40,80,.08);background:#f8fafc;">
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <input id="ot-add-hours" type="text" inputmode="decimal" placeholder="${t('lbl_hours')||'Hours'}" style="flex:1;min-width:0;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-family:var(--font-mono);font-size:13px;text-align:center;outline:none;" oninput="this.value=toWesternDigits(this.value).replace(/[^0-9.]/g,'')">
+          <input id="ot-add-amount" type="text" inputmode="numeric" placeholder="${t('lbl_amount_afn')||'Amount'}" style="flex:1.2;min-width:0;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-family:var(--font-mono);font-size:13px;font-weight:700;text-align:center;outline:none;" oninput="this.value=toWesternDigits(this.value).replace(/[^0-9.]/g,'')">
         </div>
-        <div style="flex:1;">
-          <label style="font-size:10px;font-weight:700;color:#6a7c93;text-transform:uppercase;display:block;margin-bottom:4px;">${t('lbl_amount_afn')||'Amount'} (AFN)</label>
-          <input id="ot-amount" type="text" inputmode="numeric" value="${p.overtime_amount||''}" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px;font-family:var(--font-mono);font-size:14px;font-weight:700;text-align:center;outline:none;" oninput="this.value=toWesternDigits(this.value).replace(/[^0-9.]/g,'')">
+        <div style="display:flex;gap:8px;">
+          <input id="ot-add-notes" type="text" placeholder="${t('lbl_notes_opt')||'Note (e.g. covered class 5)'}" style="flex:1;min-width:0;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:12.5px;outline:none;">
+          <button id="ot-add-btn" style="padding:9px 16px;background:linear-gradient(135deg,#22c571,#178f4f);border:none;border-radius:8px;color:#fff;font-family:var(--font-head);font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;"><i class="fas fa-plus"></i> ${t('btn_add')||'Add'}</button>
         </div>
       </div>
-      <div style="display:flex;gap:10px;">
-        <button id="ot-cancel" style="flex:1;padding:11px;background:#f5f9fc;border:1px solid rgba(20,40,80,.08);border-radius:10px;color:#6a7c93;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;">${t('lbl_cancel')||'Cancel'}</button>
-        <button id="ot-save" style="flex:1;padding:11px;background:linear-gradient(135deg,#22c571,#178f4f);border:none;border-radius:10px;color:#fff;font-family:var(--font-head);font-size:13px;font-weight:800;cursor:pointer;">${t('btn_save')||'Save'}</button>
+      <div style="padding:12px 18px;border-top:1px solid rgba(20,40,80,.08);">
+        <button id="ot-close" style="width:100%;padding:11px;background:#f5f9fc;border:1px solid rgba(20,40,80,.08);border-radius:10px;color:#6a7c93;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;">${t('lbl_close')||'Close'}</button>
       </div>
     </div>`;
   document.body.appendChild(wrap);
-  const close = () => wrap.remove();
-  wrap.querySelector('#ot-cancel').onclick = close;
-  wrap.addEventListener('click', e => { if (e.target === wrap) close(); });
-  wrap.querySelector('#ot-save').onclick = async () => {
-    const hours  = parseFloat(document.getElementById('ot-hours').value) || 0;
-    const amount = parseFloat(document.getElementById('ot-amount').value) || 0;
-    try {
-      const r = await fetch('/api/payroll/overtime', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ person_id: p.id, person_type: p.person_type, month, year, hours, amount }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'Failed');
-      close();
-      await loadPayroll();
-    } catch(e) { showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' }); }
-  };
+  wrap.addEventListener('click', e => { if (e.target === wrap) wrap.remove(); });
+  wrap.querySelector('#ot-close').onclick = () => wrap.remove();
+  wrap.querySelector('#ot-add-btn').onclick = otAddEntry;
+  renderOvertimeList();
+}
+
+function _otPersonRow() {
+  if (!_otModalCtx) return null;
+  return payrollData.find(x => x.id === _otModalCtx.personId && x.person_type === _otModalCtx.personType) || null;
+}
+
+function renderOvertimeList() {
+  const host = document.getElementById('ot-list');
+  if (!host) return;
+  const p = _otPersonRow();
+  const entries = (p && p.overtime) || [];
+  document.getElementById('ot-total').textContent =
+    `${toPersianDigits(p ? (p.overtime_hours||0) : 0)} ${t('lbl_hours')||'h'} · ${Number(p ? (p.overtime_amount||0) : 0).toLocaleString()} AFN`;
+  if (!entries.length) {
+    host.innerHTML = `<div style="padding:18px;text-align:center;color:#94a3b8;font-size:12.5px;">${t('lbl_no_overtime')||'No overtime entries this month.'}</div>`;
+    return;
+  }
+  host.innerHTML = entries.map(o => `
+    <div style="display:flex;align-items:center;gap:8px;padding:9px 10px;border-bottom:1px solid rgba(20,40,80,.06);font-size:12.5px;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-family:var(--font-mono);font-weight:700;color:#0f2845;">${Number(o.amount).toLocaleString()} AFN <span style="color:#94a3b8;font-weight:500;">· ${toPersianDigits(o.hours||0)} ${t('lbl_hours')||'h'}</span></div>
+        <div style="font-size:11px;color:#6a7c93;direction:rtl;">${o.overtime_date ? shamsiDariPD(o.overtime_date) : ''}${o.notes?` · ${String(o.notes).replace(/</g,'&lt;')}`:''}</div>
+      </div>
+      <button onclick="otEditEntry(${o.id},${Number(o.amount)})" title="${t('btn_edit')||'Edit'}" style="width:26px;height:26px;border-radius:6px;background:rgba(91,158,247,.10);border:1px solid rgba(91,158,247,.22);color:#1a4fa0;cursor:pointer;font-size:11px;"><i class="fas fa-pen"></i></button>
+      <button onclick="otDeleteEntry(${o.id})" title="${t('btn_delete')||'Delete'}" style="width:26px;height:26px;border-radius:6px;background:rgba(255,120,117,.10);border:1px solid rgba(255,120,117,.22);color:#dc4f4c;cursor:pointer;font-size:11px;"><i class="fas fa-times"></i></button>
+    </div>`).join('');
+}
+
+async function _otRefresh() {
+  await loadPayroll();
+  renderOvertimeList();
+}
+
+async function otAddEntry() {
+  const c = _otModalCtx; if (!c) return;
+  const hours  = parseFloat(document.getElementById('ot-add-hours').value)  || 0;
+  const amount = parseFloat(document.getElementById('ot-add-amount').value) || 0;
+  const notes  = document.getElementById('ot-add-notes').value.trim();
+  if (!(amount > 0) && !(hours > 0)) {
+    showAlert({ title:t('alert_title_invalid'), message:t('msg_invalid_amount')||'Enter hours or an amount.', type:'warning' });
+    return;
+  }
+  try {
+    const r = await fetch('/api/payroll/overtime', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ person_id:c.personId, person_type:c.personType, month:c.month, year:c.year, hours, amount, notes }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Failed');
+    ['ot-add-hours','ot-add-amount','ot-add-notes'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+    await _otRefresh();
+  } catch(e) { showAlert({ title:t('alert_title_error'), message:e.message, type:'error' }); }
+}
+
+function otEditEntry(id, current) {
+  showConfirmInput({
+    title: t('lbl_edit_overtime') || 'Edit Overtime Amount',
+    message: t('msg_edit_overtime') || 'Enter the corrected overtime amount (AFN).',
+    value: Math.round(current || 0),
+    confirmText: t('btn_save') || 'Save',
+    onConfirm: async (val) => {
+      const amt = parseFloat(val);
+      if (!(amt >= 0)) { showAlert({ title:t('alert_title_invalid'), message:t('msg_invalid_amount'), type:'warning' }); return; }
+      try {
+        const r = await fetch(`/api/payroll/overtime/${id}`, {
+          method:'PUT', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ amount: amt }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Failed');
+        await _otRefresh();
+      } catch(e) { showAlert({ title:t('alert_title_error'), message:e.message, type:'error' }); }
+    },
+  });
+}
+
+function otDeleteEntry(id) {
+  showConfirm({
+    title: t('confirm_del_overtime_title') || 'Delete overtime entry?',
+    message: t('confirm_del_overtime') || 'This overtime entry will be permanently removed.',
+    confirmText: t('btn_delete') || 'Delete', type: 'danger',
+    onConfirm: async () => {
+      try {
+        await fetch(`/api/payroll/overtime/${id}`, { method:'DELETE' });
+        await _otRefresh();
+      } catch(e) { showAlert({ title:t('alert_title_error'), message:e.message, type:'error' }); }
+    },
+  });
 }
 
 async function showAdvanceHistory(personType, personId) {

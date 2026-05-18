@@ -103,17 +103,28 @@ router.get('/', async (req, res) => {
       console.warn('[payroll] staff_monthly_attendance table missing — run migration_align_with_routes.sql to enable admin overrides.');
     }
 
-    // Overtime for this pay month (hours + AFN), added on top of net salary.
+    // Overtime for this pay month — multiple entries per person allowed
+    // (office logs overtime daily). Sum hours + amount; keep the list.
     const overtimeMap = {};
     try {
       const otRes = await pool.query(
-        `SELECT person_id, person_type, hours, amount
-           FROM payroll_overtime WHERE pay_month = $1`,
+        `SELECT id, person_id, person_type, hours, amount, notes, overtime_date
+           FROM payroll_overtime WHERE pay_month = $1
+          ORDER BY overtime_date ASC NULLS LAST, id ASC`,
         [payMonth]
       );
       otRes.rows.forEach(r => {
-        overtimeMap[`${r.person_type}-${r.person_id}`] =
-          { hours: parseFloat(r.hours) || 0, amount: parseFloat(r.amount) || 0 };
+        const k = `${r.person_type}-${r.person_id}`;
+        if (!overtimeMap[k]) overtimeMap[k] = { entries: [], hours: 0, amount: 0 };
+        overtimeMap[k].entries.push({
+          id: r.id,
+          hours: parseFloat(r.hours) || 0,
+          amount: parseFloat(r.amount) || 0,
+          notes: r.notes || '',
+          overtime_date: r.overtime_date,
+        });
+        overtimeMap[k].hours  += parseFloat(r.hours) || 0;
+        overtimeMap[k].amount += parseFloat(r.amount) || 0;
       });
     } catch (e) {
       if (!/payroll_overtime/.test(e.message || '')) throw e;
@@ -157,7 +168,7 @@ router.get('/', async (req, res) => {
         : Math.round(dailyRate * absentDays);
 
       // Overtime for this month (added on top of earned salary)
-      const ot       = overtimeMap[key] || { hours: 0, amount: 0 };
+      const ot       = overtimeMap[key] || { entries: [], hours: 0, amount: 0 };
       const otAmount = parseFloat(ot.amount) || 0;
 
       // Salary model:
@@ -183,8 +194,10 @@ router.get('/', async (req, res) => {
         daily_rate:          Math.round(dailyRate),
         absence_deduction:   absenceDeduction,
         // Overtime
+        overtime:        ot.entries || [],
         overtime_hours:  ot.hours || 0,
         overtime_amount: otAmount,
+        overtime_count:  (ot.entries || []).length,
         // Net figures
         net_payable:    netPayable,            // salary − tax − absence + overtime; advances draw from this
         net_salary:     netSalary,             // final amount still to pay
@@ -309,10 +322,10 @@ router.post('/advance', async (req, res) => {
   }
 });
 
-// ── POST set/update overtime for a person in a Shamsi month ───
+// ── POST add ONE overtime entry (multiple per month allowed) ──
 router.post('/overtime', async (req, res) => {
   try {
-    const { person_id, person_type, month, year, hours, amount, notes } = req.body;
+    const { person_id, person_type, month, year, hours, amount, notes, overtime_date } = req.body;
     if (!person_id || !person_type || !month || !year) {
       return res.status(400).json({ error: 'person_id, person_type, month and year are required' });
     }
@@ -321,18 +334,44 @@ router.post('/overtime', async (req, res) => {
     const a = Math.max(0, parseFloat(amount) || 0);
     const r = await pool.query(`
       INSERT INTO payroll_overtime
-        (person_id, person_type, pay_month, hours, amount, notes, updated_at)
-      VALUES ($1,$2,$3,$4,$5,$6,NOW())
-      ON CONFLICT (person_type, person_id, pay_month)
-      DO UPDATE SET hours = EXCLUDED.hours, amount = EXCLUDED.amount,
-                    notes = EXCLUDED.notes, updated_at = NOW()
+        (person_id, person_type, pay_month, hours, amount, notes, overtime_date, created_at, updated_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7::date,NOW(),NOW())
       RETURNING *`,
-      [person_id, person_type, payMonth, h, a, notes || null]);
-    res.json({ success: true, overtime: r.rows[0] });
+      [person_id, person_type, payMonth, h, a, notes || null, overtime_date || null]);
+    res.status(201).json({ success: true, overtime: r.rows[0] });
   } catch (err) {
     console.error('POST /api/payroll/overtime error:', err.message);
     res.status(500).json({ error: err.message });
   }
+});
+
+// ── PUT edit one overtime entry ───────────────────────────────
+router.put('/overtime/:id', async (req, res) => {
+  try {
+    const { hours, amount, notes, overtime_date } = req.body;
+    const h = (hours  != null && hours  !== '') ? Math.max(0, parseFloat(hours))  : null;
+    const a = (amount != null && amount !== '') ? Math.max(0, parseFloat(amount)) : null;
+    const r = await pool.query(`
+      UPDATE payroll_overtime SET
+        hours         = COALESCE($1, hours),
+        amount        = COALESCE($2, amount),
+        notes         = COALESCE($3, notes),
+        overtime_date = COALESCE($4::date, overtime_date),
+        updated_at    = NOW()
+      WHERE id = $5
+      RETURNING *`,
+      [h, a, (notes != null ? notes : null), overtime_date || null, req.params.id]);
+    if (!r.rows.length) return res.status(404).json({ error: 'Overtime entry not found' });
+    res.json({ success: true, overtime: r.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── DELETE one overtime entry ─────────────────────────────────
+router.delete('/overtime/:id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM payroll_overtime WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ── PUT edit an advance ───────────────────────────────────────
