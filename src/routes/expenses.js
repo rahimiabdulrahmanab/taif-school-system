@@ -40,27 +40,28 @@ router.get('/summary', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { title, amount, category, expense_date, notes, paid_to } = req.body;
+    const { title, amount, category, expense_date, notes, paid_to, bill_no } = req.body;
     if (!title || !amount) return res.status(400).json({ error: 'Title and amount are required' });
     const m = new Date(expense_date || new Date()).toISOString().slice(0,7);
     const result = await pool.query(`
-      INSERT INTO office_expenses (description, amount, category, expense_date, expense_month, notes, paid_to)
-      VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *
+      INSERT INTO office_expenses (description, amount, category, expense_date, expense_month, notes, paid_to, bill_no)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *
     `, [title, amount, category||'Other', expense_date||new Date().toISOString().split('T')[0], m,
-        notes||null, paid_to||null]);
+        notes||null, paid_to||null, bill_no||null]);
     res.status(201).json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.put('/:id', async (req, res) => {
   try {
-    const { title, amount, category, expense_date, notes, paid_to } = req.body;
+    const { title, amount, category, expense_date, notes, paid_to, bill_no } = req.body;
     const m = new Date(expense_date || new Date()).toISOString().slice(0,7);
     const result = await pool.query(`
       UPDATE office_expenses SET description=$1, amount=$2, category=$3, expense_date=$4,
-             expense_month=$5, notes=COALESCE($6,notes), paid_to=COALESCE($7,paid_to)
-      WHERE id=$8 RETURNING *
-    `, [title, amount, category, expense_date, m, notes ?? null, paid_to ?? null, req.params.id]);
+             expense_month=$5, notes=COALESCE($6,notes), paid_to=COALESCE($7,paid_to),
+             bill_no=COALESCE($8,bill_no)
+      WHERE id=$9 RETURNING *
+    `, [title, amount, category, expense_date, m, notes ?? null, paid_to ?? null, bill_no ?? null, req.params.id]);
     if (!result.rows.length) return res.status(404).json({ error: 'Not found' });
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }

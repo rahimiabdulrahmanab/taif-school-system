@@ -34,10 +34,11 @@ BEGIN
   END IF;
 END $$;
 
--- ── office_expenses: routes/UI display `paid_to`
+-- ── office_expenses: routes/UI display `paid_to`, `notes`, `bill_no`
 ALTER TABLE office_expenses
   ADD COLUMN IF NOT EXISTS paid_to VARCHAR(200),
-  ADD COLUMN IF NOT EXISTS notes   TEXT;
+  ADD COLUMN IF NOT EXISTS notes   TEXT,
+  ADD COLUMN IF NOT EXISTS bill_no VARCHAR(60);
 
 -- ── classes: the route uses `grade_level` and `description`, but the original
 --    schema had `grade` (NOT NULL) and `room`. Add the columns the route needs

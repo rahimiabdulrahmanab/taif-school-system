@@ -3349,8 +3349,8 @@ button[style*="background:linear-gradient"]{
   </div>
   <div style="overflow-x:auto;">
     <table class="scan-tbl-clean" style="min-width:780px;">
-      <thead><tr><th data-i18n="th_title">Title</th><th data-i18n="th_category">Category</th><th data-i18n="th_date">Date</th><th data-i18n="th_paid_to">Paid To</th><th data-i18n="th_amount">Amount</th><th style="text-align:center;" data-i18n="th_actions">Actions</th></tr></thead>
-      <tbody id="exp-tbody"><tr><td colspan="6"><div class="empty" style="padding:60px 20px;"><i class="fas fa-receipt"></i><p data-i18n="lbl_loading">Loading...</p></div></td></tr></tbody>
+      <thead><tr><th data-i18n="th_title">Title</th><th data-i18n="th_category">Category</th><th data-i18n="th_date">Date</th><th data-i18n="th_bill_no">Bill #</th><th data-i18n="th_paid_to">Paid To</th><th data-i18n="th_amount">Amount</th><th style="text-align:center;" data-i18n="th_actions">Actions</th></tr></thead>
+      <tbody id="exp-tbody"><tr><td colspan="7"><div class="empty" style="padding:60px 20px;"><i class="fas fa-receipt"></i><p data-i18n="lbl_loading">Loading...</p></div></td></tr></tbody>
     </table>
   </div>
 </div>
@@ -3383,6 +3383,10 @@ button[style*="background:linear-gradient"]{
     <div>
       <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;" data-i18n="lbl_category">Category</label>
       <select id="exp-category" style="width:100%;padding:10px 13px;background:rgba(255,255,255,.85);border:1px solid rgba(26,74,92,.12);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;"></select>
+    </div>
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;" data-i18n="lbl_bill_no">Bill #</label>
+      <input id="exp-bill-no" type="text" placeholder="e.g. 1024" data-ph="ph_bill_no" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
     </div>
     <div>
       <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;" data-i18n="lbl_paid_to">Paid To</label>
@@ -4245,7 +4249,8 @@ const LANG = {
     th_staff:'Staff', th_role:'Role', th_outstanding:'Outstanding',
     th_employee:'Employee', th_type:'Type', th_base_salary:'Base Salary',
     th_advance:'Advance', th_net_payable:'Net Payable', th_status:'Status',
-    th_title:'Title', th_category:'Category', th_date:'Date', th_paid_to:'Paid To', th_amount:'Amount',
+    th_title:'Title', th_category:'Category', th_date:'Date', th_bill_no:'Bill #', th_paid_to:'Paid To', th_amount:'Amount',
+    lbl_bill_no:'Bill #', ph_bill_no:'e.g. 1024',
     greet_morning:'Good morning!', greet_afternoon:'Good afternoon!', greet_evening:'Good evening!',
     dash_school_overview:"Here's your school overview for today",
     dash_att_chart:'Student Attendance — Last 30 Days',
@@ -4659,7 +4664,8 @@ const LANG = {
     th_staff:'کارکوونکی', th_role:'دنده', th_outstanding:'باقي‌دار',
     th_employee:'کارمند', th_type:'ډول', th_base_salary:'اصلي معاش',
     th_advance:'مساعده', th_net_payable:'خالص معاش', th_status:'حالت',
-    th_title:'سرلیک', th_category:'کټګوري', th_date:'نېټه', th_paid_to:'ترلاسه کوونکی', th_amount:'مبلغ',
+    th_title:'سرلیک', th_category:'کټګوري', th_date:'نېټه', th_bill_no:'د بل نمبر', th_paid_to:'ترلاسه کوونکی', th_amount:'مبلغ',
+    lbl_bill_no:'د بل نمبر', ph_bill_no:'لکه ۱۰۲۴',
     greet_morning:'سهار مو پخیر!', greet_afternoon:'غرمه مو پخیر!', greet_evening:'ماښام مو پخیر!',
     dash_school_overview:'د نن ورځې د ښوونځي لنډیز',
     dash_att_chart:'د زده کوونکو حاضري — وروستي ۳۰ ورځې',
@@ -9829,7 +9835,7 @@ async function loadExpenses() {
     // Table
     const tb = document.getElementById('exp-tbody');
     if (!expensesList.length) {
-      tb.innerHTML = '<tr><td colspan="6"><div class="empty"><i class="fas fa-receipt"></i><p>' + t('lbl_no_expenses_month') + '</p></div></td></tr>';
+      tb.innerHTML = '<tr><td colspan="7"><div class="empty"><i class="fas fa-receipt"></i><p>' + t('lbl_no_expenses_month') + '</p></div></td></tr>';
       return;
     }
 
@@ -9847,6 +9853,7 @@ async function loadExpenses() {
         <td>
           <div style="font-family:var(--font-mono);font-size:12.5px;color:#0f2845;font-weight:700;direction:rtl;">${dShamsi}</div>
         </td>
+        <td><span style="font-family:var(--font-mono);font-size:12.5px;color:#475569;">${e.bill_no || '—'}</span></td>
         <td><span style="font-size:12px;color:var(--text-mid);">${e.paid_to || '—'}</span></td>
         <td><span style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--text);">${Number(e.amount).toLocaleString()} AFN</span></td>
         <td style="text-align:center;">
@@ -9872,6 +9879,7 @@ function openExpenseForm(id) {
     document.getElementById('exp-date').value     = exp.expense_date ? exp.expense_date.split('T')[0] : '';
     _loadShamsiField('exd', exp.expense_date ? exp.expense_date.split('T')[0] : '');
     document.getElementById('exp-category').value = exp.category || 'Other';
+    document.getElementById('exp-bill-no').value  = exp.bill_no || '';
     document.getElementById('exp-paid-to').value  = exp.paid_to || '';
     document.getElementById('exp-notes').value    = exp.notes || '';
   } else {
@@ -9880,6 +9888,7 @@ function openExpenseForm(id) {
     document.getElementById('exp-date').value     = new Date().toISOString().split('T')[0];
     _loadShamsiField('exd', new Date().toISOString().split('T')[0]);
     document.getElementById('exp-category').value = expCategories[0] || 'Other';
+    document.getElementById('exp-bill-no').value  = '';
     document.getElementById('exp-paid-to').value  = '';
     document.getElementById('exp-notes').value    = '';
   }
@@ -9915,6 +9924,7 @@ async function saveExpense() {
     amount:       parseFloat(amount),
     category:     document.getElementById('exp-category').value,
     expense_date: document.getElementById('exp-date').value,
+    bill_no:      document.getElementById('exp-bill-no').value.trim(),
     paid_to:      document.getElementById('exp-paid-to').value,
     notes:        document.getElementById('exp-notes').value,
   };
