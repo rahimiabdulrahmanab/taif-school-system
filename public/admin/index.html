@@ -5435,7 +5435,7 @@ function initShamsiPicker() {
 
 function updateShamsiMonthNames(lang) {
   const months = lang === 'ps' ? SHAMSI_MONTHS_PASHTO : lang === 'fa' ? SHAMSI_MONTHS_DARI : SHAMSI_MONTHS_EN;
-  ['sh-month','th-month','stf-month','tj-month','sj-month','att-month','exd-month','ratt-month','sf-enr-month'].forEach(sid => {
+  ['sh-month','th-month','stf-month','tj-month','sj-month','att-month','exd-month','ratt-month','sf-enr-month','incd-month'].forEach(sid => {
     const sel=document.getElementById(sid);
     if (!sel) return;
     const prev=sel.value;
