@@ -40,6 +40,21 @@ ALTER TABLE office_expenses
   ADD COLUMN IF NOT EXISTS notes   TEXT,
   ADD COLUMN IF NOT EXISTS bill_no VARCHAR(60);
 
+-- ── external_income: canteen / rentals / other income streams.
+--    income_month is a Shamsi "YYYY-MM" key so the period filter matches
+--    the rest of the app (which works on the Afghan calendar).
+CREATE TABLE IF NOT EXISTS external_income (
+  id           SERIAL PRIMARY KEY,
+  title        VARCHAR(200)  NOT NULL,
+  amount       NUMERIC(12,2) NOT NULL DEFAULT 0,
+  income_date  DATE          NOT NULL DEFAULT CURRENT_DATE,
+  income_month VARCHAR(10),
+  note         TEXT,
+  created_at   TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_income_month
+  ON external_income (income_month);
+
 -- ── classes: the route uses `grade_level` and `description`, but the original
 --    schema had `grade` (NOT NULL) and `room`. Add the columns the route needs
 --    and drop NOT NULL on the legacy `grade` column so inserts don't fail.

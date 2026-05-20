@@ -1299,6 +1299,9 @@ button[style*="background:linear-gradient"]{
 <div class="nav-link" onclick="go('expenses',this)" data-nav="expenses">
   <span class="nav-icon"><i class="fas fa-receipt"></i></span><span class="nav-label">Office Expenses</span>
 </div>
+<div class="nav-link" onclick="go('income',this)" data-nav="income">
+  <span class="nav-icon"><i class="fas fa-hand-holding-dollar"></i></span><span class="nav-label" data-i18n="nav_income">External Income</span>
+</div>
 
 <div class="nav-section" data-nav-sec="system">System</div>
 <div class="nav-link" onclick="go('reports',this)" data-nav="reports">
@@ -3405,6 +3408,101 @@ button[style*="background:linear-gradient"]{
 
 </div>
 
+<!-- ═════════════════════════════════════════════════════════
+     EXTERNAL INCOME PAGE — canteen, rentals & other streams
+     ═════════════════════════════════════════════════════════ -->
+<div class="page" id="pg-income">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;gap:16px;flex-wrap:wrap;">
+    <div>
+      <h2 style="font-family:var(--font-head);font-size:24px;font-weight:800;color:#0f2845;letter-spacing:-.02em;" data-i18n="nav_income">External Income</h2>
+      <span style="font-size:13px;color:#6a7c93;" data-i18n="sub_income">Income from canteen, rentals and other streams</span>
+    </div>
+    <button onclick="openIncomeForm()" style="display:inline-flex;align-items:center;gap:9px;padding:11px 22px;background:linear-gradient(135deg,#22c571,#178f4f);border:none;border-radius:12px;color:#fff;font-family:var(--font-head);font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 8px 24px rgba(34,197,113,.30);">
+      <i class="fas fa-plus"></i> <span data-i18n="btn_add_income">Add Income</span>
+    </button>
+  </div>
+
+  <!-- Period + total -->
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <i class="fas fa-calendar-alt" style="color:#22c571;font-size:14px;"></i>
+      <span style="font-size:11.5px;font-weight:700;color:#6a7c93;text-transform:uppercase;letter-spacing:.05em;font-family:var(--font-head);" data-i18n="lbl_period">Period</span>
+    </div>
+    <div dir="rtl" style="display:flex;gap:6px;background:#f5f9fc;border:1px solid rgba(20,40,80,.06);border-radius:10px;padding:4px;">
+      <select id="inc-month" onchange="loadIncome()" style="padding:7px 10px;background:transparent;border:none;color:#0f2845;font-family:var(--font-body);font-size:13px;outline:none;cursor:pointer;font-weight:700;"></select>
+      <select id="inc-year" onchange="loadIncome()" style="padding:7px 10px;background:transparent;border:none;color:#0f2845;font-family:var(--font-mono);font-size:13px;outline:none;cursor:pointer;font-weight:700;"></select>
+    </div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:10px;background:rgba(34,197,113,.08);border:1px solid rgba(34,197,113,.22);border-radius:12px;padding:10px 18px;">
+      <span style="font-size:11px;color:#178f4f;text-transform:uppercase;font-weight:700;letter-spacing:.05em;" data-i18n="lbl_total_income">Total Income</span>
+      <span id="inc-total" style="font-family:var(--font-mono);font-size:18px;font-weight:800;color:#178f4f;">0 AFN</span>
+    </div>
+  </div>
+
+  <div class="dash-card">
+    <div class="dash-card-hdr">
+      <h4><span class="icon-pill" style="background:rgba(34,197,113,.15);color:#178f4f;"><i class="fas fa-hand-holding-dollar"></i></span><span data-i18n="ttl_income_records">Income Records</span></h4>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="meta" id="inc-meta" data-i18n="lbl_loading">Loading...</span>
+        <span style="font-family:var(--font-head);font-size:11px;font-weight:800;color:#fff;background:linear-gradient(135deg,#22c571,#178f4f);border-radius:14px;padding:4px 12px;" id="inc-month-badge">—</span>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="scan-tbl-clean" style="min-width:680px;">
+        <thead><tr>
+          <th data-i18n="th_title">Title</th>
+          <th data-i18n="th_date">Date</th>
+          <th data-i18n="th_amount">Amount</th>
+          <th data-i18n="lbl_notes">Note</th>
+          <th style="text-align:center;" data-i18n="th_actions">Actions</th>
+        </tr></thead>
+        <tbody id="inc-tbody"><tr><td colspan="5"><div class="empty" style="padding:60px 20px;"><i class="fas fa-hand-holding-dollar"></i><p data-i18n="lbl_loading">Loading...</p></div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Income add/edit modal -->
+  <div id="inc-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:1000;" onclick="closeIncomeForm(event)"></div>
+  <div id="inc-panel" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-52%) scale(.96);opacity:0;width:460px;max-width:95vw;max-height:90vh;background:rgba(240,249,252,.97);border:1px solid rgba(26,74,92,.12);border-radius:18px;z-index:1001;overflow-y:auto;transition:transform .3s cubic-bezier(.4,0,.2,1),opacity .3s ease;backdrop-filter:blur(20px);">
+    <div style="padding:24px 28px;border-bottom:1px solid rgba(26,74,92,.10);display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <h3 style="font-family:var(--font-head);font-size:17px;font-weight:800;color:var(--text);" id="inc-panel-title">Add Income</h3>
+        <span style="font-size:12px;color:var(--text-mid);" data-i18n="form_fill_income">Title the income, set the date and amount</span>
+      </div>
+      <button onclick="closeIncomeForm()" style="width:34px;height:34px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--text-mid);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;"><i class="fas fa-times"></i></button>
+    </div>
+    <div style="padding:24px 28px;display:grid;gap:14px;">
+      <input type="hidden" id="inc-edit-id">
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;" data-i18n="lbl_income_title">Title *</label>
+        <input id="inc-title" type="text" placeholder="e.g. Canteen — week 1" data-ph="ph_income_title" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;" data-i18n="lbl_income_amount">Amount (AFN) *</label>
+          <input id="inc-amount" type="text" inputmode="numeric" placeholder="0" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:14px;font-weight:700;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" oninput="this.value=toWesternDigits(this.value).replace(/[^0-9.]/g,'')">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;" data-i18n="lbl_expense_date">Date</label>
+          <input id="inc-date" type="date" style="display:none;">
+          <div style="direction:rtl;"><div style="display:flex;gap:5px;">
+            <select id="incd-day" onchange="_syncShamsiField('incd')" style="flex:1;padding:9px 6px;background:rgba(255,255,255,.85);border:1px solid rgba(26,74,92,.12);border-radius:var(--radius-sm);color:#0C1526;font-family:var(--font-body);font-size:13px;outline:none;"></select>
+            <select id="incd-month" onchange="_syncShamsiField('incd')" style="flex:2;padding:9px 6px;background:rgba(255,255,255,.85);border:1px solid rgba(26,74,92,.12);border-radius:var(--radius-sm);color:#0C1526;font-family:var(--font-body);font-size:13px;outline:none;"></select>
+            <select id="incd-year" onchange="_syncShamsiField('incd')" style="flex:1.5;padding:9px 6px;background:rgba(255,255,255,.85);border:1px solid rgba(26,74,92,.12);border-radius:var(--radius-sm);color:#0C1526;font-family:var(--font-body);font-size:13px;outline:none;"></select>
+          </div></div>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;" data-i18n="lbl_notes">Note</label>
+        <input id="inc-note" type="text" placeholder="Optional note..." data-ph="ph_optional_notes" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:4px;">
+        <button onclick="saveIncome()" id="inc-save-btn" style="flex:1;padding:12px;background:linear-gradient(135deg,#22c571,#178f4f);border:none;border-radius:var(--radius-sm);color:#fff;font-family:var(--font-head);font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 0 20px rgba(34,197,113,.3);"><i class="fas fa-save"></i> <span data-i18n="btn_save_income">Save Income</span></button>
+        <button onclick="closeIncomeForm()" style="padding:12px 18px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text-mid);font-family:var(--font-head);font-size:13px;cursor:pointer;"><span data-i18n="btn_cancel">Cancel</span></button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="page" id="pg-reports">
 
 <div style="margin-bottom:18px;">
@@ -4173,6 +4271,12 @@ const LANG = {
     sch_empty:'No students with scholarships or discounts yet.',
     btn_print_list:'Print List',
     nav_fees:'Fee Collection', nav_payroll:'Payroll', nav_expenses:'Office Expenses',
+    nav_income:'External Income', sub_income:'Income from canteen, rentals and other streams',
+    btn_add_income:'Add Income', lbl_total_income:'Total Income', ttl_income_records:'Income Records',
+    form_fill_income:'Title the income, set the date and amount', form_add_income:'Add Income', form_edit_income:'Edit Income',
+    lbl_income_title:'Title *', ph_income_title:'e.g. Canteen — week 1', lbl_income_amount:'Amount (AFN) *',
+    btn_save_income:'Save Income', lbl_no_income_month:'No income recorded this month.',
+    confirm_del_income:'Delete income?', lbl_record_one:'record', lbl_records_many:'records',
     nav_reports:'Reports', nav_whatsapp:'WhatsApp', nav_gate:'Gate Screen', nav_settings:'Settings',
     pi_dashboard_t:'Dashboard', pi_dashboard_s:"Overview of today's activity",
     pi_students_t:'Students', pi_students_s:'Manage student profiles and QR codes',
@@ -4588,6 +4692,12 @@ const LANG = {
     sch_empty:'لا هیڅ زده‌کوونکی د بورس یا تخفیف ترلاسه‌کوونکی نه دی.',
     btn_print_list:'د لیست چاپ',
     nav_fees:'د فیس راټولول', nav_payroll:'معاشونه', nav_expenses:'اداري لګښتونه',
+    nav_income:'بهرنی عاید', sub_income:'له کانټین، کرایې او نورو سرچینو عاید',
+    btn_add_income:'عاید زیاتول', lbl_total_income:'ټول عاید', ttl_income_records:'د عاید ریکارډونه',
+    form_fill_income:'عاید ته سرلیک ورکړئ، نېټه او اندازه وټاکئ', form_add_income:'عاید زیاتول', form_edit_income:'عاید سمول',
+    lbl_income_title:'سرلیک *', ph_income_title:'لکه کانټین — لومړۍ اونۍ', lbl_income_amount:'اندازه (افغاني) *',
+    btn_save_income:'عاید خوندي کول', lbl_no_income_month:'پدې میاشت کې عاید نشته.',
+    confirm_del_income:'عاید ړنګ کړو؟', lbl_record_one:'ریکارډ', lbl_records_many:'ریکارډونه',
     nav_reports:'راپورونه', nav_whatsapp:'واټساپ', nav_gate:'دروازه', nav_settings:'امستنې',
     pi_dashboard_t:'داشبورد', pi_dashboard_s:'د نن ورځې د ښوونځي لنډیز',
     pi_students_t:'زده کوونکي', pi_students_s:'د زده کوونکو پروفایلونه اداره کړئ',
@@ -9952,6 +10062,149 @@ async function deleteExpense(id, title) {
       try {
         await fetch('/api/expenses/'+id, { method:'DELETE' });
         loadExpenses();
+      } catch(e) { showAlert({title:t('alert_title_error'),message:e.message,type:'error'}); }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════
+//  EXTERNAL INCOME (canteen, rentals, other streams)
+// ═══════════════════════════════════════════════════
+let incomeList = [];
+
+const origGoInc = window.go;
+window.go = function(id, el) {
+  origGoInc(id, el);
+  if (id === 'income') initIncome();
+};
+
+function initIncome() {
+  const cur = getCurrentShamsi();
+  document.getElementById('inc-month').innerHTML = shamsiMonthOptions(cur.month);
+  document.getElementById('inc-year').innerHTML  = shamsiYearOptions(cur.year);
+  _initShamsiField('incd', 'inc-date');
+  loadIncome();
+}
+
+async function loadIncome() {
+  const month = document.getElementById('inc-month').value;
+  const year  = document.getElementById('inc-year').value;
+  const badge = document.getElementById('inc-month-badge');
+  if (badge) badge.textContent = SHAMSI_MONTHS_DARI[parseInt(month)] + ' ' + toPersianDigits(year);
+
+  const tb = document.getElementById('inc-tbody');
+  try {
+    const res = await fetch(`/api/income?month=${month}&year=${year}`);
+    const data = await res.json();
+    incomeList = Array.isArray(data) ? data : [];
+
+    const total = incomeList.reduce((s, e) => s + parseFloat(e.amount || 0), 0);
+    document.getElementById('inc-total').textContent = Math.round(total).toLocaleString() + ' AFN';
+    document.getElementById('inc-meta').textContent  = incomeList.length + ' ' +
+      (incomeList.length === 1 ? (t('lbl_record_one')||'record') : (t('lbl_records_many')||'records'));
+
+    if (!incomeList.length) {
+      tb.innerHTML = '<tr><td colspan="5"><div class="empty"><i class="fas fa-hand-holding-dollar"></i><p>' + (t('lbl_no_income_month')||'No income recorded this month.') + '</p></div></td></tr>';
+      return;
+    }
+    tb.innerHTML = incomeList.map(e => {
+      const dShamsi = e.income_date ? shamsiDariPD(e.income_date) : '—';
+      return `<tr>
+        <td><div style="font-weight:600;font-size:13px;color:var(--text);">${(e.title||'—').replace(/</g,'&lt;')}</div></td>
+        <td><div style="font-family:var(--font-mono);font-size:12.5px;color:#0f2845;font-weight:700;direction:rtl;">${dShamsi}</div></td>
+        <td><span style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:#178f4f;">${Number(e.amount).toLocaleString()} AFN</span></td>
+        <td><span style="font-size:12px;color:var(--text-mid);">${e.note ? String(e.note).replace(/</g,'&lt;') : '—'}</span></td>
+        <td style="text-align:center;">
+          <div style="display:flex;gap:6px;justify-content:center;">
+            <button onclick="openIncomeForm(${e.id})" style="width:30px;height:30px;border-radius:6px;background:var(--glass);border:1px solid var(--glass-border);color:var(--text-mid);cursor:pointer;font-size:12px;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--glass-border)';this.style.color='var(--text-mid)'"><i class="fas fa-edit"></i></button>
+            <button onclick="deleteIncome(${e.id},'${(e.title||'').replace(/'/g,"\\'")}')" style="width:30px;height:30px;border-radius:6px;background:var(--glass);border:1px solid var(--glass-border);color:var(--text-mid);cursor:pointer;font-size:12px;" onmouseover="this.style.borderColor='#ff7875';this.style.color='#ff7875'" onmouseout="this.style.borderColor='var(--glass-border)';this.style.color='var(--text-mid)'"><i class="fas fa-trash"></i></button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    tb.innerHTML = `<tr><td colspan="5"><div class="empty"><i class="fas fa-exclamation-triangle"></i><p>${e.message}</p></div></td></tr>`;
+  }
+}
+
+function openIncomeForm(id) {
+  document.getElementById('inc-edit-id').value = id || '';
+  document.getElementById('inc-panel-title').textContent = (id ? (t('form_edit_income')||'Edit Income') : (t('form_add_income')||'Add Income'));
+  if (id) {
+    const e = incomeList.find(x => x.id === id);
+    if (!e) return;
+    document.getElementById('inc-title').value  = e.title || '';
+    document.getElementById('inc-amount').value = e.amount || '';
+    const iso = e.income_date ? e.income_date.split('T')[0] : '';
+    document.getElementById('inc-date').value = iso;
+    _loadShamsiField('incd', iso);
+    document.getElementById('inc-note').value = e.note || '';
+  } else {
+    const iso = new Date().toISOString().split('T')[0];
+    document.getElementById('inc-title').value  = '';
+    document.getElementById('inc-amount').value = '';
+    document.getElementById('inc-date').value   = iso;
+    _loadShamsiField('incd', iso);
+    document.getElementById('inc-note').value   = '';
+  }
+  document.getElementById('inc-overlay').style.display = 'block';
+  const _ip = document.getElementById('inc-panel');
+  _ip.style.display = 'block';
+  setTimeout(() => { _ip.style.transform = 'translate(-50%,-50%) scale(1)'; _ip.style.opacity = '1'; }, 10);
+}
+
+function closeIncomeForm(e) {
+  if (e && e.target !== document.getElementById('inc-overlay')) return;
+  const _ip = document.getElementById('inc-panel');
+  _ip.style.transform = 'translate(-50%,-52%) scale(.96)';
+  _ip.style.opacity = '0';
+  setTimeout(() => {
+    _ip.style.display = 'none';
+    document.getElementById('inc-overlay').style.display = 'none';
+  }, 320);
+}
+
+async function saveIncome() {
+  const title  = document.getElementById('inc-title').value.trim();
+  const amount = document.getElementById('inc-amount').value;
+  if (!title || !amount) { showAlert({title:t('alert_title_missing'),message:t('msg_name_required'),type:'warning'}); return; }
+
+  const btn = document.getElementById('inc-save-btn');
+  btn.disabled = true;
+  const id   = document.getElementById('inc-edit-id').value;
+  const body = {
+    title,
+    amount:      parseFloat(amount),
+    income_date: document.getElementById('inc-date').value || new Date().toISOString().split('T')[0],
+    note:        document.getElementById('inc-note').value.trim(),
+  };
+  try {
+    const res = await fetch(id ? `/api/income/${id}` : '/api/income', {
+      method:  id ? 'PUT' : 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body:    JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Save failed');
+    closeIncomeForm();
+    loadIncome();
+    showAlert({ title:t('alert_title_saved'), message:`"${title}" — ${Number(body.amount).toLocaleString()} AFN`, type:'success' });
+  } catch(e) {
+    showAlert({ title:t('alert_title_error'), message:e.message, type:'error' });
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function deleteIncome(id, title) {
+  showConfirm({
+    title: t('confirm_del_income') || 'Delete income?',
+    message: (t('confirm_del_item_msg') || 'Delete "{name}"? This cannot be undone.').replace('{name}', title),
+    confirmText: t('confirm_yes_delete'), type:'danger',
+    onConfirm: async () => {
+      try {
+        await fetch('/api/income/'+id, { method:'DELETE' });
+        loadIncome();
       } catch(e) { showAlert({title:t('alert_title_error'),message:e.message,type:'error'}); }
     }
   });

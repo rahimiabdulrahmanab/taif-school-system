@@ -199,6 +199,7 @@ const waRoutes         = require('./routes/whatsapp');
 const settingsRoutes   = require('./routes/settings');
 const teacherRoutes    = require('./routes/teacher');
 const backupRoutes     = require('./routes/backup');
+const incomeRoutes     = require('./routes/income');
 
 // Attendance: POST /scan and GET / are public (gate kiosk — no login needed)
 app.use('/api/attendance', (req, res, next) => {
@@ -220,6 +221,7 @@ app.use('/api/whatsapp',   auth, waRoutes);
 app.use('/api/settings',   auth, settingsRoutes);
 app.use('/api/teacher',    auth, teacherRoutes);
 app.use('/api/backup',     auth, backupRoutes);
+app.use('/api/income',     auth, incomeRoutes);
 
 // Root redirect
 app.get('/', (req, res) => res.redirect('/login'));
