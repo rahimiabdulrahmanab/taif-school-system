@@ -51,24 +51,31 @@ router.get('/marks', async (req, res) => {
     });
     const subRes  = await pool.query('SELECT * FROM subjects WHERE id=$1', [subject_id]);
     const subject = subRes.rows[0] || { max_midterm: 40, max_final: 60 };
+    // node-postgres returns NUMERIC as string — coerce before arithmetic
+    // or '40' + '60' becomes '4060' and breaks percentage / grade.
+    const maxMid = parseFloat(subject.max_midterm) || 40;
+    const maxFin = parseFloat(subject.max_final)   || 60;
     const result  = students.rows.map(s => {
       const midRow   = marksMap[s.id] ? marksMap[s.id]['midterm'] : null;
       const finRow   = marksMap[s.id] ? marksMap[s.id]['final']   : null;
       const midScore = midRow ? parseFloat(midRow.score) : null;
       const finScore = finRow ? parseFloat(finRow.score) : null;
       const total    = (midScore !== null && finScore !== null) ? midScore + finScore : null;
-      const maxTotal = (subject.max_midterm || 40) + (subject.max_final || 60);
+      const maxTotal = maxMid + maxFin;
       return {
         ...s,
         midterm_score: midScore,
         final_score:   finScore,
         total,
         max_total:     maxTotal,
-        passed:        total !== null ? total >= 50 : null,
+        passed:        total !== null ? total >= maxTotal * 0.4 : null,
         grade:         total !== null ? getGrade(total, maxTotal) : null,
       };
     });
-    res.json({ students: result, subject });
+    // Coerce NUMERIC fields back to numbers so the frontend can do
+    // arithmetic on them without hitting the same string-concat bug.
+    const subjectOut = { ...subject, max_midterm: maxMid, max_final: maxFin };
+    res.json({ students: result, subject: subjectOut });
   } catch (err) {
     console.error('GET /api/grades/marks error:', err.message);
     res.status(500).json({ error: err.message });
@@ -120,18 +127,23 @@ router.get('/transcript/:student_id', async (req, res) => {
       const midScore = midRow ? parseFloat(midRow.score) : null;
       const finScore = finRow ? parseFloat(finRow.score) : null;
       const total    = (midScore !== null && finScore !== null) ? midScore + finScore : null;
-      const maxTotal = (sub.max_midterm || 40) + (sub.max_final || 60);
+      // NUMERIC columns arrive as strings; parseFloat to keep arithmetic numeric.
+      const maxMid   = parseFloat(sub.max_midterm) || 40;
+      const maxFin   = parseFloat(sub.max_final)   || 60;
+      const maxTotal = maxMid + maxFin;
+      const passPct  = maxTotal > 0 ? maxTotal * 0.4 : 50;     // 40% pass mark
+      const midPass  = maxMid > 0 ? maxMid * 0.4 : 16;
       return {
         subject_name:  sub.name,
         teacher_name:  sub.teacher_name,
         midterm_score: midScore,
-        max_midterm:   sub.max_midterm || 40,
+        max_midterm:   maxMid,
         final_score:   finScore,
-        max_final:     sub.max_final || 60,
+        max_final:     maxFin,
         total,
         max_total:     maxTotal,
-        passed:        total !== null ? total >= 50 : null,
-        mid_passed:    midScore !== null ? midScore >= 16 : null,
+        passed:        total !== null ? total >= passPct : null,
+        mid_passed:    midScore !== null ? midScore >= midPass : null,
         grade:         total !== null ? getGrade(total, maxTotal) : null,
       };
     }));
