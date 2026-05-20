@@ -11192,6 +11192,11 @@ function openPayConfirmModal(idx) {
   document.getElementById('pr-pay-method').value = 'cash';
 
   initPayShamsiPicker();
+  // Re-enable the (shared) confirm button — it's left disabled after a
+  // successful payment, so reopening for another teacher or after an undo
+  // would otherwise show a dead button.
+  const cbtn = document.getElementById('pr-pay-confirm-btn');
+  if (cbtn) cbtn.disabled = false;
   document.getElementById('pr-pay-overlay').style.display = 'block';
   document.getElementById('pr-pay-modal').style.display   = 'block';
 }
