@@ -7,6 +7,17 @@ const CONFIG   = require('../school-config');
 
 const auth = require('./middleware/auth');
 
+// Role guard. Pass the roles that are allowed; admin is always allowed.
+// Usage: app.use('/api/foo', auth, allow('finance'), fooRoutes)
+function allow(...roles) {
+  const ok = new Set(['admin', ...roles]);
+  return (req, res, next) => {
+    const role = req.user && req.user.role;
+    if (role && ok.has(role)) return next();
+    return res.status(403).json({ error: 'Forbidden' });
+  };
+}
+
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
@@ -209,19 +220,22 @@ app.use('/api/attendance', (req, res, next) => {
   if (isPublic) return next();
   return auth(req, res, next);
 }, attendanceRoutes);
-app.use('/api/students',   auth, studentRoutes);
-app.use('/api',            auth, peopleRoutes);
-app.use('/api/classes',    auth, classRoutes);
-app.use('/api/fees',       auth, feeRoutes);
-app.use('/api/payroll',    auth, payrollRoutes);
-app.use('/api/grades',     auth, gradesRoutes);
-app.use('/api/expenses',   auth, expensesRoutes);
-app.use('/api/reports',    auth, reportsRoutes);
-app.use('/api/whatsapp',   auth, waRoutes);
-app.use('/api/settings',   auth, settingsRoutes);
-app.use('/api/teacher',    auth, teacherRoutes);
-app.use('/api/backup',     auth, backupRoutes);
-app.use('/api/income',     auth, incomeRoutes);
+// Finance role needs read-only access to students/teachers/staff/classes for
+// fee, payroll and expense lookups, so we allow it on those mounts. Pure-
+// finance pages (fees, payroll, expenses, income) get full access.
+app.use('/api/students',   auth, allow('finance'), studentRoutes);
+app.use('/api',            auth, allow('finance'), peopleRoutes);
+app.use('/api/classes',    auth, allow('finance'), classRoutes);
+app.use('/api/fees',       auth, allow('finance'), feeRoutes);
+app.use('/api/payroll',    auth, allow('finance'), payrollRoutes);
+app.use('/api/grades',     auth,                   gradesRoutes);
+app.use('/api/expenses',   auth, allow('finance'), expensesRoutes);
+app.use('/api/reports',    auth,                   reportsRoutes);
+app.use('/api/whatsapp',   auth,                   waRoutes);
+app.use('/api/settings',   auth,                   settingsRoutes);
+app.use('/api/teacher',    auth,                   teacherRoutes);
+app.use('/api/backup',     auth,                   backupRoutes);
+app.use('/api/income',     auth, allow('finance'), incomeRoutes);
 
 // Root redirect
 app.get('/', (req, res) => res.redirect('/login'));

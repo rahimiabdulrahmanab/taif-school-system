@@ -4140,6 +4140,52 @@ button[style*="background:linear-gradient"]{
   } catch(e) {}
 })();
 
+// ── Role gating — Finance user sees only money pages ─────────
+// The Finance role is limited to Fee Collection, Payroll, Office Expenses,
+// and External Income. Everything else is hidden in the sidebar and the
+// landing page is forced to Fees.
+(function() {
+  try {
+    const user = JSON.parse(localStorage.getItem('auth_user') || '{}');
+    if (user.role !== 'finance') return;
+
+    const ALLOWED = new Set(['fees', 'payroll', 'expenses', 'income']);
+
+    // Hide nav links not in the allow-list
+    document.querySelectorAll('.nav-link[data-nav]').forEach(link => {
+      const nav = link.getAttribute('data-nav');
+      if (!ALLOWED.has(nav)) link.style.display = 'none';
+    });
+
+    // Hide section headers whose links are all hidden
+    document.querySelectorAll('.nav-section').forEach(sec => {
+      const sib = [];
+      let n = sec.nextElementSibling;
+      while (n && !n.classList.contains('nav-section')) { sib.push(n); n = n.nextElementSibling; }
+      const anyVisible = sib.some(el => el.classList && el.classList.contains('nav-link') && el.style.display !== 'none');
+      if (!anyVisible) sec.style.display = 'none';
+    });
+
+    // Update sidebar footer label
+    const sub = document.querySelector('.admin-info span');
+    if (sub && user.username) sub.textContent = '@' + user.username + ' · Finance';
+
+    // Force landing on Fees page. Defer until DOMContentLoaded so go()
+    // can use LANG / PI which are initialized later in this script.
+    function landOnFees() {
+      document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      const feesLink = document.querySelector('.nav-link[data-nav="fees"]');
+      if (feesLink && typeof go === 'function') go('fees', feesLink);
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', landOnFees);
+    } else {
+      setTimeout(landOnFees, 0);
+    }
+  } catch(e) { console.error('[role-gate]', e); }
+})();
+
 // ══════════════════════════════════════════════════════════════
 //  QR CODE — single standalone handler for students/teachers/staff
 //  Defined early & globally so it never depends on a module that
@@ -12716,6 +12762,49 @@ async function confirmReject() {
     origGo(id, el);
     if (id === 'grades') loadPendingApprovals();
   };
+})();
+
+// ── Finance-role gating ───────────────────────────────────────
+// A "finance" user can only see Fee Collection, Payroll, Office
+// Expenses and External Income. We hide everything else in the
+// sidebar, block direct go() calls to other pages, and land them
+// on the fees page instead of the dashboard.
+(function() {
+  let user; try { user = JSON.parse(localStorage.getItem('auth_user') || '{}'); } catch(e) { user = {}; }
+  if (user.role !== 'finance') return;
+
+  const ALLOWED = new Set(['fees','payroll','expenses','income']);
+
+  // Hide non-finance nav links and their section headers
+  document.querySelectorAll('.nav-link[data-nav]').forEach(link => {
+    const nav = link.getAttribute('data-nav');
+    if (!ALLOWED.has(nav)) link.style.display = 'none';
+  });
+  // Hide every section header except the one over the finance group
+  document.querySelectorAll('.nav-section').forEach(sec => {
+    if (sec.getAttribute('data-nav-sec') !== 'finance') sec.style.display = 'none';
+  });
+
+  // Override go() — silently redirect attempts at disallowed pages to fees
+  const baseGo = window.go;
+  window.go = function(id, el) {
+    if (!ALLOWED.has(id)) {
+      const feesLink = document.querySelector('.nav-link[data-nav="fees"]');
+      return baseGo('fees', feesLink);
+    }
+    return baseGo(id, el);
+  };
+
+  // On load, land on fees instead of the initially-active dashboard page
+  document.addEventListener('DOMContentLoaded', function() {
+    const feesLink = document.querySelector('.nav-link[data-nav="fees"]');
+    window.go('fees', feesLink);
+  });
+  // If DOMContentLoaded already fired (script runs late), do it now
+  if (document.readyState !== 'loading') {
+    const feesLink = document.querySelector('.nav-link[data-nav="fees"]');
+    if (feesLink) window.go('fees', feesLink);
+  }
 })();
 
 </script>
