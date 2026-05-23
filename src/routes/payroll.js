@@ -65,14 +65,16 @@ router.get('/', async (req, res) => {
     // Client rule: salary is always calculated over a FIXED 30-day month,
     // counting every day INCLUDING Fridays. Per-day rate = salary / 30 and
     // absence is measured against 30 days.
-    const MS_DAY = 86400000;
     const workingDaysInMonth = 30;
     // Only count days that have actually elapsed (current/future month safe)
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const elapsedEnd = today < range.end ? today : range.end;
-    const elapsedWorkingDays = today < range.start
+    // School days that have elapsed, EXCLUDING Fridays (school is closed and
+    // nobody scans on Friday). Absence is measured against these days so a
+    // Friday is never counted as an absence even though there's no scan.
+    const elapsedSchoolDays = today < range.start
       ? 0
-      : Math.min(30, Math.floor((elapsedEnd - range.start) / MS_DAY) + 1);
+      : workingDaysBetween(range.start, elapsedEnd);
 
     // One query: distinct days each teacher/staff scanned in during the month
     const attRes = await pool.query(
@@ -141,26 +143,21 @@ router.get('/', async (req, res) => {
       const tax       = payroll ? parseFloat(payroll.tax_amount || 0) : calculateMonthlyTax(salary);
 
       // ── Attendance-based absence ──────────────────────────────
+      // Gate scans are the source of truth: present_days = the number of
+      // distinct days actually scanned at the gate. A school day (Mon–Thu,
+      // Sat–Sun) with no scan counts as absent. An admin override, when saved
+      // on the Staff Attendance screen, always wins.
       const scannedDays = presentMap[key] || 0;       // raw gate-scan count
       const hasOverride = Object.prototype.hasOwnProperty.call(overrideMap, key);
-      // If the gate has no scans at all for this person AND the admin hasn't
-      // saved an override, assume the scanner isn't being used for them — fall
-      // back to "present every elapsed day" so we don't silently wipe salaries.
-      const noAttendanceData = !hasOverride && scannedDays === 0;
-      // present_days: admin override > scan count > "no data → assume present"
-      const presentDays = hasOverride
-        ? overrideMap[key]
-        : (noAttendanceData ? elapsedWorkingDays : scannedDays);
+      const presentDays = hasOverride ? overrideMap[key] : scannedDays;
       // absent_days:
-      //   • already paid       → frozen value stored on the payroll row
-      //   • admin override     → working_days_in_month − confirmed present_days
-      //   • no scan data       → 0 (no proof of absence)
-      //   • some scan data     → elapsed working days not yet scanned
+      //   • already paid    → frozen value stored on the payroll row
+      //   • admin override  → working_days_in_month − confirmed present_days
+      //   • otherwise       → elapsed school days (excl. Fridays) not scanned
       let absentDays;
-      if (payroll)              absentDays = parseInt(payroll.absent_days, 10) || 0;
-      else if (hasOverride)     absentDays = Math.max(0, workingDaysInMonth - presentDays);
-      else if (noAttendanceData) absentDays = 0;
-      else                      absentDays = Math.max(0, elapsedWorkingDays - scannedDays);
+      if (payroll)          absentDays = parseInt(payroll.absent_days, 10) || 0;
+      else if (hasOverride) absentDays = Math.max(0, workingDaysInMonth - presentDays);
+      else                  absentDays = Math.max(0, elapsedSchoolDays - scannedDays);
 
       const dailyRate    = salary / 30;   // fixed 30-day month (Fridays included)
       const absenceDeduction = payroll
@@ -190,7 +187,7 @@ router.get('/', async (req, res) => {
         absent_days:         absentDays,
         has_attendance_override: hasOverride,
         working_days_month:  workingDaysInMonth,
-        elapsed_working_days: elapsedWorkingDays,
+        elapsed_working_days: elapsedSchoolDays,
         daily_rate:          Math.round(dailyRate),
         absence_deduction:   absenceDeduction,
         // Overtime

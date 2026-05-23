@@ -266,15 +266,17 @@ router.get('/staff-monthly', async (req, res) => {
       const key = `${p.person_type}-${p.id}`;
       const scannedDays = scanMap[key] || 0;
       const hasOverride = Object.prototype.hasOwnProperty.call(ovMap, key);
-      // Default rules (matches payroll):
-      //   • admin override saved   → use it
-      //   • some scan data exists  → use scan count
-      //   • NO scan data at all    → assume present every elapsed day
-      //     (the gate isn't being used for this person — don't penalize)
-      const presentDays = hasOverride
-        ? ovMap[key]
-        : (scannedDays === 0 ? elapsedWorkingDays : scannedDays);
-      const absentDays  = Math.max(0, workingDaysInMonth - presentDays);
+      // Gate scans are the source of truth (matches payroll):
+      //   • admin override saved → use it
+      //   • otherwise            → present_days = days actually scanned
+      // A school day (Fridays excluded) with no scan counts as absent.
+      const presentDays = hasOverride ? ovMap[key] : scannedDays;
+      // Absent against the whole month for overrides (admin's full-month
+      // figure), otherwise against elapsed school days so future days and
+      // Fridays aren't counted as absences.
+      const absentDays = hasOverride
+        ? Math.max(0, workingDaysInMonth - presentDays)
+        : Math.max(0, elapsedWorkingDays - scannedDays);
       return {
         id: p.id,
         person_type: p.person_type,
