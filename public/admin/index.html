@@ -1438,8 +1438,8 @@ button[style*="background:linear-gradient"]{
 
 </div>
 
-<!-- ── Financial cards (2 wide) ───────────────────────────── -->
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;">
+<!-- ── Financial cards (3 wide) ───────────────────────────── -->
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:20px;">
 
   <div class="stat-card" onclick="go('fees',ql('fees'))" style="cursor:pointer;padding:22px 24px;">
     <div class="accent-bar" style="background:linear-gradient(180deg,#5DCAA5,#3aaa85);"></div>
@@ -1464,6 +1464,20 @@ button[style*="background:linear-gradient"]{
         <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">
           <div class="stat-num small" id="dash-outstanding">0</div>
           <span style="font-size:12px;color:#6a7c93;font-weight:600;">AFN</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stat-card" onclick="go('scholarships',ql('scholarships'))" style="cursor:pointer;padding:22px 24px;">
+    <div class="accent-bar" style="background:linear-gradient(180deg,#5b9ef7,#3a7abf);"></div>
+    <div style="display:flex;align-items:center;gap:18px;">
+      <div class="stat-icon" style="width:54px;height:54px;border-radius:14px;background:linear-gradient(135deg,#5b9ef7,#3a7abf);box-shadow:0 6px 16px rgba(91,158,247,.30);font-size:22px;"><i class="fas fa-award"></i></div>
+      <div style="flex:1;min-width:0;">
+        <div class="stat-lbl" style="margin:0 0 4px 0;" data-i18n="dash_scholarship_awardees">Scholarship Awardees</div>
+        <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">
+          <div class="stat-num small" id="dash-scholarship">0</div>
+          <span style="font-size:12px;color:#6a7c93;font-weight:600;" data-i18n="dash_students_lbl">students</span>
         </div>
       </div>
     </div>
@@ -2687,6 +2701,9 @@ button[style*="background:linear-gradient"]{
     </button>
     <button onclick="printGovScholarshipReport()" style="display:flex;align-items:center;gap:8px;padding:9px 18px;background:linear-gradient(135deg,#1a4a5c,#0f2845);border:none;border-radius:var(--radius-sm);color:#fff;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 6px 18px rgba(26,74,92,.3);">
       <i class="fas fa-award"></i> <span data-i18n="btn_gov_report">Scholarship</span>
+    </button>
+    <button onclick="printAwardeesList()" style="display:flex;align-items:center;gap:8px;padding:9px 18px;background:linear-gradient(135deg,#22c571,#178f4f);border:none;border-radius:var(--radius-sm);color:#fff;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 6px 18px rgba(34,197,113,.3);">
+      <i class="fas fa-list-ol"></i> <span data-i18n="btn_awardees_list">Awardees List</span>
     </button>
   </div>
 </div>
@@ -4340,6 +4357,7 @@ const LANG = {
     dash_total_students:'Total Students', dash_teachers_staff:'Teachers & Staff',
     dash_attendance_rate:'Attendance Rate', dash_present_today:'Present Today',
     dash_fee_collected:'Fee Collected This Month', dash_outstanding_fees:'Outstanding Fees',
+    dash_scholarship_awardees:'Scholarship Awardees',
     sub_students:'Manage student profiles, photos and QR codes',
     sub_teachers:'Manage teacher profiles, salaries and QR codes',
     sub_staff:'Manage non-teaching staff profiles and salaries',
@@ -4584,6 +4602,7 @@ const LANG = {
     lbl_gov_office_name:'Government Office Name (on the report)',
     hint_gov_office_name:'The exact office the report is addressed to. Appears as “Submitted to: …” on the printed report.',
     btn_gov_report:'Scholarship',
+    btn_awardees_list:'Awardees List',
     msg_gov_count_missing:'Please set the student count in Settings → Financial Settings → Gov. Scholarship Report first.',
     msg_no_students:'No students found.',
     msg_sch_select:'Tick the students you want on the report first (the checkbox column).',
@@ -4761,6 +4780,7 @@ const LANG = {
     dash_total_students:'ټول زده کوونکي', dash_teachers_staff:'ښوونکي او کارکوونکي',
     dash_attendance_rate:'د حاضرۍ کچه', dash_present_today:'نن حاضر',
     dash_fee_collected:'د دې میاشتې فیس', dash_outstanding_fees:'باقي‌دار فیسونه',
+    dash_scholarship_awardees:'د بورس ترلاسه‌کوونکي',
     sub_students:'د زده کوونکو پروفایلونه اداره کړئ',
     sub_teachers:'د ښوونکو پروفایلونه او معاشات اداره کړئ',
     sub_staff:'غیر تدریسي کارکوونکي اداره کړئ',
@@ -5005,6 +5025,7 @@ const LANG = {
     lbl_gov_office_name:'د دولتي ادارې نوم (په راپور کې)',
     hint_gov_office_name:'هغه اداره چې راپور ورته لیږل کیږي. په چاپ شوي راپور کې د «وړاندې شوی: …» په توګه ښکاري.',
     btn_gov_report:'بورس',
+    btn_awardees_list:'د بورس لیست',
     msg_gov_count_missing:'مهرباني وکړئ لومړی په امستنو → مالي امستنې → دولتي بورس راپور کې د زده‌کوونکو شمیر وټاکئ.',
     msg_no_students:'هیڅ زده‌کوونکی ونه موندل شو.',
     msg_sch_select:'لومړی هغه زده‌کوونکي په نښه کړئ چې غواړئ په راپور کې وي (د چک‌بکس کالم).',
@@ -5675,6 +5696,13 @@ async function load() {
     document.getElementById('dash-rate').textContent = rate + '%';
     document.getElementById('dash-fee').textContent  = (d.fee_month ?? 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
     document.getElementById('dash-outstanding').textContent = (d.outstanding ?? 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
+
+    // Scholarship awardees — count comes from Settings (gov_scholarship_count)
+    try {
+      const cfg = await fetch('/api/settings').then(r => r.json());
+      const schN = parseInt(cfg.gov_scholarship_count) || 0;
+      document.getElementById('dash-scholarship').textContent = schN.toLocaleString('en-US');
+    } catch(_) { document.getElementById('dash-scholarship').textContent = '0'; }
 
     // Absent alert
     if ((d.absent ?? 0) > 0) {
@@ -7189,6 +7217,162 @@ async function printGovScholarshipReport() {
     w.document.close();
   } catch (e) {
     console.error('printGovScholarshipReport error:', e);
+    showAlert({ title: t('alert_title_error') || 'Error', message: e.message, type: 'error' });
+  }
+}
+
+// ── Awardees List — random N students for the authority ───────
+// N comes from Settings → gov_scholarship_count. Picks N students at
+// random from ALL active students and prints name / father / class.
+async function printAwardeesList() {
+  try {
+    const settings = await fetch('/api/settings').then(r => r.json()).catch(() => ({}));
+    const N = parseInt(settings.gov_scholarship_count) || 0;
+    if (N <= 0) {
+      showAlert({
+        title:   t('alert_title_missing') || 'Set the number first',
+        message: t('msg_gov_count_missing') || 'Please set the student count in Settings → Financial Settings → Gov. Scholarship Report first.',
+        type:    'warning',
+      });
+      return;
+    }
+
+    const [stu, cls] = await Promise.all([
+      fetch('/api/students').then(r => r.json()),
+      fetch('/api/classes').then(r => r.json()),
+    ]);
+    const clsMap = {};
+    (Array.isArray(cls) ? cls : []).forEach(c => {
+      clsMap[c.id] = ((c.grade_level || '') + (c.section ? ' ' + c.section : '')).trim() || c.name;
+    });
+
+    // Active students only, then shuffle (Fisher–Yates) and take N
+    const pool = (Array.isArray(stu) ? stu : []).filter(s => s.is_active !== false);
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    const picked = pool.slice(0, N);
+    if (!picked.length) {
+      showAlert({ title: t('alert_title_error') || 'Error', message: t('msg_no_students') || 'No students found.', type: 'error' });
+      return;
+    }
+
+    const schoolName  = window._cachedSchoolName  || document.getElementById('school-name')?.textContent || 'Taif High School';
+    const schoolAddr  = window._cachedSchoolAddr  || '';
+    const schoolPhone = window._cachedSchoolPhone || '';
+    const logoUrl     = window._cachedSchoolLogo  || '';
+    const todayShamsi = shamsiDariPD(new Date());
+    const govOffice   = (settings.gov_office_name || '').trim() || 'Directorate of Education';
+
+    const rows = picked.map((s, i) => `
+      <tr>
+        <td style="text-align:center;">${toPersianDigits(i + 1)}</td>
+        <td style="font-weight:700;">${(s.first_name || '') + ' ' + (s.last_name || '')}</td>
+        <td>${s.parent_name || '—'}</td>
+        <td style="direction:rtl;text-align:right;">${clsMap[s.class_id] || s.class_name || '—'}</td>
+        <td style="text-align:center;">${s.student_code || '—'}</td>
+      </tr>`).join('');
+
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Scholarship Awardees — ${schoolName}</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI','Noto Naskh Arabic',Tahoma,Arial,sans-serif;color:#1a2942;padding:32px 36px;}
+  .hdr{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:3px solid #1a4a5c;padding-bottom:16px;margin-bottom:8px;}
+  .hdr-left{display:flex;align-items:center;gap:14px;}
+  .logo{width:60px;height:60px;border-radius:10px;object-fit:cover;border:1px solid #cbd5e1;}
+  .logo-fallback{width:60px;height:60px;border-radius:10px;background:linear-gradient(135deg,#1a4a5c,#5DCAA5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:800;}
+  .school-name{font-size:22px;font-weight:800;color:#0f2845;}
+  .school-meta{font-size:11px;color:#64748b;margin-top:3px;}
+  .hdr-right{text-align:right;font-size:11px;color:#64748b;}
+  .hdr-right .date-fa{direction:rtl;font-weight:700;color:#0f2845;font-size:13px;}
+  .title-band{text-align:center;margin:18px 0 6px;}
+  .title-en{font-size:17px;font-weight:800;color:#1a4a5c;letter-spacing:.03em;text-transform:uppercase;}
+  .title-fa{font-size:16px;font-weight:700;color:#0f2845;direction:rtl;margin-top:3px;}
+  .subtitle{text-align:center;font-size:11.5px;color:#64748b;margin-bottom:18px;}
+  .meta-row{display:flex;justify-content:center;gap:36px;margin-bottom:16px;font-size:12.5px;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;padding:10px 18px;}
+  .meta-row strong{color:#0f2845;}
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  thead th{background:#1a4a5c;color:#fff;padding:9px 8px;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;}
+  thead th .fa{display:block;font-weight:600;font-size:10px;opacity:.85;direction:rtl;margin-top:1px;}
+  tbody td{padding:7px 8px;border-bottom:1px solid #e2e8f0;}
+  tbody tr:nth-child(even){background:#f8fafc;}
+  .declaration{margin-top:20px;font-size:11.5px;color:#475569;line-height:1.7;background:#f8fafc;border-left:4px solid #1a4a5c;padding:12px 16px;}
+  .declaration .fa{direction:rtl;display:block;margin-top:4px;}
+  .signature{display:grid;grid-template-columns:1fr 1fr;gap:80px;margin-top:54px;}
+  .signature div{text-align:center;border-top:1px solid #94a3b8;padding-top:8px;font-size:12px;color:#475569;font-weight:600;}
+  .footer{margin-top:30px;padding-top:12px;border-top:1px solid #cbd5e1;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;}
+  @media print { body{padding:18px;} .no-print{display:none;} }
+  .print-btn{position:fixed;top:14px;right:14px;padding:10px 16px;background:#1a4a5c;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;box-shadow:0 4px 10px rgba(0,0,0,.15);}
+</style></head><body>
+<button class="print-btn no-print" onclick="window.print()">🖨 Print / Save as PDF</button>
+
+<div class="hdr">
+  <div class="hdr-left">
+    ${logoUrl ? `<img src="${logoUrl}" class="logo" alt="">` : `<div class="logo-fallback">${(schoolName.match(/\b(\w)/g) || ['T']).slice(0,2).join('').toUpperCase()}</div>`}
+    <div>
+      <div class="school-name">${schoolName}</div>
+      <div class="school-meta">${schoolAddr || ''}${schoolAddr && schoolPhone ? ' · ' : ''}${schoolPhone || ''}</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <div>Date / نیټه</div>
+    <div class="date-fa">${todayShamsi}</div>
+  </div>
+</div>
+
+<div class="title-band">
+  <div class="title-en">Scholarship Awardees List</div>
+  <div class="title-fa">د بورس ترلاسه‌کوونکو زده‌کوونکو لیست</div>
+</div>
+<div class="subtitle">
+  Submitted to · وړاندې شوی: <strong>${govOffice}</strong>
+</div>
+
+<div class="meta-row">
+  <div><strong>School / ښوونځی:</strong> ${schoolName}</div>
+  <div><strong>Total Awardees / ټول ترلاسه‌کوونکي:</strong> ${toPersianDigits(picked.length)}</div>
+  <div><strong>Date / نیټه:</strong> ${todayShamsi}</div>
+</div>
+
+<table>
+  <thead><tr>
+    <th style="width:44px;">#<span class="fa">شمیره</span></th>
+    <th>Student Name<span class="fa">د زده‌کوونکي نوم</span></th>
+    <th>Father Name<span class="fa">د پلار نوم</span></th>
+    <th>Class<span class="fa">ټولګی</span></th>
+    <th style="width:130px;">Student Code<span class="fa">کوډ</span></th>
+  </tr></thead>
+  <tbody>${rows || '<tr><td colspan="5" style="text-align:center;padding:24px;color:#94a3b8;">No students found</td></tr>'}</tbody>
+</table>
+
+<div class="declaration">
+  This is to certify that the above-listed students are scholarship awardees at ${schoolName}.
+  <span class="fa">دا تصدیق کیږي چې پورته یاد شوي زده‌کوونکي د ${schoolName} د بورس ترلاسه‌کوونکي دي.</span>
+</div>
+
+<div class="signature">
+  <div>Principal / مدیر</div>
+  <div>Official Stamp / رسمي مهر</div>
+</div>
+
+<div class="footer">
+  <div>${schoolName} — Scholarship Awardees List · د بورس ترلاسه‌کوونکو لیست</div>
+  <div>${todayShamsi}</div>
+</div>
+
+</body></html>`;
+
+    const w = window.open('', '_blank');
+    if (!w) {
+      showAlert({ title: 'Pop-up blocked', message: 'Allow pop-ups to print the report.', type: 'warning' });
+      return;
+    }
+    w.document.write(html);
+    w.document.close();
+  } catch (e) {
+    console.error('printAwardeesList error:', e);
     showAlert({ title: t('alert_title_error') || 'Error', message: e.message, type: 'error' });
   }
 }
