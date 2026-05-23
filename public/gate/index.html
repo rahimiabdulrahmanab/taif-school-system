@@ -409,7 +409,9 @@ async function loadStats() {
   try {
     const [statsRes, scansRes] = await Promise.all([
       fetch('/api/dashboard/stats'),
-      fetch('/api/attendance?person_type=student'),
+      // No person_type filter → today's students, teachers AND staff all
+      // show in Recent Scans (renderRecent already styles each type).
+      fetch('/api/attendance'),
     ]);
     const stats  = await statsRes.json();
     const scans  = await scansRes.json();
