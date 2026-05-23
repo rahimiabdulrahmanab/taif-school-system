@@ -11521,8 +11521,11 @@ function recalcPayModal() {
 
   let absentDays = parseInt(document.getElementById('pr-pay-absent-days').value, 10);
   if (isNaN(absentDays) || absentDays < 0) absentDays = 0;
-  // Can't be absent more than the working days that have actually elapsed
-  const maxAbsent = p.elapsed_working_days || p.working_days_month || 0;
+  // The admin can manually set absent days up to the whole month's working
+  // days (e.g. paying at month end, or someone absent most of the month).
+  // Only the auto-prefill is based on elapsed days — the manual cap is the
+  // full month so a value like 5 isn't snapped back to the days elapsed.
+  const maxAbsent = p.working_days_month || 30;
   if (maxAbsent && absentDays > maxAbsent) {
     absentDays = maxAbsent;
     document.getElementById('pr-pay-absent-days').value = absentDays;
