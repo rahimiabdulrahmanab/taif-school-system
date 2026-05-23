@@ -7246,13 +7246,32 @@ async function printAwardeesList() {
       clsMap[c.id] = ((c.grade_level || '') + (c.section ? ' ' + c.section : '')).trim() || c.name;
     });
 
-    // Active students only, then shuffle (Fisher–Yates) and take N
-    const pool = (Array.isArray(stu) ? stu : []).filter(s => s.is_active !== false);
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [pool[i], pool[j]] = [pool[j], pool[i]];
+    // The report = every GENUINE scholarship student (those with a real
+    // discount) PLUS random other students used as padding, so the total
+    // matches the number set in Settings. Genuine ones are always included.
+    const shuffle = arr => {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    };
+    const isGenuine = s =>
+      s.discount_type && s.discount_type !== 'none' && parseFloat(s.discount_value) > 0;
+
+    const active  = (Array.isArray(stu) ? stu : []).filter(s => s.is_active !== false);
+    const genuine = active.filter(isGenuine);
+    const others  = active.filter(s => !isGenuine(s));
+
+    let picked;
+    if (genuine.length >= N) {
+      // More genuine recipients than the target — cap at N
+      picked = shuffle(genuine.slice()).slice(0, N);
+    } else {
+      // All genuine + random padding from the rest, then mix the order
+      const fill = shuffle(others.slice()).slice(0, N - genuine.length);
+      picked = shuffle(genuine.concat(fill));
     }
-    const picked = pool.slice(0, N);
     if (!picked.length) {
       showAlert({ title: t('alert_title_error') || 'Error', message: t('msg_no_students') || 'No students found.', type: 'error' });
       return;
