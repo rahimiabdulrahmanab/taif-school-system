@@ -3862,10 +3862,16 @@ button[style*="background:linear-gradient"]{
       <input id="set-default-fee" type="text" inputmode="numeric" placeholder="0" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" oninput="this.value=toWesternDigits(this.value).replace(/[^0-9]/g,'')">
     </div>
 
-    <div style="grid-column:1 / -1;">
+    <div>
       <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;" data-i18n="lbl_gov_scholarship_count">Gov. Scholarship Report — Number of Students</label>
       <input id="set-gov-scholarship-count" type="text" inputmode="numeric" placeholder="150" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" oninput="this.value=toWesternDigits(this.value).replace(/[^0-9]/g,'')">
       <div style="font-size:10.5px;color:var(--text-dim);margin-top:5px;line-height:1.5;" data-i18n="hint_gov_scholarship_count">How many students to list on the printable Government Scholarship Report (Scholarships page).</div>
+    </div>
+
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;" data-i18n="lbl_gov_scholarship_percent">Scholarship Percentage (optional)</label>
+      <input id="set-gov-scholarship-percent" type="text" inputmode="numeric" placeholder="e.g. 50" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" oninput="this.value=toWesternDigits(this.value).replace(/[^0-9]/g,'')">
+      <div style="font-size:10.5px;color:var(--text-dim);margin-top:5px;line-height:1.5;" data-i18n="hint_gov_scholarship_percent">Fixed scholarship % used for every student on the Awardees List. Leave empty to use a random percentage per student.</div>
     </div>
 
     <div style="grid-column:1 / -1;">
@@ -4599,6 +4605,8 @@ const LANG = {
     // ── Government scholarship report ──
     lbl_gov_scholarship_count:'Gov. Scholarship Report — Number of Students',
     hint_gov_scholarship_count:'How many students to list on the printable Government Scholarship Report (Scholarships page).',
+    lbl_gov_scholarship_percent:'Scholarship Percentage (optional)',
+    hint_gov_scholarship_percent:'Fixed scholarship % used for every student on the Awardees List. Leave empty to use a random percentage per student.',
     lbl_gov_office_name:'Government Office Name (on the report)',
     hint_gov_office_name:'The exact office the report is addressed to. Appears as “Submitted to: …” on the printed report.',
     btn_gov_report:'Scholarship',
@@ -5022,6 +5030,8 @@ const LANG = {
     // ── Government scholarship report (Pashto) ──
     lbl_gov_scholarship_count:'دولتي بورس راپور — د زده‌کوونکو شمیر',
     hint_gov_scholarship_count:'په چاپیدونکي دولتي بورس راپور کې د کومو زده‌کوونکو شمیر چې لیست شي (د بورسونو پاڼه).',
+    lbl_gov_scholarship_percent:'د بورس سلنه (اختیاري)',
+    hint_gov_scholarship_percent:'د بورس لیست کې د هر زده‌کوونکي لپاره ثابته سلنه. خالي یې پریږدئ ترڅو هر زده‌کوونکي ته تصادفي سلنه وکارول شي.',
     lbl_gov_office_name:'د دولتي ادارې نوم (په راپور کې)',
     hint_gov_office_name:'هغه اداره چې راپور ورته لیږل کیږي. په چاپ شوي راپور کې د «وړاندې شوی: …» په توګه ښکاري.',
     btn_gov_report:'بورس',
@@ -7284,14 +7294,16 @@ async function printAwardeesList() {
     const todayShamsi = shamsiDariPD(new Date());
     const govOffice   = (settings.gov_office_name || '').trim() || 'Directorate of Education';
 
-    // Each awardee gets a random scholarship percentage and the resulting
-    // monthly aid (fee × %). This is ONLY for the printed government report —
-    // it never touches fees, payroll or any stored financial data.
+    // Scholarship percentage per awardee → monthly aid (fee × %). If the
+    // office set a fixed percentage in Settings, every student uses that;
+    // otherwise each gets a random one. This is ONLY for the printed
+    // government report — it never touches fees, payroll or stored data.
     const PCT_TIERS  = [25, 30, 40, 50, 75, 100];
+    const fixedPct   = parseFloat(settings.gov_scholarship_percent) || 0;
     const defaultFee = parseFloat(settings.default_monthly_fee) || 0;
     let totalAid = 0;
     const rows = picked.map((s, i) => {
-      const pct = PCT_TIERS[Math.floor(Math.random() * PCT_TIERS.length)];
+      const pct = fixedPct > 0 ? fixedPct : PCT_TIERS[Math.floor(Math.random() * PCT_TIERS.length)];
       const fee = parseFloat(s.monthly_fee) || defaultFee;
       const aid = Math.round(fee * pct / 100);
       totalAid += aid;
@@ -10918,8 +10930,9 @@ async function loadSettingsPage() {
     setVal('set-currency',        s.currency           || '');
     setVal('set-currency-symbol', s.currency_symbol    || '');
     setVal('set-default-fee',     s.default_monthly_fee|| '');
-    setVal('set-gov-scholarship-count', s.gov_scholarship_count || '');
-    setVal('set-gov-office-name',       s.gov_office_name       || '');
+    setVal('set-gov-scholarship-count',   s.gov_scholarship_count   || '');
+    setVal('set-gov-scholarship-percent', s.gov_scholarship_percent || '');
+    setVal('set-gov-office-name',         s.gov_office_name         || '');
     setVal('set-install-year',          s.install_year          || '1405');
     setVal('set-install-month',         s.install_month         || '3');
 
@@ -10976,8 +10989,9 @@ async function saveSettings(section) {
     data.currency             = document.getElementById('set-currency').value.trim();
     data.currency_symbol      = document.getElementById('set-currency-symbol').value.trim();
     data.default_monthly_fee  = document.getElementById('set-default-fee').value;
-    data.gov_scholarship_count = document.getElementById('set-gov-scholarship-count').value;
-    data.gov_office_name       = document.getElementById('set-gov-office-name').value.trim();
+    data.gov_scholarship_count   = document.getElementById('set-gov-scholarship-count').value;
+    data.gov_scholarship_percent = document.getElementById('set-gov-scholarship-percent').value;
+    data.gov_office_name         = document.getElementById('set-gov-office-name').value.trim();
     data.install_year          = document.getElementById('set-install-year').value || '1405';
     data.install_month         = document.getElementById('set-install-month').value || '3';
   }
