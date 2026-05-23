@@ -638,8 +638,12 @@ router.get('/balances', async (req, res) => {
       const fee = effectiveFeeOf(s);
       const { startY, startM } = walkStart(s.enrolled_at);
 
-      let totalBalance = 0;
-      let unpaidMonths = 0;
+      // Running bank-account ledger: sum everything billed and everything
+      // paid across all expected months, then net them. This way ANY
+      // payment lowers the outstanding total (even an overpayment on one
+      // month or a payment on a pre-cutoff month becomes a credit against
+      // the rest), and every elapsed unpaid month raises it.
+      let monthsDue = 0, monthsPaid = 0, unpaidMonths = 0;
       let y = startY, m = startM;
       while (y < cur.year || (y === cur.year && m <= cur.month)) {
         const key = `${s.id}-${y}-${m}`;
@@ -647,15 +651,22 @@ router.get('/balances', async (req, res) => {
           const ov  = dueMap.get(key);
           const due = (ov !== undefined) ? ov : (atOrAfterCutoff(y, m) ? fee : 0);
           const pd  = paidMap.get(key) || 0;
-          const bal = Math.max(0, +(due - pd).toFixed(2));
-          if (bal > 0) { totalBalance += bal; unpaidMonths++; }
+          monthsDue  += due;
+          monthsPaid += pd;
+          if (+(due - pd).toFixed(2) > 0) unpaidMonths++;
         }
         m++; if (m > 12) { m = 1; y++; }
       }
 
-      // Total Due running balance contributes to total exposure
-      const totalDue = Math.max(0, +(s.previous_debt - (debtPaidMap.get(s.id) || 0)).toFixed(2));
-      totalBalance += totalDue;
+      // Opening / carry-forward debt and the payments made against it
+      const openingDue  = Math.max(0, parseFloat(s.previous_debt) || 0);
+      const openingPaid = debtPaidMap.get(s.id) || 0;
+
+      const totalBalance = Math.max(0,
+        +((monthsDue + openingDue) - (monthsPaid + openingPaid)).toFixed(2));
+
+      // Total Due (opening debt) remaining, for display
+      const totalDue = Math.max(0, +(openingDue - openingPaid).toFixed(2));
 
       const periodPaid = (periodYear && periodMonth)
         ? (paidMap.get(`${s.id}-${periodYear}-${periodMonth}`) || 0)
