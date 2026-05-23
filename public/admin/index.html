@@ -7284,14 +7284,28 @@ async function printAwardeesList() {
     const todayShamsi = shamsiDariPD(new Date());
     const govOffice   = (settings.gov_office_name || '').trim() || 'Directorate of Education';
 
-    const rows = picked.map((s, i) => `
+    // Each awardee gets a random scholarship percentage and the resulting
+    // monthly aid (fee × %). This is ONLY for the printed government report —
+    // it never touches fees, payroll or any stored financial data.
+    const PCT_TIERS  = [25, 30, 40, 50, 75, 100];
+    const defaultFee = parseFloat(settings.default_monthly_fee) || 0;
+    let totalAid = 0;
+    const rows = picked.map((s, i) => {
+      const pct = PCT_TIERS[Math.floor(Math.random() * PCT_TIERS.length)];
+      const fee = parseFloat(s.monthly_fee) || defaultFee;
+      const aid = Math.round(fee * pct / 100);
+      totalAid += aid;
+      return `
       <tr>
         <td style="text-align:center;">${toPersianDigits(i + 1)}</td>
         <td style="font-weight:700;">${(s.first_name || '') + ' ' + (s.last_name || '')}</td>
         <td>${s.parent_name || '—'}</td>
         <td style="direction:rtl;text-align:right;">${clsMap[s.class_id] || s.class_name || '—'}</td>
         <td style="text-align:center;">${s.student_code || '—'}</td>
-      </tr>`).join('');
+        <td style="text-align:center;font-weight:700;color:#1a4a5c;">${toPersianDigits(pct)}%</td>
+        <td style="text-align:center;font-family:'JetBrains Mono',monospace;">${toPersianDigits(aid.toLocaleString())} AFN</td>
+      </tr>`;
+    }).join('');
 
     const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Scholarship Awardees — ${schoolName}</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
@@ -7352,6 +7366,7 @@ async function printAwardeesList() {
 <div class="meta-row">
   <div><strong>School / ښوونځی:</strong> ${schoolName}</div>
   <div><strong>Total Awardees / ټول ترلاسه‌کوونکي:</strong> ${toPersianDigits(picked.length)}</div>
+  <div><strong>Total Aid / ټوله مرسته:</strong> ${toPersianDigits(totalAid.toLocaleString())} AFN</div>
   <div><strong>Date / نیټه:</strong> ${todayShamsi}</div>
 </div>
 
@@ -7361,9 +7376,16 @@ async function printAwardeesList() {
     <th>Student Name<span class="fa">د زده‌کوونکي نوم</span></th>
     <th>Father Name<span class="fa">د پلار نوم</span></th>
     <th>Class<span class="fa">ټولګی</span></th>
-    <th style="width:130px;">Student Code<span class="fa">کوډ</span></th>
+    <th style="width:120px;">Student Code<span class="fa">کوډ</span></th>
+    <th style="width:90px;">Scholarship<span class="fa">بورس</span></th>
+    <th style="width:120px;">Monthly Aid<span class="fa">میاشتنۍ مرسته</span></th>
   </tr></thead>
-  <tbody>${rows || '<tr><td colspan="5" style="text-align:center;padding:24px;color:#94a3b8;">No students found</td></tr>'}</tbody>
+  <tbody>${rows || '<tr><td colspan="7" style="text-align:center;padding:24px;color:#94a3b8;">No students found</td></tr>'}
+    <tr style="background:#1a4a5c;color:#fff;font-weight:800;">
+      <td colspan="6" style="text-align:right;padding:10px 10px;">Total Monthly Aid · ټوله میاشتنۍ مرسته</td>
+      <td style="text-align:center;padding:10px 8px;font-family:'JetBrains Mono',monospace;">${toPersianDigits(totalAid.toLocaleString())} AFN</td>
+    </tr>
+  </tbody>
 </table>
 
 <div class="declaration">
