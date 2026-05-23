@@ -11941,7 +11941,7 @@ function _amountInWords(amt) {
 function _receiptCss() {
   return `
     *{box-sizing:border-box;margin:0;padding:0;}
-    @page{size:A5;margin:8mm;}
+    @page{size:A4 portrait;margin:10mm;}
     body{font-family:'Inter','Segoe UI',Tahoma,Arial,sans-serif;padding:30px;color:#1a2942;background:#fff;font-size:12.5px;line-height:1.45;max-width:480px;margin:0 auto;-webkit-font-smoothing:antialiased;}
     .receipt{border:2px solid #0f2845;border-radius:16px;overflow:hidden;background:#fff;box-shadow:0 8px 24px rgba(20,40,80,.10);position:relative;}
     .receipt::before{content:'';position:absolute;top:0;left:0;right:0;height:6px;background:linear-gradient(90deg,#5DCAA5 0%,#3aaa85 50%,#0f2845 100%);}
@@ -11981,7 +11981,14 @@ function _receiptCss() {
     .footer{text-align:center;padding:10px 20px 14px;background:#f5f9fc;border-top:1px dashed #cbd5e1;font-size:10px;color:#6a7c93;}
     .footer strong{color:#0f2845;}
     .print-btn{position:fixed;top:14px;right:14px;padding:10px 16px;background:linear-gradient(135deg,#5DCAA5,#3aaa85);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;box-shadow:0 4px 10px rgba(0,0,0,.15);z-index:1000;}
-    @media print{body{padding:0;max-width:none;} .receipt{box-shadow:none;border-color:#cbd5e1;} .no-print{display:none;}}
+    @media print{
+      html,body{height:auto;}
+      body{padding:0;max-width:none;}
+      .receipt{box-shadow:none;border-color:#cbd5e1;page-break-inside:avoid;break-inside:avoid;}
+      .sig{page-break-inside:avoid;break-inside:avoid;}
+      table.bk tr{page-break-inside:avoid;break-inside:avoid;}
+      .no-print{display:none;}
+    }
   `;
 }
 
@@ -12140,9 +12147,16 @@ function printSalaryReceipt(person, overrides) {
     <tr><td style="color:#dc4f4c;">Less: Absence Deduction (${toPersianDigits(person.absent_days || 0)} days) · منفی: د غیرحاضرۍ کسر</td><td class="r" style="color:#dc4f4c;">− ${Math.round(person.absence_deduction).toLocaleString()} AFN</td></tr>
   ` : `<tr><td>Absence Deduction · د غیرحاضرۍ کسر</td><td class="r" style="color:#94a3b8;">— None · هیڅ</td></tr>`;
 
+  // Overtime (added on top of net payable). "fund" = amount paid for the hours.
+  const otHours  = Number(person.overtime_hours  || 0);
+  const otAmount = Number(person.overtime_amount || 0);
+  const overtimeBlock = (otAmount > 0 || otHours > 0) ? `
+    <tr><td style="color:#178f4f;">Add: Overtime · جمع: اضافه کاري (${toPersianDigits(otHours)} hrs · ساعته)</td><td class="r" style="color:#178f4f;">+ ${Math.round(otAmount).toLocaleString()} AFN</td></tr>
+  ` : `<tr><td>Overtime · اضافه کاري</td><td class="r" style="color:#94a3b8;">— None · هیڅ</td></tr>`;
+
   const netPayableVal = (typeof person.net_payable === 'number')
     ? person.net_payable
-    : Math.max(0, (person.salary || 0) - (person.tax_amount || 0) - (person.absence_deduction || 0));
+    : Math.max(0, (person.salary || 0) - (person.tax_amount || 0) - (person.absence_deduction || 0)) + otAmount;
 
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Salary Receipt — ${receiptNo}</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -12167,6 +12181,7 @@ function printSalaryReceipt(person, overrides) {
       <tr><td>Base Salary · بنسټیز معاش</td><td class="r">${Number(person.salary||0).toLocaleString()} AFN</td></tr>
       ${taxBlock}
       ${absenceBlock}
+      ${overtimeBlock}
       <tr><td style="font-weight:800;">Net Payable · د ورکړې وړ خالص</td><td class="r" style="font-weight:800;">${Math.round(netPayableVal).toLocaleString()} AFN</td></tr>
       ${advBlock}
       <tr class="total"><td>NET PAID · خالص ورکړل شوی</td><td class="r" style="color:#178f4f;">${Number(person.net_salary||0).toLocaleString()} AFN</td></tr>
