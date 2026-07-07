@@ -109,7 +109,7 @@ router.post('/', upload.single('photo'), async (req, res) => {
   try {
     const {
       first_name, last_name, date_of_birth, gender,
-      class_id, parent_name, parent_phone, address,
+      class_id, parent_name, parent_phone, parent_phone2, address,
       monthly_fee, discount_type, discount_value, discount_note,
       enrolled_at, previous_debt,
     } = req.body;
@@ -122,17 +122,17 @@ router.post('/', upload.single('photo'), async (req, res) => {
       INSERT INTO students (
         student_code, barcode, first_name, last_name,
         date_of_birth, gender, class_id,
-        parent_name, parent_phone, address,
+        parent_name, parent_phone, parent_phone2, address,
         photo, monthly_fee,
         discount_type, discount_value, discount_note,
         enrolled_at, previous_debt
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
-                COALESCE($16::date, CURRENT_DATE),$17)
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
+                COALESCE($17::date, CURRENT_DATE),$18)
       RETURNING *
     `, [
       student_code, barcode, first_name, last_name,
       date_of_birth || null, gender || null, class_id || null,
-      parent_name || null, parent_phone || null, address || null,
+      parent_name || null, parent_phone || null, parent_phone2 || null, address || null,
       photo,
       parseFloat(monthly_fee) || 0,
       discount_type || 'none',
@@ -156,7 +156,7 @@ router.put('/:id', upload.single('photo'), async (req, res) => {
   try {
     const {
       first_name, last_name, date_of_birth, gender,
-      class_id, parent_name, parent_phone, address,
+      class_id, parent_name, parent_phone, parent_phone2, address,
       monthly_fee, discount_type, discount_value, discount_note,
       is_active, enrolled_at, previous_debt,
     } = req.body;
@@ -180,20 +180,21 @@ router.put('/:id', upload.single('photo'), async (req, res) => {
         first_name     = $1,  last_name      = $2,
         date_of_birth  = $3,  gender         = $4,
         class_id       = $5,  parent_name    = $6,
-        parent_phone   = $7,  address        = $8,
-        photo          = $9,  monthly_fee    = $10,
-        discount_type  = $11, discount_value = $12,
-        discount_note  = $13, is_active      = $14,
-        enrolled_at    = COALESCE($15::date, enrolled_at),
-        previous_debt  = $16
-      WHERE id = $17
+        parent_phone   = $7,  parent_phone2  = $8,
+        address        = $9,  photo          = $10,
+        monthly_fee    = $11,
+        discount_type  = $12, discount_value = $13,
+        discount_note  = $14, is_active      = $15,
+        enrolled_at    = COALESCE($16::date, enrolled_at),
+        previous_debt  = $17
+      WHERE id = $18
       RETURNING *
     `, [
       first_name, last_name,
       date_of_birth || null, gender || null,
       class_id || null, parent_name || null,
-      parent_phone || null, address || null,
-      photo,
+      parent_phone || null, parent_phone2 || null,
+      address || null, photo,
       parseFloat(monthly_fee) || 0,
       discount_type || 'none',
       parseFloat(discount_value) || 0,

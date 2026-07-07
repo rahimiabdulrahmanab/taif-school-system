@@ -1754,14 +1754,17 @@ button[style*="background:linear-gradient"]{
         <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;" data-i18n="lbl_parent_name">Parent Name</label>
         <input id="sf-pname" type="text" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;transition:var(--transition);" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="Mohammad" data-ph="ph_parent_name">
       </div>
-      <!-- WhatsApp / Phone — AFG only -->
+      <!-- WhatsApp / Phone — accepts any international format so parents
+           who live abroad can be entered. Include the country code. -->
       <div>
         <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;" data-i18n="lbl_whatsapp_num">WhatsApp Number</label>
-        <div dir="ltr" style="display:flex;align-items:center;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);overflow:hidden;">
-          <span style="padding:10px 12px;background:rgba(93,202,165,.18);color:var(--accent);font-family:var(--font-mono);font-size:13px;font-weight:800;letter-spacing:.02em;user-select:none;white-space:nowrap;">+93 (0)</span>
-          <input id="sf-pphone-vis" type="tel" inputmode="numeric" maxlength="9" placeholder="xxxxxxxxx" oninput="syncAfgPhone(this)" style="flex:1;padding:10px 13px;background:transparent;border:none;color:var(--text);font-family:var(--font-mono);font-size:14px;font-weight:600;outline:none;letter-spacing:.05em;">
-        </div>
-        <input type="hidden" id="sf-pphone">
+        <input id="sf-pphone" type="tel" dir="ltr" placeholder="+93 700 000 000" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:13px;font-weight:600;outline:none;letter-spacing:.02em;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+        <div style="font-size:10.5px;color:var(--text-dim);margin-top:5px;" data-i18n="hint_whatsapp_intl">Include the country code, e.g. +93 for Afghanistan or +1 for USA.</div>
+      </div>
+
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;" data-i18n="lbl_whatsapp_num_2">WhatsApp Number 2 (optional)</label>
+        <input id="sf-pphone2" type="tel" dir="ltr" placeholder="+1 555 555 5555" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:13px;font-weight:600;outline:none;letter-spacing:.02em;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
       </div>
 
       <!-- Address -->
@@ -4461,6 +4464,8 @@ const LANG = {
     lbl_dob:'Date of Birth', lbl_gender:'Gender',
     lbl_class_sel:'Class', lbl_parent_info:'Parent Info',
     lbl_parent_name:'Parent Name', lbl_whatsapp_num:'WhatsApp Number',
+    lbl_whatsapp_num_2:'WhatsApp Number 2 (optional)',
+    hint_whatsapp_intl:'Include the country code, e.g. +93 for Afghanistan or +1 for USA.',
     lbl_address:'Address', lbl_fee_discount:'Fee & Discount',
     lbl_monthly_fee_afn:'Monthly Fee (AFN)',
     lbl_enrollment_date:'Enrollment Date (Shamsi)',
@@ -4886,6 +4891,8 @@ const LANG = {
     lbl_dob:'د زیږون نېټه', lbl_gender:'جنسیت',
     lbl_class_sel:'ټولګی', lbl_parent_info:'د والدینو معلومات',
     lbl_parent_name:'د والدینو نوم', lbl_whatsapp_num:'واټساپ شمېره',
+    lbl_whatsapp_num_2:'دوهمه واټساپ شمېره (اختیاري)',
+    hint_whatsapp_intl:'د هیواد کوډ شامل کړئ، د بېلګې په توګه د افغانستان لپاره +93 یا د امریکا لپاره +1.',
     lbl_address:'پته', lbl_fee_discount:'فیس او تخفیف',
     lbl_monthly_fee_afn:'میاشتنی فیس (افغاني)',
     lbl_enrollment_date:'د شاملیدو نیټه (لمریز)',
@@ -5763,7 +5770,7 @@ async function load() {
             <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.first_name} ${s.last_name}</div>
             <div style="font-size:11px;color:var(--text-dim);">${s.class_name || '—'}</div>
           </div>
-          ${s.parent_phone ? `<a href="https://wa.me/${s.parent_phone.replace(/\D/g,'')}" target="_blank" style="color:#25D366;font-size:14px;flex-shrink:0;"><i class="fab fa-whatsapp"></i></a>` : ''}
+          ${(s.parent_phone || s.parent_phone2) ? `<a href="https://wa.me/${(s.parent_phone || s.parent_phone2).replace(/\D/g,'')}" target="_blank" style="color:#25D366;font-size:14px;flex-shrink:0;"><i class="fab fa-whatsapp"></i></a>` : ''}
         </div>`;
       }).join('');
       if (absent.length > 8) {
@@ -5952,7 +5959,7 @@ function filterStudents() {
   const q   = document.getElementById('stu-search').value.toLowerCase();
   const cls = document.getElementById('stu-class-filter').value;
   let list  = allStudents;
-  if (q)   list = list.filter(s => (s.first_name+' '+s.last_name+s.student_code+s.parent_phone).toLowerCase().includes(q));
+  if (q)   list = list.filter(s => (s.first_name+' '+s.last_name+' '+s.student_code+' '+(s.parent_phone||'')+' '+(s.parent_phone2||'')).toLowerCase().includes(q));
   if (cls) list = list.filter(s => String(s.class_id) === cls);
   renderStudents(list);
 }
@@ -5997,7 +6004,16 @@ function renderStudents(list) {
       discHtml = `<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(91,158,247,.12);color:#1a4fa0;border:1px solid rgba(91,158,247,.3);padding:3px 10px;border-radius:14px;font-size:11.5px;font-weight:700;"><span style="width:5px;height:5px;border-radius:50%;background:#5b9ef7;"></span>${s.discount_value}%</span>`;
     }
 
-    const phoneVis = s.parent_phone ? s.parent_phone.replace(/^\+93/, '+93 (0) ') : '—';
+    // Build phone cell — show both parent phones with WhatsApp links.
+    // Phones are stored free-form (international), so display them as-is.
+    const _waLink = p =>
+      `<a href="https://wa.me/${p.replace(/\D/g,'')}" target="_blank" title="WhatsApp" style="color:#25D366;font-size:14px;flex-shrink:0;"><i class="fab fa-whatsapp"></i></a>`;
+    const _phoneRow = p =>
+      `<div style="display:flex;align-items:center;gap:6px;"><span style="font-family:var(--font-mono);font-size:12px;color:#334155;direction:ltr;">${p}</span>${_waLink(p)}</div>`;
+    const phones = [s.parent_phone, s.parent_phone2].filter(Boolean);
+    const phoneVis = phones.length
+      ? `<div style="display:flex;flex-direction:column;gap:2px;">${phones.map(_phoneRow).join('')}</div>`
+      : '<span style="color:#94a3b8;font-size:11.5px;">—</span>';
 
     return `<tr>
       <td><div class="pc" style="display:flex;align-items:center;gap:11px;">${photoHtml}<div style="min-width:0;">
@@ -6008,7 +6024,7 @@ function renderStudents(list) {
       <td>${s.class_name
             ? `<span style="display:inline-block;background:rgba(20,140,110,.10);color:#0d7055;border:1px solid rgba(20,140,110,.22);padding:3px 11px;border-radius:14px;font-size:11.5px;font-weight:700;direction:rtl;">${s.class_name}</span>`
             : '<span style="color:#94a3b8;font-size:11.5px;">—</span>'}</td>
-      <td><span style="font-family:var(--font-mono);font-size:12px;color:#334155;direction:ltr;display:inline-block;">${phoneVis}</span></td>
+      <td>${phoneVis}</td>
       <td><span style="font-family:var(--font-mono);font-size:12.5px;font-weight:700;color:#0f2845;">${Number(s.monthly_fee).toLocaleString()}</span> <span style="font-size:10px;color:#94a3b8;font-weight:600;">AFN</span></td>
       <td>${discHtml}</td>
       <td style="text-align:center;">
@@ -6036,7 +6052,8 @@ function openStudentForm(id) {
     document.getElementById('sf-gender').value = s.gender     || '';
     document.getElementById('sf-class').value  = s.class_id   || '';
     document.getElementById('sf-pname').value  = s.parent_name || '';
-    loadPhoneForEdit(s.parent_phone || '');
+    document.getElementById('sf-pphone').value  = s.parent_phone  || '';
+    document.getElementById('sf-pphone2').value = s.parent_phone2 || '';
     document.getElementById('sf-addr').value   = s.address    || '';
     document.getElementById('sf-fee').value    = s.monthly_fee || 0;
     document.getElementById('sf-dtype').value  = s.discount_type || 'none';
@@ -6085,7 +6102,8 @@ function clearStudentForm() {
   document.getElementById('stu-photo-preview').innerHTML = '<i class="fas fa-user"></i>';
   capturedBlob = null;
   toggleDiscount();
-  setAfgPhone('sf-pphone', '');
+  document.getElementById('sf-pphone').value  = '';
+  document.getElementById('sf-pphone2').value = '';
 }
 
 // ── Phone number helpers ───────────────────────────────────────
@@ -6164,7 +6182,8 @@ async function saveStudent() {
   fd.append('gender',         document.getElementById('sf-gender').value);
   fd.append('class_id',       document.getElementById('sf-class').value);
   fd.append('parent_name',    document.getElementById('sf-pname').value);
-  fd.append('parent_phone',   document.getElementById('sf-pphone').value);
+  fd.append('parent_phone',   document.getElementById('sf-pphone').value.trim());
+  fd.append('parent_phone2',  document.getElementById('sf-pphone2').value.trim());
   fd.append('address',        document.getElementById('sf-addr').value);
   fd.append('monthly_fee',    document.getElementById('sf-fee').value || 0);
   fd.append('discount_type',  document.getElementById('sf-dtype').value);
