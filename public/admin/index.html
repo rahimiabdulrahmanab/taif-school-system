@@ -4013,6 +4013,21 @@ button[style*="background:linear-gradient"]{
       </div>
     </div>
 
+    <!-- Data health & reconciliation -->
+    <div style="padding:18px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+        <div style="width:38px;height:38px;border-radius:10px;background:rgba(91,158,247,.12);display:flex;align-items:center;justify-content:center;font-size:16px;color:#5b9ef7;flex-shrink:0;"><i class="fas fa-heart-pulse"></i></div>
+        <div>
+          <div style="font-family:var(--font-head);font-size:14px;font-weight:700;color:var(--text);" data-i18n="ttl_data_health">Data Health & Reconciliation</div>
+          <div style="font-size:12px;color:var(--text-dim);" data-i18n="desc_data_health">Live check straight from the database: row counts, financial totals and integrity tests — proof that what the browser shows is what is really stored.</div>
+        </div>
+      </div>
+      <button id="dh-run-btn" onclick="runDataHealth()" style="padding:9px 20px;background:linear-gradient(135deg,#5b9ef7,#3a7abf);border:none;border-radius:20px;color:#fff;font-family:var(--font-head);font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:7px;">
+        <i class="fas fa-stethoscope"></i> <span data-i18n="btn_run_health">Run Health Check</span>
+      </button>
+      <div id="dh-results" style="display:none;margin-top:16px;"></div>
+    </div>
+
     <!-- Danger zone -->
     <div style="padding:18px;background:rgba(255,77,79,.06);border:1px solid rgba(255,77,79,.25);border-radius:var(--radius-sm);">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
@@ -4346,6 +4361,7 @@ const LANG = {
     sch_recipients_list:'Scholarship Recipients',
     sch_th_no:'#', sch_th_student:'Student Name', sch_th_father:'Father Name', sch_th_class:'Class',
     sch_th_fee:'Monthly Fee', sch_th_discount:'Discount', sch_th_after:'After Discount', sch_th_note:'Note',
+    cls_monthly_billing:'Monthly Billing',
     sch_empty:'No students with scholarships or discounts yet.',
     btn_print_list:'Print List',
     nav_fees:'Fee Collection', nav_payroll:'Payroll', nav_expenses:'Office Expenses',
@@ -4698,6 +4714,9 @@ const LANG = {
     btn_update_password:'Update Password',
     // Data Management
     ttl_data_mgmt:'Data Management', sub_data_mgmt:'Backup your data or wipe the database',
+    ttl_data_health:'Data Health & Reconciliation',
+    desc_data_health:'Live check straight from the database: row counts, financial totals and integrity tests — proof that what the browser shows is what is really stored.',
+    btn_run_health:'Run Health Check',
     ttl_backup:'Backup Data', desc_backup:'Download all school data as an Excel workbook or JSON file for safe storage.',
     btn_backup_excel:'Download Excel', btn_backup_json:'Download JSON',
     ttl_danger_zone:'Danger Zone', desc_wipe:'Permanently delete ALL students, teachers, staff, classes, attendance, fees, marks, payroll and expenses. Admin users and settings are kept.',
@@ -4773,6 +4792,7 @@ const LANG = {
     sch_recipients_list:'د بورس ترلاسه‌کوونکي',
     sch_th_no:'#', sch_th_student:'د زده‌کوونکي نوم', sch_th_father:'د پلار نوم', sch_th_class:'ټولګی',
     sch_th_fee:'میاشتنۍ فیس', sch_th_discount:'تخفیف', sch_th_after:'د تخفیف وروسته', sch_th_note:'یادښت',
+    cls_monthly_billing:'ټول میاشتنی فیس',
     sch_empty:'لا هیڅ زده‌کوونکی د بورس یا تخفیف ترلاسه‌کوونکی نه دی.',
     btn_print_list:'د لیست چاپ',
     nav_fees:'د فیس راټولول', nav_payroll:'معاشونه', nav_expenses:'اداري لګښتونه',
@@ -5125,6 +5145,9 @@ const LANG = {
     btn_update_password:'پاسورډ تازه کول',
     // Data Management
     ttl_data_mgmt:'د معلوماتو مدیریت', sub_data_mgmt:'خپل معلومات بیک اپ کړئ یا ډیټابیس پاک کړئ',
+    ttl_data_health:'د معلوماتو روغتیا او پرتله کول',
+    desc_data_health:'مستقیم له ډیټابیس څخه ژوندۍ کتنه: د ریکارډونو شمیر، مالي مجموعې او د کره‌والي ازموینې — ثبوت چې په براوزر کې ښودل شوي هغه څه دي چې په ریښتیا زیرمه شوي.',
+    btn_run_health:'روغتیایي کتنه پیل کړئ',
     ttl_backup:'معلومات بیک اپ کړئ', desc_backup:'د ښوونځي ټول معلومات د Excel یا JSON فایل په توګه ډاونلوډ کړئ.',
     btn_backup_excel:'Excel ډاونلوډ کړئ', btn_backup_json:'JSON ډاونلوډ کړئ',
     ttl_danger_zone:'د خطر سیمه', desc_wipe:'ټول زده کوونکي، ښوونکي، کارکوونکي، ټولګي، حاضري، فیسونه، نمرې، معاشونه او لګښتونه د تل لپاره ړنګیږي. د مدیر کاروونکي او امستنې ساتل کیږي.',
@@ -7831,7 +7854,7 @@ async function refreshDrawer(classId) {
     stats.style.display = 'flex';
     stats.innerHTML =
       chip('fa-users', '#5b9ef7', t('dash_students_lbl') || 'students', enrolled.length) +
-      chip('fa-money-bill-wave', '#178f4f', (t('sch_th_fee') || 'Monthly Fee') + ' / ' + (t('lbl_month_singular') || 'month'), Math.round(clsBilling).toLocaleString() + ' AFN') +
+      chip('fa-money-bill-wave', '#178f4f', t('cls_monthly_billing') || 'Monthly Billing', Math.round(clsBilling).toLocaleString() + ' AFN') +
       chip('fa-exclamation-circle', clsOutstanding > 0 ? '#dc4f4c' : '#178f4f', t('th_outstanding') || 'Outstanding', Math.round(clsOutstanding).toLocaleString() + ' AFN');
 
     // Students list — table-style with fee insight per student
@@ -11153,6 +11176,91 @@ async function uploadLogo(input) {
     showAlert({ title: t('alert_title_saved'), message: t('msg_saved_ok'), type: 'success' });
   } catch(e) {
     showAlert({ title: t('alert_title_failed'), message: e.message, type: 'error' });
+  }
+}
+
+// ── Data Health & Reconciliation ─────────────────────────────
+// Fetches /api/backup/health (computed live from the DB) and renders
+// row counts, financial totals and integrity checks so the office can
+// verify the browser matches the database.
+async function runDataHealth() {
+  const btn  = document.getElementById('dh-run-btn');
+  const host = document.getElementById('dh-results');
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ...`;
+  try {
+    const r = await fetch('/api/backup/health');
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Health check failed');
+
+    const esc = v => String(v == null ? '—' : v).replace(/</g,'&lt;');
+    const afn = v => (v == null ? '—' : Math.round(v).toLocaleString() + ' AFN');
+    const dbTime = new Date(d.db_time);
+
+    const banner = d.healthy
+      ? `<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:rgba(34,197,113,.10);border:1px solid rgba(34,197,113,.3);border-radius:10px;margin-bottom:14px;">
+           <i class="fas fa-check-circle" style="color:#178f4f;font-size:18px;"></i>
+           <div>
+             <div style="font-family:var(--font-head);font-weight:800;font-size:13px;color:#178f4f;">All integrity checks passed · ټول ازموینې بریالۍ وې</div>
+             <div style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);">Database time: ${dbTime.toLocaleString()}</div>
+           </div>
+         </div>`
+      : `<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:rgba(220,79,76,.10);border:1px solid rgba(220,79,76,.3);border-radius:10px;margin-bottom:14px;">
+           <i class="fas fa-triangle-exclamation" style="color:#dc4f4c;font-size:18px;"></i>
+           <div style="font-family:var(--font-head);font-weight:800;font-size:13px;color:#dc4f4c;">Some checks found problems — see below · ځینې ستونزې وموندل شوې</div>
+         </div>`;
+
+    const countRows = Object.entries(d.counts).map(([tbl, n]) => `
+      <div style="display:flex;justify-content:space-between;padding:5px 10px;background:rgba(255,255,255,.55);border:1px solid var(--glass-border);border-radius:7px;">
+        <span style="font-size:11px;color:var(--text-mid);font-family:var(--font-mono);">${esc(tbl)}</span>
+        <span style="font-size:12px;font-weight:800;font-family:var(--font-mono);color:var(--text);">${n == null ? '—' : Number(n).toLocaleString()}</span>
+      </div>`).join('');
+
+    const T = d.totals || {};
+    const totalRow = (label, val) => `
+      <div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px dotted var(--glass-border);font-size:12px;">
+        <span style="color:var(--text-mid);">${label}</span>
+        <span style="font-family:var(--font-mono);font-weight:800;color:var(--text);">${val}</span>
+      </div>`;
+    const totalsHtml =
+      totalRow('Fees collected — all time · ټول راټول شوي فیسونه', afn(T.fees_collected_all_time)) +
+      totalRow(`Fees collected — this month (${esc(T.shamsi_today)}) · د دې میاشتې فیسونه`, afn(T.fees_collected_this_month)) +
+      totalRow('Opening debts billed · پخواني پورونه', afn(T.opening_debt_billed)) +
+      totalRow('Opening debts paid · تادیه شوي پخواني پورونه', afn(T.opening_debt_paid)) +
+      totalRow('Salaries paid this month · د دې میاشتې معاشونه', afn(T.salaries_paid_this_month)) +
+      totalRow('Office expenses — all time · ټول دفتري لګښتونه', afn(T.expenses_all_time)) +
+      totalRow('External income — all time · ټول بهرني عواید', afn(T.external_income_all_time));
+
+    const CHECK_LABELS = {
+      payments_pointing_to_missing_student:  'Payments linked to a deleted student',
+      payments_with_null_or_negative_amount: 'Payments with empty / negative amount',
+      duplicate_attendance_same_day:         'Duplicate attendance on the same day',
+      duplicate_salary_payment_same_month:   'Salary paid twice for one month',
+      students_with_negative_debt:           'Students with negative debt',
+      attendance_pointing_to_missing_person: 'Attendance for a deleted person',
+      advances_pointing_to_missing_person:   'Advances for a deleted person',
+    };
+    const checksHtml = (d.checks || []).map(c => `
+      <div style="display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px dotted var(--glass-border);">
+        <i class="fas fa-${c.ok ? 'check-circle' : 'times-circle'}" style="color:${c.ok ? '#178f4f' : '#dc4f4c'};font-size:13px;"></i>
+        <span style="flex:1;font-size:12px;color:var(--text-mid);">${esc(CHECK_LABELS[c.name] || c.name)}</span>
+        <span style="font-family:var(--font-mono);font-size:11.5px;font-weight:800;color:${c.ok ? '#178f4f' : '#dc4f4c'};">${c.ok ? 'OK' : (c.bad_rows == null ? 'ERROR' : c.bad_rows + ' rows')}</span>
+      </div>`).join('');
+
+    host.innerHTML = banner + `
+      <div style="font-size:11px;font-weight:800;color:var(--text-dim);text-transform:uppercase;letter-spacing:.07em;font-family:var(--font-head);margin:8px 0 8px;">Records in database · په ډیټابیس کې ریکارډونه</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:7px;">${countRows}</div>
+      <div style="font-size:11px;font-weight:800;color:var(--text-dim);text-transform:uppercase;letter-spacing:.07em;font-family:var(--font-head);margin:16px 0 4px;">Financial totals · مالي مجموعې</div>
+      ${totalsHtml}
+      <div style="font-size:11px;font-weight:800;color:var(--text-dim);text-transform:uppercase;letter-spacing:.07em;font-family:var(--font-head);margin:16px 0 4px;">Integrity checks · د کره‌والي ازموینې</div>
+      ${checksHtml}`;
+    host.style.display = 'block';
+  } catch (e) {
+    showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' });
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = orig;
   }
 }
 
