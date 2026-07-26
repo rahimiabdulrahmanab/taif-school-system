@@ -5748,7 +5748,7 @@ async function load() {
       tb.innerHTML = '<tr><td colspan="3"><div class="empty"><i class="fas fa-qrcode"></i><p>' + t('dash_no_scans') + '</p></div></td></tr>';
     } else {
       tb.innerHTML = sc.map(s => {
-        const ini = ((s.first_name||'?')[0] + (s.last_name||'')[0]).toUpperCase();
+        const ini = ((s.first_name||'?')[0] + ((s.last_name||'')[0]||'')).toUpperCase();
         const typ = s.person_type === 'teacher' ? `<span class="badge bg-b">${t('nav_teachers')}</span>`
                   : s.person_type === 'staff'   ? `<span class="badge bg-o">${t('nav_staff')}</span>`
                   : `<span class="badge bg-t">${t('th_student')}</span>`;
@@ -5773,7 +5773,7 @@ async function load() {
       al.innerHTML = '<div class="empty" style="padding:24px 0;"><i class="fas fa-check-circle" style="color:#48d085;opacity:1;"></i><p>' + t('dash_all_present') + '</p></div>';
     } else {
       al.innerHTML = absent.slice(0, 8).map(s => {
-        const ini = ((s.first_name||'?')[0] + (s.last_name||'')[0]).toUpperCase();
+        const ini = ((s.first_name||'?')[0] + ((s.last_name||'')[0]||'')).toUpperCase();
         return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--glass-border);">
           <div style="width:32px;height:32px;border-radius:50%;background:rgba(255,120,100,.12);border:1.5px solid rgba(255,120,100,.2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#ff7875;font-family:var(--font-head);flex-shrink:0;">${ini}</div>
           <div style="flex:1;min-width:0;">
@@ -8366,7 +8366,7 @@ async function loadStaffMonthly() {
     }
 
     tbody.innerHTML = data.rows.map(r => {
-      const ini = ((r.first_name||'?')[0] + (r.last_name||'')[0]).toUpperCase();
+      const ini = ((r.first_name||'?')[0] + ((r.last_name||'')[0]||'')).toUpperCase();
       const typeChip = r.person_type === 'teacher'
         ? '<span style="display:inline-block;background:rgba(91,158,247,.12);color:#1a4fa0;border:1px solid rgba(91,158,247,.25);padding:2px 9px;border-radius:14px;font-size:10.5px;font-weight:700;font-family:var(--font-head);">Teacher</span>'
         : '<span style="display:inline-block;background:rgba(255,170,61,.12);color:#8b5a0e;border:1px solid rgba(255,170,61,.25);padding:2px 9px;border-radius:14px;font-size:10.5px;font-weight:700;font-family:var(--font-head);">Staff</span>';
@@ -8478,7 +8478,7 @@ async function loadAttendance() {
       ptb.innerHTML = '<tr><td colspan="4"><div class="empty" style="padding:60px 20px;"><i class="fas fa-clipboard-check"></i><p>' + t('lbl_no_att_records') + '</p></div></td></tr>';
     } else {
       ptb.innerHTML = present.map(s => {
-        const ini    = ((s.first_name||'?')[0] + (s.last_name||'')[0]).toUpperCase();
+        const ini    = ((s.first_name||'?')[0] + ((s.last_name||'')[0]||'')).toUpperCase();
         const folder = s.person_type === 'teacher' ? 'teachers' : s.person_type === 'staff' ? 'staff' : 'students';
         const avatarGrad = s.person_type === 'teacher' ? 'linear-gradient(135deg,#5b9ef7,#3a7abf)'
                         : s.person_type === 'staff'   ? 'linear-gradient(135deg,#ffaa3d,#d97706)'
@@ -8526,7 +8526,7 @@ async function loadAttendance() {
       atb.innerHTML = `<tr><td colspan="${cols}"><div class="empty" style="padding:60px 20px;"><i class="fas fa-check-circle" style="color:#48d085 !important;opacity:1;"></i><p style="color:#178f4f !important;font-weight:700;">${allPresent}</p></div></td></tr>`;
     } else {
       atb.innerHTML = absent.map(s => {
-        const ini    = ((s.first_name||'?')[0] + (s.last_name||'')[0]).toUpperCase();
+        const ini    = ((s.first_name||'?')[0] + ((s.last_name||'')[0]||'')).toUpperCase();
         const folder = isTeacher ? 'teachers' : isStaff ? 'staff' : 'students';
         const photoHtml = s.photo
           ? `<img src="/uploads/${folder}/${s.photo}" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid #fff;box-shadow:0 2px 8px rgba(220,38,38,.20);">`
@@ -11220,7 +11220,7 @@ async function loadPayroll() {
 }
 
 function renderPayrollRow(p, idx) {
-  const ini = ((p.first_name||'?')[0] + (p.last_name||'')[0]).toUpperCase();
+  const ini = ((p.first_name||'?')[0] + ((p.last_name||'')[0]||'')).toUpperCase();
   const typeChip = p.person_type === 'teacher'
     ? '<span style="display:inline-block;background:rgba(91,158,247,.12);color:#1a4fa0;border:1px solid rgba(91,158,247,.25);padding:2px 9px;border-radius:14px;font-size:10.5px;font-weight:700;font-family:var(--font-head);">Teacher</span>'
     : '<span style="display:inline-block;background:rgba(255,170,61,.12);color:#8b5a0e;border:1px solid rgba(255,170,61,.25);padding:2px 9px;border-radius:14px;font-size:10.5px;font-weight:700;font-family:var(--font-head);">Staff</span>';
@@ -11725,7 +11725,7 @@ function openPayConfirmModal(idx) {
   document.getElementById('pr-pay-idx').value = idx;
   document.getElementById('pr-pay-name').textContent = p.first_name + ' ' + p.last_name;
   document.getElementById('pr-pay-meta').textContent = (p.code || '—') + ' · ' + (p.person_type === 'teacher' ? 'Teacher' : 'Staff');
-  document.getElementById('pr-pay-avatar').textContent = ((p.first_name||'?')[0] + (p.last_name||'')[0]).toUpperCase();
+  document.getElementById('pr-pay-avatar').textContent = ((p.first_name||'?')[0] + ((p.last_name||'')[0]||'')).toUpperCase();
   document.getElementById('pr-pay-base').textContent  = (p.salary || 0).toLocaleString() + ' AFN';
 
   // Advances list

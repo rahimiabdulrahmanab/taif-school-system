@@ -440,7 +440,7 @@ function renderRecent() {
     return;
   }
   list.innerHTML = recentScans.map(s => {
-    const ini  = esc(((s.first_name||'?')[0] + (s.last_name||'')[0]).toUpperCase());
+    const ini  = esc(((s.first_name||'?')[0] + ((s.last_name||'')[0]||'')).toUpperCase());
     const time = Shamsi.shamsiTime(s.scan_time);
     const photoHtml = s.photo
       ? `<img src="/uploads/${s.person_type === 'student' ? 'students' : s.person_type === 'teacher' ? 'teachers' : 'staff'}/${esc(s.photo)}" style="width:100%;height:100%;object-fit:cover;">`
@@ -521,7 +521,7 @@ function showPerson(data) {
   document.getElementById('person-card').style.animation = 'card-in .4s cubic-bezier(.4,0,.2,1)';
 
   // Fill data
-  const ini = ((data.first_name||'?')[0] + (data.last_name||'')[0]).toUpperCase();
+  const ini = ((data.first_name||'?')[0] + ((data.last_name||'')[0]||'')).toUpperCase();
   document.getElementById('person-name').textContent  = data.first_name + ' ' + data.last_name;
   document.getElementById('person-class').textContent = data.class_name || '—';
   document.getElementById('person-code').textContent  = data.person_code || '';
