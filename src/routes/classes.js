@@ -50,7 +50,9 @@ router.get('/:id', async (req, res) => {
     if (!cls.rows.length) return res.status(404).json({ error: 'Not found' });
 
     const students = await pool.query(
-      `SELECT id, first_name, last_name, student_code, photo
+      `SELECT id, first_name, last_name, student_code, photo,
+              monthly_fee, discount_type, discount_value,
+              COALESCE(previous_debt, 0) AS previous_debt
        FROM students WHERE class_id = $1 ORDER BY first_name, last_name`,
       [req.params.id]
     );
