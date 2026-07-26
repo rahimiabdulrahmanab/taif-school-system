@@ -425,6 +425,14 @@ async function loadStats() {
   } catch(e) { console.error('loadStats error:', e); }
 }
 
+// Escape user-entered text before splicing into HTML — this page is public,
+// so a name containing markup must render as text, never execute.
+function esc(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function renderRecent() {
   const list = document.getElementById('recent-list');
   if (!recentScans.length) {
@@ -432,16 +440,16 @@ function renderRecent() {
     return;
   }
   list.innerHTML = recentScans.map(s => {
-    const ini  = ((s.first_name||'?')[0] + (s.last_name||'')[0]).toUpperCase();
+    const ini  = esc(((s.first_name||'?')[0] + (s.last_name||'')[0]).toUpperCase());
     const time = Shamsi.shamsiTime(s.scan_time);
     const photoHtml = s.photo
-      ? `<img src="/uploads/${s.person_type === 'student' ? 'students' : s.person_type === 'teacher' ? 'teachers' : 'staff'}/${s.photo}" style="width:100%;height:100%;object-fit:cover;">`
+      ? `<img src="/uploads/${s.person_type === 'student' ? 'students' : s.person_type === 'teacher' ? 'teachers' : 'staff'}/${esc(s.photo)}" style="width:100%;height:100%;object-fit:cover;">`
       : ini;
     return `<div class="scan-item">
       <div class="scan-av">${photoHtml}</div>
       <div class="scan-info">
-        <div class="scan-name">${s.first_name} ${s.last_name}</div>
-        <div class="scan-meta">${s.class_name || s.person_type || '—'}</div>
+        <div class="scan-name">${esc(s.first_name)} ${esc(s.last_name)}</div>
+        <div class="scan-meta">${esc(s.class_name || s.person_type || '—')}</div>
       </div>
       <div class="scan-time-badge">${time}</div>
     </div>`;

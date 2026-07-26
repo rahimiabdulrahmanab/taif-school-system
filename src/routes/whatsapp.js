@@ -1,6 +1,7 @@
 const express = require('express');
 const pool    = require('../db.js');
 const wa      = require('../whatsapp-client');
+const { kabulTodayISO } = require('../shamsi.js');
 const router  = express.Router();
 
 // ── GET status ────────────────────────────────────────────────
@@ -35,10 +36,19 @@ router.post('/send', async (req, res) => {
     if (!phone)   return res.status(400).json({ error: 'Phone number required' });
     if (!message) return res.status(400).json({ error: 'Message required' });
 
-    // Normalise to Afghan number: strip non-digits, ensure starts with 93
-    let clean = phone.replace(/\D/g, '');
-    if (clean.startsWith('0')) clean = '93' + clean.slice(1);
-    if (!clean.startsWith('93')) clean = '93' + clean;
+    // Normalise the number WITHOUT assuming Afghanistan — some parents live
+    // abroad. Rules:
+    //   "+<anything>"   → international, keep as-is (digits only)
+    //   "00<country>…"  → international, strip the 00
+    //   "07XXXXXXXX"    → local AFG format, 0 → 93
+    //   9 bare digits   → local AFG subscriber number, prefix 93
+    //   anything else   → assume it already includes a country code
+    const raw = String(phone).trim();
+    let clean = raw.replace(/\D/g, '');
+    if (raw.startsWith('+'))            { /* keep clean as-is */ }
+    else if (clean.startsWith('00'))    clean = clean.slice(2);
+    else if (clean.startsWith('0'))     clean = '93' + clean.slice(1);
+    else if (clean.length === 9)        clean = '93' + clean;
 
     await wa.sendMessage(clean, message);
     res.json({ success: true, phone: clean });
@@ -81,15 +91,18 @@ router.get('/templates', (req, res) => {
 // ── POST send absence alerts (bulk) ──────────────────────────
 router.post('/send-absence-alerts', async (req, res) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = kabulTodayISO();
     const { class_id } = req.body;
 
+    // Use the second parent number as fallback when the primary is empty
     let query = `
-      SELECT s.first_name, s.last_name, s.parent_phone, s.student_code, c.name as class_name
+      SELECT s.first_name, s.last_name,
+             COALESCE(s.parent_phone, s.parent_phone2) AS parent_phone,
+             s.student_code, c.name as class_name
       FROM students s
       LEFT JOIN classes c ON c.id = s.class_id
       WHERE s.is_active = true
-      AND s.parent_phone IS NOT NULL
+      AND COALESCE(s.parent_phone, s.parent_phone2) IS NOT NULL
       AND s.id NOT IN (
         SELECT person_id FROM attendance
         WHERE scan_date = $1 AND person_type = 'student'

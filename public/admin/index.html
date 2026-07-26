@@ -5712,7 +5712,17 @@ async function load() {
     const rate  = total > 0 ? Math.round(((d.present ?? 0) / total) * 100) : 0;
     document.getElementById('dash-rate').textContent = rate + '%';
     document.getElementById('dash-fee').textContent  = (d.fee_month ?? 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
-    document.getElementById('dash-outstanding').textContent = (d.outstanding ?? 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
+
+    // Outstanding = the REAL ledger total (sum of every student's running
+    // balance), not a student count — must agree with the Fee Collection page.
+    try {
+      const bal = await fetch('/api/fees/balances').then(r => r.json());
+      const totalOut = (Array.isArray(bal) ? bal : []).reduce((s, b) => s + (parseFloat(b.total_balance) || 0), 0);
+      document.getElementById('dash-outstanding').textContent =
+        Math.round(totalOut).toLocaleString('en-US');
+    } catch(_) {
+      document.getElementById('dash-outstanding').textContent = '—';
+    }
 
     // Scholarship awardees — count comes from Settings (gov_scholarship_count)
     try {
@@ -9265,7 +9275,7 @@ async function initWhatsApp() {
     const stuSel = document.getElementById('wa-student-sel');
     stuSel.innerHTML = '<option value="">Select student...</option>';
     waStudentsList.forEach(s => {
-      stuSel.innerHTML += `<option value="${s.id}" data-phone="${s.parent_phone||''}" data-name="${s.first_name} ${s.last_name}" data-code="${s.student_code}" data-parent="${s.parent_name||''}">${s.first_name} ${s.last_name} — ${s.student_code}</option>`;
+      stuSel.innerHTML += `<option value="${s.id}" data-phone="${s.parent_phone||s.parent_phone2||''}" data-name="${s.first_name} ${s.last_name}" data-code="${s.student_code}" data-parent="${s.parent_name||''}">${s.first_name} ${s.last_name} — ${s.student_code}</option>`;
     });
 
     // Populate class select
@@ -9474,9 +9484,9 @@ function gatherWARecipients() {
     cbs.forEach(cb => {
       const id  = parseInt(cb.id.replace('wa-abs-',''));
       const stu = waStudentsList.find(s => s.id === id);
-      if (stu && stu.parent_phone) {
+      if (stu && (stu.parent_phone || stu.parent_phone2)) {
         list.push({
-          phone:   stu.parent_phone,
+          phone:   stu.parent_phone || stu.parent_phone2,
           name:    `${stu.first_name} ${stu.last_name}`,
           subtitle: stu.class_name || '',
           message: fillTemplateForStudent(rawTemplate, stu),
@@ -9487,10 +9497,10 @@ function gatherWARecipients() {
   } else if (waRecipientType === 'class') {
     const classId = document.getElementById('wa-class-sel').value;
     if (!classId) return { error: t('msg_class_name_required') };
-    const cs = waStudentsList.filter(s => String(s.class_id) === classId && s.parent_phone);
+    const cs = waStudentsList.filter(s => String(s.class_id) === classId && (s.parent_phone || s.parent_phone2));
     if (!cs.length) return { error: t('msg_wa_no_phone') };
     cs.forEach(s => list.push({
-      phone:    s.parent_phone,
+      phone:    s.parent_phone || s.parent_phone2,
       name:     `${s.first_name} ${s.last_name}`,
       subtitle: s.class_name || '',
       message:  fillTemplateForStudent(rawTemplate, s),

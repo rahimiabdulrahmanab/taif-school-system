@@ -1,8 +1,26 @@
 const express = require('express');
 const pool    = require('../db.js');
 const CONFIG  = require('../../school-config.js');
-const { toShamsi } = require('../shamsi.js');
+const { toShamsi, todayShamsi } = require('../shamsi.js');
 const router  = express.Router();
+
+// Run fn inside a DB transaction. Multi-statement money operations must be
+// atomic — a crash halfway through a split payment or a carry-forward would
+// otherwise leave the ledger half-applied.
+async function withTx(fn) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (e) {
+    try { await client.query('ROLLBACK'); } catch (_) {}
+    throw e;
+  } finally {
+    client.release();
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────
 //  SIMPLE FEE MODEL
@@ -27,8 +45,7 @@ function effectiveFeeOf(s) {
 // Convert enrolled_at (or today) → Shamsi (year, month) walk-start.
 // Caps lookback at 60 months for safety on ancient enrollment dates.
 function walkStart(enrolledAt) {
-  const now = new Date();
-  const cur = toShamsi(now.getFullYear(), now.getMonth() + 1, now.getDate());
+  const cur = todayShamsi();   // Kabul calendar day, not server-UTC
   let y = cur.year, m = cur.month;
   if (enrolledAt) {
     const e = new Date(enrolledAt);
@@ -209,46 +226,48 @@ router.post('/', async (req, res) => {
     const expected    = +(fee * monthsList.length).toFixed(2);
     const excess      = +(total - expected).toFixed(2);
 
-    const results = [];
-
-    if (excess > 0 && apply_excess_to_debt) {
-      // Pay each selected month at its full fee, then apply leftover to debt.
-      for (const m of monthsList) {
-        const r = await pool.query(`
+    const results = await withTx(async (c) => {
+      const out = [];
+      if (excess > 0 && apply_excess_to_debt) {
+        // Pay each selected month at its full fee, then apply leftover to debt.
+        for (const m of monthsList) {
+          const r = await c.query(`
+            INSERT INTO fee_payments
+              (student_id, amount, amount_paid, original_fee,
+               payment_month, payment_year, payment_method, notes, payment_date)
+            VALUES ($1,$2,$2,$2,$3,$4,$5,$6,NOW())
+            RETURNING *
+          `, [student_id, fee, m.month, m.year, payment_method || 'cash', notes || null]);
+          out.push(r.rows[0]);
+        }
+        const d = await c.query(`
           INSERT INTO fee_payments
             (student_id, amount, amount_paid, original_fee,
-             payment_month, payment_year, payment_method, notes, payment_date)
-          VALUES ($1,$2,$2,$2,$3,$4,$5,$6,NOW())
+             payment_month, payment_year, payment_method, notes,
+             payment_date, is_previous_debt)
+          VALUES ($1, $2, $2, $2, NULL, NULL, $3, $4, NOW(), TRUE)
           RETURNING *
-        `, [student_id, fee, m.month, m.year, payment_method || 'cash', notes || null]);
-        results.push(r.rows[0]);
+        `, [student_id, excess, payment_method || 'cash',
+            (notes ? notes + ' — ' : '') + 'excess applied to debt']);
+        out.push(d.rows[0]);
+      } else {
+        // No excess routing → split evenly across the selected months.
+        const perMonth = monthsList.length > 0 ? (total / monthsList.length) : total;
+        const perMonthAmt = Math.round(perMonth * 100) / 100;
+        for (const m of monthsList) {
+          const r = await c.query(`
+            INSERT INTO fee_payments
+              (student_id, amount, amount_paid, original_fee,
+               payment_month, payment_year, payment_method, notes, payment_date)
+            VALUES ($1,$2,$2,$2,$3,$4,$5,$6,NOW())
+            RETURNING *
+          `, [student_id, perMonthAmt, m.month, m.year,
+              payment_method || 'cash', notes || null]);
+          out.push(r.rows[0]);
+        }
       }
-      const d = await pool.query(`
-        INSERT INTO fee_payments
-          (student_id, amount, amount_paid, original_fee,
-           payment_month, payment_year, payment_method, notes,
-           payment_date, is_previous_debt)
-        VALUES ($1, $2, $2, $2, NULL, NULL, $3, $4, NOW(), TRUE)
-        RETURNING *
-      `, [student_id, excess, payment_method || 'cash',
-          (notes ? notes + ' — ' : '') + 'excess applied to debt']);
-      results.push(d.rows[0]);
-    } else {
-      // No excess routing → split evenly across the selected months.
-      const perMonth = monthsList.length > 0 ? (total / monthsList.length) : total;
-      const perMonthAmt = Math.round(perMonth * 100) / 100;
-      for (const m of monthsList) {
-        const r = await pool.query(`
-          INSERT INTO fee_payments
-            (student_id, amount, amount_paid, original_fee,
-             payment_month, payment_year, payment_method, notes, payment_date)
-          VALUES ($1,$2,$2,$2,$3,$4,$5,$6,NOW())
-          RETURNING *
-        `, [student_id, perMonthAmt, m.month, m.year,
-            payment_method || 'cash', notes || null]);
-        results.push(r.rows[0]);
-      }
-    }
+      return out;
+    });
 
     res.status(201).json({ success: true, payments: results, excess });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -287,20 +306,21 @@ router.post('/carry-forward', async (req, res) => {
       return res.status(400).json({ error: 'Month is already fully paid' });
     }
 
-    // Marker payment so the month is closed
-    await pool.query(`
-      INSERT INTO fee_payments
-        (student_id, amount, amount_paid, original_fee,
-         payment_month, payment_year, payment_method, notes,
-         payment_date, carried_forward)
-      VALUES ($1, 0, 0, $2, $3, $4, 'carry', $5, NOW(), TRUE)
-    `, [student_id, fee, month, year, `Carried ${remaining} AFN forward to Total Due`]);
+    // Marker payment + debt growth must land together or not at all.
+    await withTx(async (c) => {
+      await c.query(`
+        INSERT INTO fee_payments
+          (student_id, amount, amount_paid, original_fee,
+           payment_month, payment_year, payment_method, notes,
+           payment_date, carried_forward)
+        VALUES ($1, 0, 0, $2, $3, $4, 'carry', $5, NOW(), TRUE)
+      `, [student_id, fee, month, year, `Carried ${remaining} AFN forward to Total Due`]);
 
-    // Grow the student's Total Due
-    await pool.query(
-      `UPDATE students SET previous_debt = COALESCE(previous_debt, 0) + $1 WHERE id = $2`,
-      [remaining, student_id]
-    );
+      await c.query(
+        `UPDATE students SET previous_debt = COALESCE(previous_debt, 0) + $1 WHERE id = $2`,
+        [remaining, student_id]
+      );
+    });
 
     res.json({ success: true, carried: remaining });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -352,18 +372,20 @@ router.post('/close-month', async (req, res) => {
       const remaining = Math.max(0, +(fee - paid).toFixed(2));
       if (remaining <= 0) continue;
 
-      await pool.query(`
-        INSERT INTO fee_payments
-          (student_id, amount, amount_paid, original_fee,
-           payment_month, payment_year, payment_method, notes,
-           payment_date, carried_forward)
-        VALUES ($1, 0, 0, $2, $3, $4, 'carry', $5, NOW(), TRUE)
-      `, [s.id, fee, month, year, `Carried ${remaining} AFN forward to Total Due`]);
+      await withTx(async (c) => {
+        await c.query(`
+          INSERT INTO fee_payments
+            (student_id, amount, amount_paid, original_fee,
+             payment_month, payment_year, payment_method, notes,
+             payment_date, carried_forward)
+          VALUES ($1, 0, 0, $2, $3, $4, 'carry', $5, NOW(), TRUE)
+        `, [s.id, fee, month, year, `Carried ${remaining} AFN forward to Total Due`]);
 
-      await pool.query(
-        `UPDATE students SET previous_debt = COALESCE(previous_debt, 0) + $1 WHERE id = $2`,
-        [remaining, s.id]
-      );
+        await c.query(
+          `UPDATE students SET previous_debt = COALESCE(previous_debt, 0) + $1 WHERE id = $2`,
+          [remaining, s.id]
+        );
+      });
       closed++;
       totalCarried += remaining;
     }
@@ -395,8 +417,7 @@ router.get('/statement/:student_id', async (req, res) => {
     const s   = sres.rows[0];
     const fee = effectiveFeeOf(s);
 
-    const now = new Date();
-    const cur = toShamsi(now.getFullYear(), now.getMonth() + 1, now.getDate());
+    const cur = todayShamsi();
     let sy = cur.year, sm = cur.month;
     if (s.enrolled_at) {
       const e = new Date(s.enrolled_at);
@@ -532,8 +553,17 @@ router.post('/due', async (req, res) => {
 });
 
 // PUT /api/fees/:id — edit an existing payment
+// Carry-forward markers must not be edited: their "amount" is 0 by design
+// and the carried value already lives in students.previous_debt.
 router.put('/:id', async (req, res) => {
   try {
+    const row = await pool.query('SELECT carried_forward FROM fee_payments WHERE id = $1', [req.params.id]);
+    if (!row.rows.length) return res.status(404).json({ error: 'Payment not found' });
+    if (row.rows[0].carried_forward) {
+      return res.status(400).json({
+        error: 'This row is a carry-forward marker, not a payment. Delete it to undo the carry, or adjust the amount on the Total Due instead.',
+      });
+    }
     const { amount, payment_method, notes, payment_date } = req.body;
     const amt = (amount != null && amount !== '') ? parseFloat(amount) : null;
     const r = await pool.query(`
@@ -546,14 +576,39 @@ router.put('/:id', async (req, res) => {
       WHERE id = $5
       RETURNING *`,
       [amt, payment_method || null, notes || null, payment_date || null, req.params.id]);
-    if (!r.rows.length) return res.status(404).json({ error: 'Payment not found' });
     res.json({ success: true, payment: r.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ── DELETE a payment ──────────────────────────────────────────
+// Deleting a carry-forward marker is an UNDO of the carry: the month
+// reopens as outstanding, so the amount that was rolled into the student's
+// Total Due must come back out — otherwise the debt is double-counted.
 router.delete('/:id', async (req, res) => {
   try {
+    const row = await pool.query(
+      'SELECT student_id, carried_forward, notes FROM fee_payments WHERE id = $1',
+      [req.params.id]);
+    if (!row.rows.length) return res.json({ success: true });
+
+    const p = row.rows[0];
+    if (p.carried_forward) {
+      const m = /Carried ([\d.]+) AFN/.exec(p.notes || '');
+      const carried = m ? parseFloat(m[1]) : NaN;
+      if (isNaN(carried)) {
+        return res.status(400).json({
+          error: 'Cannot undo this carry-forward automatically (amount not recorded). Adjust the student\'s Total Due manually first.',
+        });
+      }
+      await withTx(async (c) => {
+        await c.query('DELETE FROM fee_payments WHERE id = $1', [req.params.id]);
+        await c.query(
+          `UPDATE students SET previous_debt = GREATEST(0, COALESCE(previous_debt,0) - $1) WHERE id = $2`,
+          [carried, p.student_id]);
+      });
+      return res.json({ success: true, undone_carry: carried });
+    }
+
     await pool.query('DELETE FROM fee_payments WHERE id = $1', [req.params.id]);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -565,8 +620,7 @@ router.get('/balances', async (req, res) => {
     const periodYear  = parseInt(req.query.year);
     const periodMonth = parseInt(req.query.month);
 
-    const now = new Date();
-    const cur = toShamsi(now.getFullYear(), now.getMonth() + 1, now.getDate());
+    const cur = todayShamsi();
 
     const students = await pool.query(`
       SELECT id, monthly_fee, discount_type, discount_value, enrolled_at,

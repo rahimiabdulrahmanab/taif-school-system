@@ -1,13 +1,17 @@
 const express = require('express');
 const pool    = require('../db.js');
-const { toShamsi } = require('../shamsi.js');
+const { toShamsi, todayShamsi, kabulTodayISO } = require('../shamsi.js');
 const router  = express.Router();
 
 // External income (canteen, rentals, other streams). Filtered by Shamsi
 // month/year — we store income_month as a Shamsi "YYYY-MM" key derived
 // from the Gregorian income_date so the period dropdown matches the app.
 function shamsiKey(dateStr) {
-  const d = new Date(dateStr || new Date());
+  if (!dateStr) {
+    const s = todayShamsi();   // Kabul "today", not server-UTC
+    return `${s.year}-${String(s.month).padStart(2, '0')}`;
+  }
+  const d = new Date(dateStr);
   if (isNaN(d)) return null;
   const s = toShamsi(d.getFullYear(), d.getMonth() + 1, d.getDate());
   return `${s.year}-${String(s.month).padStart(2, '0')}`;
@@ -36,7 +40,7 @@ router.post('/', async (req, res) => {
   try {
     const { title, amount, income_date, note } = req.body;
     if (!title || !amount) return res.status(400).json({ error: 'Title and amount are required' });
-    const date = income_date || new Date().toISOString().split('T')[0];
+    const date = income_date || kabulTodayISO();
     const r = await pool.query(`
       INSERT INTO external_income (title, amount, income_date, income_month, note)
       VALUES ($1,$2,$3,$4,$5) RETURNING *
@@ -49,7 +53,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { title, amount, income_date, note } = req.body;
-    const date = income_date || new Date().toISOString().split('T')[0];
+    const date = income_date || kabulTodayISO();
     const r = await pool.query(`
       UPDATE external_income SET
         title = $1, amount = $2, income_date = $3, income_month = $4, note = $5

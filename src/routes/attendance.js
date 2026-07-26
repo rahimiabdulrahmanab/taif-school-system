@@ -1,13 +1,13 @@
 const express = require('express');
 const pool    = require('../db.js');
-const { shamsiMonthRange, workingDaysBetween } = require('../shamsi.js');
+const { shamsiMonthRange, workingDaysBetween, kabulTodayISO, kabulTodayDate } = require('../shamsi.js');
 const router  = express.Router();
 
 // ── GET attendance for a date (default today) ─────────────────
 router.get('/', async (req, res) => {
   try {
     const { date, class_id, person_type } = req.query;
-    const targetDate = date || new Date().toISOString().split('T')[0];
+    const targetDate = date || kabulTodayISO();
 
     let query = `
       SELECT
@@ -61,7 +61,7 @@ router.post('/scan', async (req, res) => {
     const { code } = req.body;
     if (!code) return res.status(400).json({ error: 'No code provided' });
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = kabulTodayISO();
     let person = null;
     let person_type = null;
 
@@ -92,22 +92,16 @@ router.post('/scan', async (req, res) => {
 
     if (!person) return res.status(404).json({ error: 'Person not found', code });
 
-    // Check if already scanned today
-    const existing = await pool.query(
-      `SELECT id FROM attendance WHERE person_id = $1 AND person_type = $2 AND scan_date = $3`,
+    // One row per person per day — the unique index makes this race-safe
+    // (two simultaneous scans can't create a duplicate). rowCount 0 means
+    // the person had already scanned today.
+    const ins = await pool.query(
+      `INSERT INTO attendance (person_id, person_type, scan_date, scan_time)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (person_type, person_id, scan_date) DO NOTHING`,
       [person.id, person_type, today]
     );
-
-    let alreadyScanned = false;
-    if (existing.rows.length) {
-      alreadyScanned = true;
-    } else {
-      await pool.query(
-        `INSERT INTO attendance (person_id, person_type, scan_date, scan_time)
-         VALUES ($1, $2, $3, NOW())`,
-        [person.id, person_type, today]
-      );
-    }
+    const alreadyScanned = ins.rowCount === 0;
 
     // Return full info for gate screen
     res.json({
@@ -131,7 +125,7 @@ router.post('/scan', async (req, res) => {
 router.get('/absent', async (req, res) => {
   try {
     const { class_id, person_type, date } = req.query;
-    const targetDate = date || new Date().toISOString().split('T')[0];
+    const targetDate = date || kabulTodayISO();
     const type = person_type || 'student';
 
     let query, params;
@@ -221,10 +215,10 @@ router.get('/staff-monthly', async (req, res) => {
     const y = parseInt(year)  || new Date().getFullYear();
     const payMonth = `${y}-${String(m).padStart(2, '0')}`;
 
-    // Shamsi month → Gregorian range
+    // Shamsi month → Gregorian range. "Today" is the Kabul calendar day.
     const range = shamsiMonthRange(y, m);
     const workingDaysInMonth = workingDaysBetween(range.start, range.end);
-    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const today = kabulTodayDate();
     const elapsedEnd = today < range.end ? today : range.end;
     const elapsedWorkingDays = today < range.start ? 0 : workingDaysBetween(range.start, elapsedEnd);
 

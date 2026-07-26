@@ -1,6 +1,7 @@
 const express = require('express');
 const bcrypt  = require('bcryptjs');
 const pool    = require('../db.js');
+const { currentAcademicYear } = require('../academic-year.js');
 const router  = express.Router();
 
 // All routes here require a valid teacher JWT (enforced in server.js)
@@ -82,9 +83,10 @@ router.get('/marks/:subject_id/:exam_type', requireTeacher, async (req, res) => 
       [subject.class_id]
     );
 
+    const acadYear = await currentAcademicYear();
     const marksRes = await pool.query(
-      `SELECT * FROM marks WHERE subject_id = $1 AND exam_type = $2`,
-      [subject_id, exam_type]
+      `SELECT * FROM marks WHERE subject_id = $1 AND exam_type = $2 AND academic_year = $3`,
+      [subject_id, exam_type, acadYear]
     );
     const marksMap = {};
     marksRes.rows.forEach(m => { marksMap[m.student_id] = m; });
@@ -134,7 +136,7 @@ router.post('/marks/save', requireTeacher, async (req, res) => {
     if (!subRes.rows.length) return res.status(403).json({ error: 'Access denied' });
     const subject  = subRes.rows[0];
     const maxScore = exam_type === 'midterm' ? (subject.max_midterm || 40) : (subject.max_final || 60);
-    const year     = new Date().getFullYear().toString();
+    const year     = await currentAcademicYear();
 
     // Approved marks can be re-edited — they revert to draft for re-approval
 
@@ -147,7 +149,7 @@ router.post('/marks/save', requireTeacher, async (req, res) => {
         INSERT INTO marks
           (student_id, subject_id, exam_type, term, score, max_score, academic_year, status, submitted_by)
         VALUES ($1,$2,$3,$3,$4,$5,$6,'draft',$7)
-        ON CONFLICT (student_id, subject_id, exam_type)
+        ON CONFLICT (student_id, subject_id, exam_type, academic_year)
         DO UPDATE SET score=$4, status='draft', submitted_by=$7
       `, [m.student_id, subject_id, exam_type, score, maxScore, year, req.user.id]);
       saved++;
@@ -172,9 +174,10 @@ router.post('/marks/submit', requireTeacher, async (req, res) => {
     );
     if (!subRes.rows.length) return res.status(403).json({ error: 'Access denied' });
 
+    const acadYear = await currentAcademicYear();
     const draftRes = await pool.query(
-      `SELECT COUNT(*) FROM marks WHERE subject_id=$1 AND exam_type=$2 AND status IN ('draft','rejected')`,
-      [subject_id, exam_type]
+      `SELECT COUNT(*) FROM marks WHERE subject_id=$1 AND exam_type=$2 AND academic_year=$3 AND status IN ('draft','rejected')`,
+      [subject_id, exam_type, acadYear]
     );
     if (parseInt(draftRes.rows[0].count) === 0)
       return res.status(400).json({ error: 'No draft marks to submit. Please save marks first.' });
@@ -182,8 +185,8 @@ router.post('/marks/submit', requireTeacher, async (req, res) => {
     await pool.query(`
       UPDATE marks
       SET status='submitted', submitted_at=NOW(), rejection_note=NULL
-      WHERE subject_id=$1 AND exam_type=$2 AND status IN ('draft','rejected')
-    `, [subject_id, exam_type]);
+      WHERE subject_id=$1 AND exam_type=$2 AND academic_year=$3 AND status IN ('draft','rejected')
+    `, [subject_id, exam_type, acadYear]);
 
     res.json({ success: true, message: 'Marks submitted for admin approval' });
   } catch (err) { res.status(500).json({ error: err.message }); }

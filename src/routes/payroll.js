@@ -1,28 +1,8 @@
 const express = require('express');
 const pool    = require('../db.js');
-const { shamsiMonthRange, workingDaysBetween } = require('../shamsi.js');
+const { shamsiMonthRange, workingDaysBetween, kabulTodayDate } = require('../shamsi.js');
+const { TAX_BRACKETS, calculateMonthlyTax } = require('../tax.js');
 const router  = express.Router();
-
-// ── Afghanistan wage income tax — progressive (marginal) brackets ─
-// Bracket 1: 0 – 5,000     AFN  → 0%
-// Bracket 2: 5,000 – 12,500 AFN → 2%   on the portion above 5,000
-// Bracket 3: 12,500+        AFN → 10%  on the portion above 12,500
-const TAX_BRACKETS = [
-  { upTo: 5000,   rate: 0    },
-  { upTo: 12500,  rate: 0.02 },
-  { upTo: Infinity, rate: 0.10 },
-];
-function calculateMonthlyTax(salary) {
-  const s = Math.max(0, Number(salary) || 0);
-  let tax = 0, prev = 0;
-  for (const b of TAX_BRACKETS) {
-    if (s <= prev) break;
-    const slice = Math.min(s, b.upTo) - prev;
-    tax += slice * b.rate;
-    prev = b.upTo;
-  }
-  return Math.round(tax * 100) / 100; // round to 2 decimals
-}
 
 // ── GET payroll list for a month/year ────────────────────────
 router.get('/', async (req, res) => {
@@ -66,8 +46,9 @@ router.get('/', async (req, res) => {
     // counting every day INCLUDING Fridays. Per-day rate = salary / 30 and
     // absence is measured against 30 days.
     const workingDaysInMonth = 30;
-    // Only count days that have actually elapsed (current/future month safe)
-    const today = new Date(); today.setHours(0, 0, 0, 0);
+    // Only count days that have actually elapsed (current/future month safe).
+    // "Today" is the Kabul calendar day — the server may run in UTC.
+    const today = kabulTodayDate();
     const elapsedEnd = today < range.end ? today : range.end;
     // School days that have elapsed, EXCLUDING Fridays (school is closed and
     // nobody scans on Friday). Absence is measured against these days so a
@@ -171,14 +152,25 @@ router.get('/', async (req, res) => {
       // Salary model:
       //   net_payable = salary − tax − absence_deduction + overtime
       //   net_salary  = net_payable − advances             (what's still to hand over)
-      const netPayable = Math.max(0, salary - tax - absenceDeduction) + otAmount;
-      const netSalary  = Math.max(0, netPayable - advTotal);
+      // PAID rows are FROZEN: what was actually handed over is stored on the
+      // payroll row at payment time. Advances/overtime added later must not
+      // rewrite history (or a reprinted receipt would show a different sum).
+      let netPayable, netSalary, advShown;
+      if (payroll) {
+        netSalary  = parseFloat(payroll.net_salary || 0);
+        advShown   = parseFloat(payroll.advance_taken || 0);
+        netPayable = netSalary + advShown;
+      } else {
+        netPayable = Math.max(0, salary - tax - absenceDeduction) + otAmount;
+        netSalary  = Math.max(0, netPayable - advTotal);
+        advShown   = advTotal;
+      }
 
       return {
         ...p,
         salary,
         advances,                              // detailed list with dates
-        advance_amount: advTotal,              // sum (back-compat for existing UI)
+        advance_amount: advShown,              // frozen for paid rows, live otherwise
         advance_count:  advances.length,
         tax_amount:     tax,
         // Attendance

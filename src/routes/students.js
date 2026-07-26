@@ -412,23 +412,28 @@ router.post('/promote', async (req, res) => {
       moves[k] = (moves[k] || 0) + 1;
     }
 
-    // Apply promotions
-    for (const u of promoteUpdates) {
-      await pool.query('UPDATE students SET class_id = $1 WHERE id = $2',
-        [u.destId, u.studentId]);
-    }
-    // Graduate the final grade (archive — kept in DB, off active lists)
-    if (graduateIds.length) {
-      try {
-        await pool.query(`
+    // Apply promotions + graduation atomically — a crash halfway through
+    // would otherwise leave half the school moved up and half not.
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (const u of promoteUpdates) {
+        await client.query('UPDATE students SET class_id = $1 WHERE id = $2',
+          [u.destId, u.studentId]);
+      }
+      // Graduate the final grade (archive — kept in DB, off active lists)
+      if (graduateIds.length) {
+        await client.query(`
           UPDATE students
              SET graduated = TRUE, graduated_at = CURRENT_DATE, is_active = FALSE
            WHERE id = ANY($1)`, [graduateIds]);
-      } catch (e) {
-        if (/graduated/.test(e.message)) {
-          await pool.query('UPDATE students SET is_active = FALSE WHERE id = ANY($1)', [graduateIds]);
-        } else { throw e; }
       }
+      await client.query('COMMIT');
+    } catch (e) {
+      try { await client.query('ROLLBACK'); } catch (_) {}
+      throw e;
+    } finally {
+      client.release();
     }
 
     const missing = Object.entries(missingDest)

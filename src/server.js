@@ -6,6 +6,17 @@ const pool     = require('./db');
 const CONFIG   = require('../school-config');
 
 const auth = require('./middleware/auth');
+const { todayShamsi } = require('./shamsi');
+
+// A forged token is game over, so refuse to silently run on the well-known
+// fallback secret outside local development.
+if (!process.env.JWT_SECRET && (process.env.RENDER || process.env.NODE_ENV === 'production')) {
+  console.error('╔══════════════════════════════════════════════════════════════╗');
+  console.error('║  WARNING: JWT_SECRET is not set. The server is using the      ║');
+  console.error('║  default secret that is public in the GitHub repo — anyone    ║');
+  console.error('║  can forge admin tokens. Set JWT_SECRET in the environment.   ║');
+  console.error('╚══════════════════════════════════════════════════════════════╝');
+}
 
 // Role guard. Pass the roles that are allowed; admin is always allowed.
 // Usage: app.use('/api/foo', auth, allow('finance'), fooRoutes)
@@ -14,6 +25,19 @@ function allow(...roles) {
   return (req, res, next) => {
     const role = req.user && req.user.role;
     if (role && ok.has(role)) return next();
+    return res.status(403).json({ error: 'Forbidden' });
+  };
+}
+
+// Read-only role guard: admin gets everything; the listed roles get GET/HEAD
+// only. Used so the finance user can look people/classes up for fee and
+// payroll screens without being able to create, edit or delete them.
+function allowRead(...roles) {
+  const ro = new Set(roles);
+  return (req, res, next) => {
+    const role = req.user && req.user.role;
+    if (role === 'admin') return next();
+    if (role && ro.has(role) && (req.method === 'GET' || req.method === 'HEAD')) return next();
     return res.status(403).json({ error: 'Forbidden' });
   };
 }
@@ -93,13 +117,24 @@ app.get('/api/health', async (req, res) => {
 // Dashboard stats
 app.get('/api/dashboard/stats', async (req, res) => {
   try {
+    // "This month" is the current SHAMSI month — the whole fee system is
+    // keyed on the Afghan calendar, so the dashboard must agree with it.
+    const sh = todayShamsi();
     const [students, teachers, staff, present, feeMonth, outstanding] = await Promise.all([
       pool.query('SELECT COUNT(*) FROM students WHERE is_active = true'),
       pool.query('SELECT COUNT(*) FROM teachers WHERE is_active = true'),
       pool.query('SELECT COUNT(*) FROM staff    WHERE is_active = true'),
       pool.query("SELECT COUNT(*) FROM attendance WHERE scan_date = CURRENT_DATE AND person_type = 'student'"),
-      pool.query(`SELECT COALESCE(SUM(amount),0) AS total FROM fee_payments WHERE DATE_TRUNC('month', payment_date) = DATE_TRUNC('month', CURRENT_DATE)`),
-      pool.query(`SELECT COUNT(*) FROM students WHERE is_active = true AND id NOT IN (SELECT DISTINCT student_id FROM fee_payments WHERE DATE_TRUNC('month', payment_date) = DATE_TRUNC('month', CURRENT_DATE))`),
+      pool.query(
+        `SELECT COALESCE(SUM(amount),0) AS total FROM fee_payments
+          WHERE payment_year = $1 AND payment_month = $2
+            AND COALESCE(carried_forward, FALSE) = FALSE`,
+        [String(sh.year), String(sh.month)]),
+      pool.query(
+        `SELECT COUNT(*) FROM students WHERE is_active = true AND id NOT IN (
+           SELECT DISTINCT student_id FROM fee_payments
+            WHERE payment_year = $1 AND payment_month = $2)`,
+        [String(sh.year), String(sh.month)]),
     ]);
     const total_s   = parseInt(students.rows[0].count);
     const present_n = parseInt(present.rows[0].count);
@@ -220,22 +255,27 @@ app.use('/api/attendance', (req, res, next) => {
   if (isPublic) return next();
   return auth(req, res, next);
 }, attendanceRoutes);
-// Finance role needs read-only access to students/teachers/staff/classes for
-// fee, payroll and expense lookups, so we allow it on those mounts. Pure-
-// finance pages (fees, payroll, expenses, income) get full access.
-app.use('/api/students',   auth, allow('finance'), studentRoutes);
-app.use('/api',            auth, allow('finance'), peopleRoutes);
-app.use('/api/classes',    auth, allow('finance'), classRoutes);
-app.use('/api/fees',       auth, allow('finance'), feeRoutes);
-app.use('/api/payroll',    auth, allow('finance'), payrollRoutes);
-app.use('/api/grades',     auth,                   gradesRoutes);
-app.use('/api/expenses',   auth, allow('finance'), expensesRoutes);
-app.use('/api/reports',    auth,                   reportsRoutes);
-app.use('/api/whatsapp',   auth,                   waRoutes);
-app.use('/api/settings',   auth,                   settingsRoutes);
-app.use('/api/teacher',    auth,                   teacherRoutes);
-app.use('/api/backup',     auth,                   backupRoutes);
-app.use('/api/income',     auth, allow('finance'), incomeRoutes);
+// Finance role: full access to the money pages (fees, payroll, expenses,
+// income) and READ-ONLY access to students/teachers/staff/classes for
+// lookups. Everything administrative (grades, reports, whatsapp, settings
+// writes, backup/wipe) is admin-only — a finance or teacher token must
+// never be able to change school config, approve marks, or wipe data.
+app.use('/api/students',   auth, allowRead('finance'), studentRoutes);
+app.use('/api',            auth, allowRead('finance'), peopleRoutes);
+app.use('/api/classes',    auth, allowRead('finance'), classRoutes);
+app.use('/api/fees',       auth, allow('finance'),     feeRoutes);
+app.use('/api/payroll',    auth, allow('finance'),     payrollRoutes);
+app.use('/api/grades',     auth, allow(),              gradesRoutes);
+app.use('/api/expenses',   auth, allow('finance'),     expensesRoutes);
+app.use('/api/reports',    auth, allow(),              reportsRoutes);
+app.use('/api/whatsapp',   auth, allow(),              waRoutes);
+// Settings: reads are needed by several authed screens; writes are admin-only.
+app.use('/api/settings',   auth, (req, res, next) =>
+  (req.method === 'GET' || req.method === 'HEAD') ? next() : allow()(req, res, next),
+  settingsRoutes);
+app.use('/api/teacher',    auth,                       teacherRoutes);
+app.use('/api/backup',     auth, allow(),              backupRoutes);
+app.use('/api/income',     auth, allow('finance'),     incomeRoutes);
 
 // Root redirect
 app.get('/', (req, res) => res.redirect('/login'));

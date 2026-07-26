@@ -1,6 +1,7 @@
 const express = require('express');
 const bcrypt  = require('bcryptjs');
 const pool    = require('../db.js');
+const { currentAcademicYear } = require('../academic-year.js');
 const router  = express.Router();
 
 router.get('/subjects/:class_id', async (req, res) => {
@@ -39,11 +40,13 @@ router.delete('/subjects/:id', async (req, res) => {
 router.get('/marks', async (req, res) => {
   try {
     const { class_id, subject_id } = req.query;
+    const year = await currentAcademicYear();
     const students = await pool.query(
       `SELECT id, first_name, last_name, student_code, photo FROM students WHERE class_id=$1 ORDER BY first_name, last_name`,
       [class_id]
     );
-    const marksRes = await pool.query(`SELECT * FROM marks WHERE subject_id=$1`, [subject_id]);
+    const marksRes = await pool.query(
+      `SELECT * FROM marks WHERE subject_id=$1 AND academic_year=$2`, [subject_id, year]);
     const marksMap = {};
     marksRes.rows.forEach(m => {
       if (!marksMap[m.student_id]) marksMap[m.student_id] = {};
@@ -93,11 +96,13 @@ router.post('/marks', async (req, res) => {
     if (isNaN(parsedScore))        return res.status(400).json({ error: 'Score must be a number' });
     if (parsedScore < 0)           return res.status(400).json({ error: 'Score cannot be negative' });
     if (parsedScore > maxScore)    return res.status(400).json({ error: `Score cannot exceed ${maxScore}` });
-    const year   = new Date().getFullYear().toString();
+    // Keyed per academic year — a new year starts a fresh set of marks
+    // instead of overwriting last year's transcript.
+    const year   = await currentAcademicYear();
     const result = await pool.query(`
       INSERT INTO marks (student_id, subject_id, exam_type, term, score, max_score, academic_year)
       VALUES ($1,$2,$3,$3,$4,$5,$6)
-      ON CONFLICT (student_id, subject_id, exam_type) DO UPDATE SET score=$4
+      ON CONFLICT (student_id, subject_id, exam_type, academic_year) DO UPDATE SET score=$4
       RETURNING *
     `, [student_id, subject_id, exam_type, score, maxScore, year]);
     res.json(result.rows[0]);
@@ -120,8 +125,11 @@ router.get('/transcript/:student_id', async (req, res) => {
       `SELECT sub.*, t.first_name||' '||t.last_name AS teacher_name FROM subjects sub LEFT JOIN teachers t ON t.id=sub.teacher_id WHERE sub.class_id=$1 ORDER BY sub.name`,
       [s.class_id]
     );
+    const year = await currentAcademicYear();
     const transcript = await Promise.all(subjects.rows.map(async (sub) => {
-      const marks    = await pool.query(`SELECT * FROM marks WHERE student_id=$1 AND subject_id=$2`, [s.id, sub.id]);
+      const marks    = await pool.query(
+        `SELECT * FROM marks WHERE student_id=$1 AND subject_id=$2 AND academic_year=$3`,
+        [s.id, sub.id, year]);
       const midRow   = marks.rows.find(m => m.exam_type === 'midterm');
       const finRow   = marks.rows.find(m => m.exam_type === 'final');
       const midScore = midRow ? parseFloat(midRow.score) : null;

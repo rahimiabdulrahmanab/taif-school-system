@@ -76,4 +76,36 @@ function workingDaysBetween(startDate, endDate) {
   return count;
 }
 
-module.exports = { toShamsi, fromShamsi, shamsiMonthRange, workingDaysBetween, _isoDate };
+// ── Kabul-local "today" ─────────────────────────────────────────
+// The server may run in UTC (Render) while the school lives at UTC+4:30.
+// Every "what day is it" decision must use Kabul time, or scans and month
+// boundaries shift to the previous day between 00:00 and 04:30 local.
+const KABUL_OFFSET_MS = 4.5 * 3600 * 1000;
+
+// {gy, gm, gd} of the current Kabul calendar day
+function kabulToday() {
+  const d = new Date(Date.now() + KABUL_OFFSET_MS);
+  return { gy: d.getUTCFullYear(), gm: d.getUTCMonth() + 1, gd: d.getUTCDate() };
+}
+
+// "YYYY-MM-DD" of the current Kabul day (for scan_date etc.)
+function kabulTodayISO() {
+  const k = kabulToday();
+  const pad = n => String(n).padStart(2, '0');
+  return `${k.gy}-${pad(k.gm)}-${pad(k.gd)}`;
+}
+
+// Shamsi {year, month, day} of the current Kabul day
+function todayShamsi() {
+  const k = kabulToday();
+  return toShamsi(k.gy, k.gm, k.gd);
+}
+
+// Date object at Kabul midnight of today (for date-range comparisons)
+function kabulTodayDate() {
+  const k = kabulToday();
+  return new Date(k.gy, k.gm - 1, k.gd);
+}
+
+module.exports = { toShamsi, fromShamsi, shamsiMonthRange, workingDaysBetween, _isoDate,
+                   kabulToday, kabulTodayISO, todayShamsi, kabulTodayDate };

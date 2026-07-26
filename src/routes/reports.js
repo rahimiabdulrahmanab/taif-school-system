@@ -1,5 +1,7 @@
 const express = require('express');
 const pool    = require('../db.js');
+const { kabulTodayISO } = require('../shamsi.js');
+const { calculateMonthlyTax } = require('../tax.js');
 const router  = express.Router();
 
 // ── Student List by Class ─────────────────────────────────────
@@ -23,7 +25,7 @@ router.get('/students', async (req, res) => {
 router.get('/attendance', async (req, res) => {
   try {
     const { date, class_id } = req.query;
-    const d = date || new Date().toISOString().split('T')[0];
+    const d = date || kabulTodayISO();
 
     // Present
     let presentQ = `
@@ -115,16 +117,54 @@ router.get('/payroll', async (req, res) => {
     const payrollRes = await pool.query(`SELECT * FROM payroll WHERE pay_month=$1`, [payMonth]);
     const advRes     = await pool.query(`SELECT * FROM payroll_advances WHERE pay_month=$1`, [payMonth]);
     const payMap = {}; payrollRes.rows.forEach(p => payMap[`${p.person_type}-${p.person_id}`] = p);
-    const advMap = {}; advRes.rows.forEach(a => advMap[`${a.person_type}-${a.person_id}`] = a);
+    // SUM all advances per person — multiple advances per month are allowed
+    const advMap = {};
+    advRes.rows.forEach(a => {
+      const k = `${a.person_type}-${a.person_id}`;
+      advMap[k] = (advMap[k] || 0) + (parseFloat(a.amount) || 0);
+    });
+    // Overtime sums per person (table may not exist on old DBs)
+    const otMap = {};
+    try {
+      const otRes = await pool.query(
+        `SELECT person_type, person_id, COALESCE(SUM(amount),0)::float AS total
+           FROM payroll_overtime WHERE pay_month=$1 GROUP BY person_type, person_id`, [payMonth]);
+      otRes.rows.forEach(o => { otMap[`${o.person_type}-${o.person_id}`] = o.total; });
+    } catch (_) {}
 
+    // Same salary model as the payroll page:
+    //   net = salary − tax − (absence, paid rows only) + overtime − advances
+    // Paid rows use the FROZEN figures stored at payment time.
     const result = people.map(p => {
       const key    = `${p.person_type}-${p.id}`;
+      const paid   = payMap[key] || null;
       const salary = parseFloat(p.monthly_salary) || 0;
-      const adv    = advMap[key] ? parseFloat(advMap[key].amount) : 0;
-      return { ...p, salary, advance: adv, net: salary - adv, is_paid: !!payMap[key] };
+      if (paid) {
+        return {
+          ...p, salary,
+          advance: parseFloat(paid.advance_taken || 0),
+          tax:     parseFloat(paid.tax_amount || 0),
+          net:     parseFloat(paid.net_salary || 0),
+          is_paid: true,
+        };
+      }
+      const adv = advMap[key] || 0;
+      const tax = calculateMonthlyTax(salary);
+      const ot  = otMap[key] || 0;
+      return {
+        ...p, salary,
+        advance: adv,
+        tax,
+        net: Math.max(0, salary - tax + ot - adv),
+        is_paid: false,
+      };
     });
 
-    res.json({ month: m, year: y, people: result, total_salary: result.reduce((s,p)=>s+p.salary,0), total_paid: result.filter(p=>p.is_paid).reduce((s,p)=>s+p.net,0) });
+    res.json({
+      month: m, year: y, people: result,
+      total_salary: result.reduce((s,p)=>s+p.salary,0),
+      total_paid:   result.filter(p=>p.is_paid).reduce((s,p)=>s+p.net,0),
+    });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
