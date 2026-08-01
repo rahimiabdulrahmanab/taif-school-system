@@ -5449,6 +5449,40 @@ function shamsiMonthOptions(selected) {
   }
   return html;
 }
+
+// ── School holiday months (Sartan/Asad by default) ────────────
+// Loaded from /api/config. Billing and payroll period selectors offer
+// only the working months — the school year is 10 months, not 12.
+window.HOLIDAY_MONTHS = new Set([4, 5]);
+
+function isHolidayMonth(m) { return window.HOLIDAY_MONTHS.has(parseInt(m)); }
+
+// Same as shamsiMonthOptions but skips holiday months. Use for any
+// selector that picks a BILLING or SALARY period. Plain date pickers
+// must keep all 12 months — a payment can still be dated in Sartan.
+function billableMonthOptions(selected) {
+  let html = '';
+  let fallback = null;
+  for (let m = 1; m <= 12; m++) {
+    if (isHolidayMonth(m)) continue;
+    if (fallback === null) fallback = m;
+    html += `<option value="${m}">${SHAMSI_MONTHS_DARI[m]}</option>`;
+  }
+  // If the current month is a holiday, land on the first working month
+  const pick = isHolidayMonth(selected) ? fallback : selected;
+  return html.replace(`<option value="${pick}">`, `<option value="${pick}" selected>`);
+}
+
+// Rebuild every billing/payroll period selector after the holiday list
+// is known (or changed in Settings), keeping the chosen value if valid.
+function refreshBillingPeriodSelectors() {
+  ['fee-month', 'payroll-month', 'rpt-fee-month', 'rpt-pay-month', 'sa-month'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel || !sel.options.length) return;
+    const prev = parseInt(sel.value);
+    sel.innerHTML = billableMonthOptions(isHolidayMonth(prev) ? getCurrentShamsi().month : prev);
+  });
+}
 // Always-Dari Shamsi month name lookup (Western digits for the year)
 function shamsiMonthName(m) { return SHAMSI_MONTHS_DARI[m] || ''; }
 function shamsiDate(input) {
@@ -8490,7 +8524,7 @@ async function loadStaffMonthly() {
   // Populate Shamsi month/year selectors once
   if (!mSel.options.length) {
     const cur = getCurrentShamsi();
-    mSel.innerHTML = shamsiMonthOptions(cur.month);
+    mSel.innerHTML = billableMonthOptions(cur.month);
     ySel.innerHTML = shamsiYearOptions(cur.year);
   }
   const month = parseInt(mSel.value) || getCurrentShamsi().month;
@@ -8727,7 +8761,7 @@ async function initFees() {
     const ySel = document.getElementById('fee-year');
     if (mSel && !mSel.dataset.init) {
       const cur = getCurrentShamsi();
-      mSel.innerHTML = shamsiMonthOptions(cur.month);
+      mSel.innerHTML = billableMonthOptions(cur.month);
       ySel.innerHTML = shamsiYearOptions(cur.year);
       mSel.dataset.init = '1';
     }
@@ -8850,7 +8884,11 @@ async function loadFeeList() {
     const isPartial = paid > 0 && !isFull;
 
     let statusBadge, actionBtn;
-    if (!periodExpected && paid === 0) {
+    if (bal.period_holiday) {
+      // School holiday — no fee is charged for this month at all.
+      statusBadge = `<span class="badge" style="background:rgba(155,110,255,.15);color:#6e3fdb;border:1px solid rgba(155,110,255,.3);"><i class="fas fa-umbrella-beach" style="font-size:9px;"></i> ${t('status_holiday')||'Holiday'}</span>`;
+      actionBtn   = `<button onclick="openFeePanel(${s.id})" style="padding:6px 14px;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;color:var(--text-mid);font-family:var(--font-head);font-size:12px;font-weight:700;cursor:pointer;"><i class="fas fa-eye"></i> View</button>`;
+    } else if (!periodExpected && paid === 0) {
       statusBadge = `<span title="${t('hint_period_untracked')||'This month isn\'t tracked for this student — add it to Previously Unpaid Months, or change the install cutoff in Settings.'}" style="font-size:12px;color:var(--text-dim);cursor:help;">— <i class="fas fa-info-circle" style="font-size:10px;opacity:.6;"></i></span>`;
       actionBtn   = `<button onclick="openFeePanel(${s.id})" style="padding:6px 14px;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;color:var(--text-mid);font-family:var(--font-head);font-size:12px;font-weight:700;cursor:pointer;"><i class="fas fa-eye"></i> View</button>`;
     } else if (isFull) {
@@ -10689,9 +10727,9 @@ async function initReports() {
   _loadShamsiField('ratt', now.toISOString().split('T')[0]);
   // All month/year filters use Shamsi calendar — schools in Afghanistan operate on Shamsi
   const cur = getCurrentShamsi();
-  document.getElementById('rpt-fee-month').innerHTML = shamsiMonthOptions(cur.month);
+  document.getElementById('rpt-fee-month').innerHTML = billableMonthOptions(cur.month);
   document.getElementById('rpt-fee-year').innerHTML  = shamsiYearOptions(cur.year);
-  document.getElementById('rpt-pay-month').innerHTML = shamsiMonthOptions(cur.month);
+  document.getElementById('rpt-pay-month').innerHTML = billableMonthOptions(cur.month);
   document.getElementById('rpt-pay-year').innerHTML  = shamsiYearOptions(cur.year);
   document.getElementById('rpt-exp-month').innerHTML = shamsiMonthOptions(cur.month);
   document.getElementById('rpt-exp-year').innerHTML  = shamsiYearOptions(cur.year);
@@ -10841,6 +10879,13 @@ function reportHeader(title, subtitle) {
     if (cfg.school_address)      window._cachedSchoolAddr  = cfg.school_address;
     if (cfg.name)                window._cachedSchoolName  = cfg.name;
     if (cfg.abbreviation)        window._cachedSchoolAbbr  = cfg.abbreviation;
+    // Holiday months drive which periods the billing/payroll selectors offer
+    if (cfg.non_billable_months !== undefined) {
+      window.HOLIDAY_MONTHS = new Set(
+        String(cfg.non_billable_months).split(',')
+          .map(x => parseInt(x.trim(), 10)).filter(n => n >= 1 && n <= 12));
+      refreshBillingPeriodSelectors();
+    }
   } catch(_) {}
 })();
 
@@ -11169,6 +11214,10 @@ async function saveSettings(section) {
     data.default_monthly_fee  = document.getElementById('set-default-fee').value;
     data.non_billable_months = Array.from(document.querySelectorAll('.hol-month:checked'))
                                     .map(c => c.value).join(',');
+    // Keep the in-page holiday list in sync so period selectors update now
+    window.HOLIDAY_MONTHS = new Set(data.non_billable_months.split(',')
+                              .map(x => parseInt(x, 10)).filter(Boolean));
+    setTimeout(refreshBillingPeriodSelectors, 0);
     data.gov_scholarship_count   = document.getElementById('set-gov-scholarship-count').value;
     data.gov_scholarship_percent = document.getElementById('set-gov-scholarship-percent').value;
     data.gov_office_name         = document.getElementById('set-gov-office-name').value.trim();
@@ -11406,7 +11455,7 @@ function initPayroll() {
   const cur  = getCurrentShamsi();
   const mSel = document.getElementById('payroll-month');
   const ySel = document.getElementById('payroll-year');
-  if (mSel) mSel.innerHTML = shamsiMonthOptions(cur.month);
+  if (mSel) mSel.innerHTML = billableMonthOptions(cur.month);
   if (ySel) ySel.innerHTML = shamsiYearOptions(cur.year);
   loadPayroll();
 }

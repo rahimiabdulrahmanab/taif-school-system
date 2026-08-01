@@ -757,9 +757,11 @@ router.get('/balances', async (req, res) => {
         ? (paidMap.get(`${s.id}-${periodYear}-${periodMonth}`) || 0)
         : 0;
 
-      // Period is "expected" if it falls within the auto-walk range
+      // Period is "expected" if it falls within the auto-walk range.
+      // A holiday month is never expected — no fee is charged for it.
+      const periodIsHoliday = !!(periodMonth && holidayMonths.has(periodMonth));
       let periodExpected = false;
-      if (periodYear && periodMonth) {
+      if (periodYear && periodMonth && !periodIsHoliday) {
         const inRange = (
           (periodYear > startY || (periodYear === startY && periodMonth >= startM)) &&
           (periodYear < cur.year || (periodYear === cur.year && periodMonth <= cur.month))
@@ -773,8 +775,9 @@ router.get('/balances', async (req, res) => {
         unpaid_months:   unpaidMonths,
         total_due:       totalDue,
         period_paid:     periodPaid,
-        period_due:      fee,
+        period_due:      periodIsHoliday ? 0 : fee,
         period_expected: periodExpected,
+        period_holiday:  periodIsHoliday,
       };
     });
 

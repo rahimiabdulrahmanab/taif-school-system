@@ -98,6 +98,11 @@ app.get('/api/config', async (req, res) => {
       final_max:        parseInt(db.final_max    || CONFIG.final_max),
       pass_mark:        parseInt(db.pass_mark    || CONFIG.pass_mark),
       absence_alert_time: db.absence_alert_time || CONFIG.absence_alert_time,
+      // Months the school is closed — no fee billed, no salary earned.
+      // The UI hides these from every billing/payroll period selector.
+      non_billable_months: (db.non_billable_months !== undefined && db.non_billable_months !== null)
+        ? String(db.non_billable_months)
+        : '4,5',
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
