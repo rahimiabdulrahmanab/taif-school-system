@@ -2,6 +2,7 @@ const express = require('express');
 const pool    = require('../db.js');
 const { kabulTodayISO } = require('../shamsi.js');
 const { calculateMonthlyTax } = require('../tax.js');
+const { getHolidayMonths } = require('../holidays.js');
 const router  = express.Router();
 
 // ── Student List by Class ─────────────────────────────────────
@@ -135,10 +136,14 @@ router.get('/payroll', async (req, res) => {
     // Same salary model as the payroll page:
     //   net = salary − tax − (absence, paid rows only) + overtime − advances
     // Paid rows use the FROZEN figures stored at payment time.
+    // Holiday months earn no salary — overtime only.
+    const holidayMonths = await getHolidayMonths();
+    const isHolidayMonth = holidayMonths.has(m);
+
     const result = people.map(p => {
       const key    = `${p.person_type}-${p.id}`;
       const paid   = payMap[key] || null;
-      const salary = parseFloat(p.monthly_salary) || 0;
+      const salary = isHolidayMonth ? 0 : (parseFloat(p.monthly_salary) || 0);
       if (paid) {
         return {
           ...p, salary,
@@ -162,6 +167,7 @@ router.get('/payroll', async (req, res) => {
 
     res.json({
       month: m, year: y, people: result,
+      is_holiday_month: isHolidayMonth,
       total_salary: result.reduce((s,p)=>s+p.salary,0),
       total_paid:   result.filter(p=>p.is_paid).reduce((s,p)=>s+p.net,0),
     });

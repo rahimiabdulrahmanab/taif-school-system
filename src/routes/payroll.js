@@ -2,6 +2,7 @@ const express = require('express');
 const pool    = require('../db.js');
 const { shamsiMonthRange, workingDaysBetween, kabulTodayDate } = require('../shamsi.js');
 const { TAX_BRACKETS, calculateMonthlyTax } = require('../tax.js');
+const { getHolidayMonths } = require('../holidays.js');
 const router  = express.Router();
 
 // ── GET payroll list for a month/year ────────────────────────
@@ -113,11 +114,18 @@ router.get('/', async (req, res) => {
       if (!/payroll_overtime/.test(e.message || '')) throw e;
     }
 
+    // Summer holidays (Sartan/Asad): school is closed, so no salary is
+    // earned. Overtime is still payable — that is money for work actually
+    // done during the break (e.g. summer classes).
+    const holidayMonths = await getHolidayMonths();
+    const isHolidayMonth = holidayMonths.has(m);
+
     const result = people.map(p => {
       const key      = `${p.person_type}-${p.id}`;
       const payroll  = payrollMap[key] || null;
       const advances = advMap[key] || [];
-      const salary   = parseFloat(p.monthly_salary) || 0;
+      const baseSalary = parseFloat(p.monthly_salary) || 0;
+      const salary   = isHolidayMonth ? 0 : baseSalary;
       const advTotal = advances.reduce((s, a) => s + parseFloat(a.amount || 0), 0);
       // If already paid, use the stored tax amount (frozen at payment time).
       // Otherwise compute on the fly so the office always sees the live figure.
@@ -135,15 +143,18 @@ router.get('/', async (req, res) => {
       //   • already paid    → frozen value stored on the payroll row
       //   • admin override  → working_days_in_month − confirmed present_days
       //   • otherwise       → elapsed school days (excl. Fridays) not scanned
+      // Nobody is "absent" during a school holiday — there is no work day
+      // to miss, and no salary to deduct from.
       let absentDays;
-      if (payroll)          absentDays = parseInt(payroll.absent_days, 10) || 0;
+      if (isHolidayMonth)   absentDays = 0;
+      else if (payroll)     absentDays = parseInt(payroll.absent_days, 10) || 0;
       else if (hasOverride) absentDays = Math.max(0, workingDaysInMonth - presentDays);
       else                  absentDays = Math.max(0, elapsedSchoolDays - scannedDays);
 
       const dailyRate    = salary / 30;   // fixed 30-day month (Fridays included)
-      const absenceDeduction = payroll
+      const absenceDeduction = isHolidayMonth ? 0 : (payroll
         ? parseFloat(payroll.deduction_amount || 0)
-        : Math.round(dailyRate * absentDays);
+        : Math.round(dailyRate * absentDays));
 
       // Overtime for this month (added on top of earned salary)
       const ot       = overtimeMap[key] || { entries: [], hours: 0, amount: 0 };
@@ -169,6 +180,8 @@ router.get('/', async (req, res) => {
       return {
         ...p,
         salary,
+        base_salary:     baseSalary,           // contract salary, before the holiday rule
+        is_holiday_month: isHolidayMonth,      // school closed → no salary earned
         advances,                              // detailed list with dates
         advance_amount: advShown,              // frozen for paid rows, live otherwise
         advance_count:  advances.length,
@@ -213,6 +226,23 @@ router.post('/pay', async (req, res) => {
             absent_days, deduction_amount } = req.body;
     const payMonth = `${year}-${String(month).padStart(2,'0')}`;
 
+    // School holiday → no salary is earned. Only overtime actually worked
+    // during the break can be paid out.
+    const holidayMonths = await getHolidayMonths();
+    const isHolidayMonth = holidayMonths.has(parseInt(month));
+    if (isHolidayMonth) {
+      const otRes = await pool.query(
+        `SELECT COALESCE(SUM(amount),0)::float AS total FROM payroll_overtime
+          WHERE person_id=$1 AND person_type=$2 AND pay_month=$3`,
+        [person_id, person_type, payMonth]).catch(() => ({ rows: [{ total: 0 }] }));
+      const otTotal = parseFloat(otRes.rows[0].total) || 0;
+      if (otTotal <= 0) {
+        return res.status(400).json({
+          error: 'This month is a school holiday — no salary is paid. Add overtime first if the person worked during the break.',
+        });
+      }
+    }
+
     // Check not already paid
     const exists = await pool.query(
       `SELECT id FROM payroll WHERE person_id=$1 AND person_type=$2 AND pay_month=$3`,
@@ -227,7 +257,9 @@ router.post('/pay', async (req, res) => {
     } else {
       salaryRes = await pool.query(`SELECT monthly_salary FROM staff WHERE id=$1`, [person_id]);
     }
-    const baseSalary = parseFloat(salaryRes.rows[0]?.monthly_salary) || 0;
+    // In a holiday month no salary is earned, so the frozen record stores
+    // 0 base salary and 0 tax — the payout is overtime only.
+    const baseSalary = isHolidayMonth ? 0 : (parseFloat(salaryRes.rows[0]?.monthly_salary) || 0);
 
     // Sum all advances for the month (not just one)
     const advRes = await pool.query(
@@ -239,8 +271,8 @@ router.post('/pay', async (req, res) => {
     const advAmt = parseFloat(advRes.rows[0].total) || 0;
     const taxAmt = calculateMonthlyTax(baseSalary);
     // Absence — admin may override the auto-counted value at payment time
-    const absentDays  = Math.max(0, parseInt(absent_days, 10) || 0);
-    const deduction   = Math.max(0, parseFloat(deduction_amount) || 0);
+    const absentDays  = isHolidayMonth ? 0 : Math.max(0, parseInt(absent_days, 10) || 0);
+    const deduction   = isHolidayMonth ? 0 : Math.max(0, parseFloat(deduction_amount) || 0);
 
     const result = await pool.query(`
       INSERT INTO payroll
@@ -276,6 +308,15 @@ router.post('/advance', async (req, res) => {
     const amt = parseFloat(amount);
 
     if (!amt || amt <= 0) return res.status(400).json({ error: 'Advance amount must be greater than 0' });
+
+    // No salary is earned in a holiday month, so there is nothing for an
+    // advance to be recovered from.
+    const holidayMonths = await getHolidayMonths();
+    if (holidayMonths.has(parseInt(month))) {
+      return res.status(400).json({
+        error: 'This month is a school holiday — no salary is earned, so an advance cannot be given against it. Record it under a working month instead.',
+      });
+    }
 
     // Cumulative advances + this one must not exceed NET PAYABLE (salary after tax)
     const salTable = person_type === 'teacher' ? 'teachers' : 'staff';
@@ -466,8 +507,12 @@ router.get('/tax-report', async (req, res) => {
        ORDER BY s.first_name
     `, [payMonth]);
 
+    // No salary is earned in a holiday month, so no wage tax is due either.
+    const taxHolidayMonths = await getHolidayMonths();
+    const taxIsHoliday = taxHolidayMonths.has(m);
+
     const rows = [...teachers.rows, ...staff.rows].map(r => {
-      const salary = parseFloat(r.monthly_salary) || 0;
+      const salary = taxIsHoliday ? 0 : (parseFloat(r.monthly_salary) || 0);
       // If they've been paid this month, use the frozen tax. Otherwise compute live.
       const tax = r.tax_amount != null ? parseFloat(r.tax_amount) : calculateMonthlyTax(salary);
       return {
@@ -489,6 +534,7 @@ router.get('/tax-report', async (req, res) => {
 
     res.json({
       period: { month: m, year: y },
+      is_holiday_month: taxIsHoliday,
       brackets: TAX_BRACKETS.map(b => ({ upTo: b.upTo === Infinity ? null : b.upTo, rate: b.rate })),
       rows,
       totals: {

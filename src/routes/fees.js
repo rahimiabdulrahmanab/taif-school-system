@@ -2,6 +2,7 @@ const express = require('express');
 const pool    = require('../db.js');
 const CONFIG  = require('../../school-config.js');
 const { toShamsi, todayShamsi } = require('../shamsi.js');
+const { getHolidayMonths } = require('../holidays.js');
 const router  = express.Router();
 
 // Run fn inside a DB transaction. Multi-statement money operations must be
@@ -34,27 +35,8 @@ async function withTx(fn) {
 //                        no longer shows as outstanding; the debt grew.
 // ─────────────────────────────────────────────────────────────────────
 
-// ── Summer-holiday (non-billable) months ──────────────────────
-// Afghan schools close for Sartan (4) and Asad (5), and Taif charges no
-// fee for them. Stored school-wide as a comma-separated list of Shamsi
-// month numbers in settings.non_billable_months, so one setting fixes
-// every student at once — past, present and every future year.
-const DEFAULT_NON_BILLABLE = [4, 5];   // سرطان، اسد
-
-async function getNonBillableMonths() {
-  try {
-    const r = await pool.query(
-      `SELECT value FROM settings WHERE key = 'non_billable_months'`);
-    if (!r.rows.length || r.rows[0].value == null) return new Set(DEFAULT_NON_BILLABLE);
-    const raw = String(r.rows[0].value).trim();
-    if (raw === '') return new Set();     // admin explicitly cleared it → bill every month
-    return new Set(raw.split(',')
-      .map(x => parseInt(x.trim(), 10))
-      .filter(n => n >= 1 && n <= 12));
-  } catch (_) {
-    return new Set(DEFAULT_NON_BILLABLE);
-  }
-}
+// Summer-holiday months are shared with payroll — see src/holidays.js
+const getNonBillableMonths = getHolidayMonths;
 
 // Compute the student's effective monthly fee (after discount).
 function effectiveFeeOf(s) {
