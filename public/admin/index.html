@@ -1639,7 +1639,7 @@ button[style*="background:linear-gradient"]{
 <!-- Student table -->
 <div class="dash-card">
   <div style="overflow-x:auto;">
-    <table class="scan-tbl-clean" style="min-width:880px;">
+    <table class="scan-tbl-clean" style="min-width:980px;">
       <thead>
         <tr>
           <th data-i18n="th_student">Student</th>
@@ -1648,11 +1648,12 @@ button[style*="background:linear-gradient"]{
           <th data-i18n="th_parent_phone">Parent Phone</th>
           <th data-i18n="th_monthly_fee">Monthly Fee</th>
           <th data-i18n="th_discount">Discount</th>
+          <th data-i18n="th_due">Due</th>
           <th style="text-align:center;" data-i18n="th_actions">Actions</th>
         </tr>
       </thead>
       <tbody id="stu-tbody">
-        <tr><td colspan="7"><div class="empty" style="padding:60px 20px;"><i class="fas fa-user-graduate"></i><p>No students yet. Click Add Student to begin.</p></div></td></tr>
+        <tr><td colspan="8"><div class="empty" style="padding:60px 20px;"><i class="fas fa-user-graduate"></i><p>No students yet. Click Add Student to begin.</p></div></td></tr>
       </tbody>
     </table>
   </div>
@@ -4443,7 +4444,7 @@ const LANG = {
     lbl_no_teachers:'No teachers found.', lbl_no_staff:'No staff found.',
     lbl_no_classes:'No classes yet.', lbl_no_data:'No data found.',
     th_student:'Student', th_code:'Code', th_class:'Class', th_parent_phone:'Parent Phone',
-    th_monthly_fee:'Monthly Fee', th_discount:'Discount', th_actions:'Actions',
+    th_monthly_fee:'Monthly Fee', th_discount:'Discount', th_due:'Due', th_actions:'Actions',
     th_teacher:'Teacher', th_subject:'Subject', th_phone:'Phone', th_monthly_salary:'Monthly Salary',
     th_staff:'Staff', th_role:'Role', th_outstanding:'Outstanding',
     th_employee:'Employee', th_type:'Type', th_base_salary:'Base Salary',
@@ -4874,7 +4875,7 @@ const LANG = {
     lbl_no_teachers:'هېڅ ښوونکی ونه موندل شو.', lbl_no_staff:'هېڅ کارکوونکی ونه موندل شو.',
     lbl_no_classes:'لا هیڅ ټولګی نشته.', lbl_no_data:'هېڅ ډاټا ونه موندل شوه.',
     th_student:'زده کوونکی', th_code:'کوډ', th_class:'ټولګی', th_parent_phone:'د والدینو شمېره',
-    th_monthly_fee:'میاشتنی فیس', th_discount:'تخفیف', th_actions:'کړنې',
+    th_monthly_fee:'میاشتنی فیس', th_discount:'تخفیف', th_due:'باقي', th_actions:'کړنې',
     th_teacher:'ښوونکی', th_subject:'مضمون', th_phone:'ټیلیفون', th_monthly_salary:'میاشتنی معاش',
     th_staff:'کارکوونکی', th_role:'دنده', th_outstanding:'باقي‌دار',
     th_employee:'کارمند', th_type:'ډول', th_base_salary:'اصلي معاش',
@@ -5958,6 +5959,7 @@ applyLang(_lang);
 //  STUDENT MANAGEMENT JS
 // ═══════════════════════════════════════════════════
 let allStudents  = [];
+let studentDueMap = {};   // student_id → running ledger balance row
 let editingStudId = null;
 let webcamStream  = null;
 let capturedBlob  = null;
@@ -5971,12 +5973,21 @@ window.go = function(id, el) {
 
 async function loadStudents() {
   try {
-    const [stuRes, clsRes] = await Promise.all([
+    // Balances come from the same running ledger the Fee Collection page
+    // uses, so the Due column here can never disagree with it.
+    const [stuRes, clsRes, balRes] = await Promise.all([
       fetch('/api/students'),
       fetch('/api/classes'),
+      fetch('/api/fees/balances'),
     ]);
     allStudents = await stuRes.json();
     const classes = await clsRes.json();
+
+    studentDueMap = {};
+    if (balRes.ok) {
+      const balances = await balRes.json();
+      (Array.isArray(balances) ? balances : []).forEach(b => { studentDueMap[b.student_id] = b; });
+    }
 
     // Populate class filter + form select
     const cf  = document.getElementById('stu-class-filter');
@@ -6020,7 +6031,7 @@ function renderStudents(list) {
 
   const tb = document.getElementById('stu-tbody');
   if (!list.length) {
-    tb.innerHTML = `<tr><td colspan="7"><div class="empty" style="padding:60px 20px;">
+    tb.innerHTML = `<tr><td colspan="8"><div class="empty" style="padding:60px 20px;">
       <i class="fas fa-user-graduate"></i>
       <p>${t('lbl_no_students')}</p>
       <button onclick="openStudentForm()" style="margin-top:14px;padding:9px 20px;background:linear-gradient(135deg,#5DCAA5,#3aaa85);border:none;border-radius:24px;color:#0a1f1a;font-family:var(--font-head);font-size:12px;font-weight:800;cursor:pointer;box-shadow:0 6px 16px rgba(93,202,165,.3);">
@@ -6054,6 +6065,18 @@ function renderStudents(list) {
       ? `<div style="display:flex;flex-direction:column;gap:2px;">${phones.map(_phoneRow).join('')}</div>`
       : '<span style="color:#94a3b8;font-size:11.5px;">—</span>';
 
+    // Due — running ledger balance (unpaid months + opening debt).
+    // Click opens the student's full account statement.
+    const bal  = studentDueMap[s.id] || { total_balance: 0, unpaid_months: 0 };
+    const owed = +bal.total_balance || 0;
+    const dueHtml = owed > 0
+      ? `<div onclick="openFeePanel(${s.id})" title="${t('lbl_account_statement')||'Account Statement'}" style="cursor:pointer;line-height:1.35;">
+           <span style="font-family:var(--font-mono);font-size:12.5px;font-weight:800;color:#dc4f4c;">${Math.round(owed).toLocaleString()}</span>
+           <span style="font-size:10px;color:#94a3b8;font-weight:600;">AFN</span>
+           <span style="display:block;font-size:10px;color:#8aa0b5;">${bal.unpaid_months} ${bal.unpaid_months === 1 ? (t('lbl_month_singular')||'month') : (t('lbl_months_plural')||'months')}</span>
+         </div>`
+      : `<span style="font-size:11.5px;font-weight:700;color:#178f4f;"><i class="fas fa-check-circle" style="font-size:10px;"></i> 0</span>`;
+
     return `<tr>
       <td><div class="pc" style="display:flex;align-items:center;gap:11px;">${photoHtml}<div style="min-width:0;">
         <div style="font-weight:700;font-size:13.5px;color:#0f2845;font-family:var(--font-head);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.first_name} ${s.last_name}</div>
@@ -6066,6 +6089,7 @@ function renderStudents(list) {
       <td>${phoneVis}</td>
       <td><span style="font-family:var(--font-mono);font-size:12.5px;font-weight:700;color:#0f2845;">${Number(s.monthly_fee).toLocaleString()}</span> <span style="font-size:10px;color:#94a3b8;font-weight:600;">AFN</span></td>
       <td>${discHtml}</td>
+      <td>${dueHtml}</td>
       <td style="text-align:center;">
         <div style="display:inline-flex;gap:5px;justify-content:center;">
           <button onclick="openStudentForm(${s.id})" title="Edit" style="width:30px;height:30px;border-radius:8px;background:rgba(91,158,247,.10);border:1px solid rgba(91,158,247,.22);color:#3a7abf;cursor:pointer;font-size:12px;transition:transform .15s ease;" onmouseover="this.style.transform='scale(1.08)';this.style.background='rgba(91,158,247,.18)'" onmouseout="this.style.transform='scale(1)';this.style.background='rgba(91,158,247,.10)'"><i class="fas fa-edit"></i></button>
