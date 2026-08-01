@@ -34,6 +34,28 @@ async function withTx(fn) {
 //                        no longer shows as outstanding; the debt grew.
 // ─────────────────────────────────────────────────────────────────────
 
+// ── Summer-holiday (non-billable) months ──────────────────────
+// Afghan schools close for Sartan (4) and Asad (5), and Taif charges no
+// fee for them. Stored school-wide as a comma-separated list of Shamsi
+// month numbers in settings.non_billable_months, so one setting fixes
+// every student at once — past, present and every future year.
+const DEFAULT_NON_BILLABLE = [4, 5];   // سرطان، اسد
+
+async function getNonBillableMonths() {
+  try {
+    const r = await pool.query(
+      `SELECT value FROM settings WHERE key = 'non_billable_months'`);
+    if (!r.rows.length || r.rows[0].value == null) return new Set(DEFAULT_NON_BILLABLE);
+    const raw = String(r.rows[0].value).trim();
+    if (raw === '') return new Set();     // admin explicitly cleared it → bill every month
+    return new Set(raw.split(',')
+      .map(x => parseInt(x.trim(), 10))
+      .filter(n => n >= 1 && n <= 12));
+  } catch (_) {
+    return new Set(DEFAULT_NON_BILLABLE);
+  }
+}
+
 // Compute the student's effective monthly fee (after discount).
 function effectiveFeeOf(s) {
   let fee = parseFloat(s.monthly_fee) || 0;
@@ -129,13 +151,14 @@ router.get('/student/:student_id', async (req, res) => {
     });
 
     // Auto-walk Shamsi months from enrolled_at → now
+    const holidayMonths = await getNonBillableMonths();
     const { startY, startM, curY, curM } = walkStart(s.enrolled_at);
     const outstanding = [];
     if (startY < curY || (startY === curY && startM <= curM)) {
       let y = startY, m = startM;
       while (y < curY || (y === curY && m <= curM)) {
         const key = `${y}-${m}`;
-        if (!carriedMonths.has(key)) {
+        if (!carriedMonths.has(key) && !holidayMonths.has(m)) {
           const paid    = +(paidByMonth[key] || 0).toFixed(2);
           const balance = Math.max(0, +(fee - paid).toFixed(2));
           if (balance > 0) {
@@ -283,6 +306,13 @@ router.post('/carry-forward', async (req, res) => {
       return res.status(400).json({ error: 'student_id, year and month are required' });
     }
 
+    const holidayMonths = await getNonBillableMonths();
+    if (holidayMonths.has(parseInt(month))) {
+      return res.status(400).json({
+        error: 'This month is a school holiday — no fee is charged, so there is nothing to carry forward.',
+      });
+    }
+
     const stuRes = await pool.query(
       `SELECT monthly_fee, discount_type, discount_value, previous_debt
          FROM students WHERE id = $1`,
@@ -336,6 +366,16 @@ router.post('/close-month', async (req, res) => {
     const month = parseInt(req.body.month);
     if (!year || !month) {
       return res.status(400).json({ error: 'year and month are required' });
+    }
+
+    // Summer-holiday months are never billed, so there is nothing to carry.
+    const holidayMonths = await getNonBillableMonths();
+    if (holidayMonths.has(month)) {
+      return res.json({
+        success: true, students_closed: 0, total_carried: 0,
+        skipped_holiday: true,
+        message: 'This month is a school holiday — no fee is charged, so there is nothing to carry forward.',
+      });
     }
 
     const students = await pool.query(`
@@ -467,20 +507,24 @@ router.get('/statement/:student_id', async (req, res) => {
     } catch (_) {}
     const atOrAfterCutoff = (yy, mm) =>
       (yy > cutY) || (yy === cutY && mm >= cutM);
+    const holidayMonths = await getNonBillableMonths();
 
     const byYear = {};
     let y = cur.year, m = cur.month;
     while (y > sy || (y === sy && m >= sm)) {
       const k = `${y}-${m}`;
       const ov  = dueByKey[k];
+      const isHoliday = !ov && holidayMonths.has(m);
       const due = ov ? parseFloat(ov.amount_due)
-                     : (atOrAfterCutoff(y, m) ? fee : 0);
+                     : (isHoliday ? 0 : (atOrAfterCutoff(y, m) ? fee : 0));
       const pays = payByKey[k] || [];
       const paid = +pays.reduce((t, p) => t + parseFloat(p.amount || 0), 0).toFixed(2);
       const balance = +(due - paid).toFixed(2);
       (byYear[y] = byYear[y] || []).push({
         year: y, month: m, due, paid, balance,
-        status: paid <= 0 ? 'unpaid' : (balance > 0 ? 'partial' : 'paid'),
+        status: isHoliday ? 'holiday'
+              : (paid <= 0 ? 'unpaid' : (balance > 0 ? 'partial' : 'paid')),
+        holiday: isHoliday,
         due_overridden: !!ov,
         due_note: ov ? ov.notes : null,
         payments: pays,
@@ -687,6 +731,7 @@ router.get('/balances', async (req, res) => {
       });
     } catch (_) {}
     const atOrAfterCutoff = (yy, mm) => (yy > cutY) || (yy === cutY && mm >= cutM);
+    const holidayMonths = await getNonBillableMonths();
 
     const out = students.rows.map(s => {
       const fee = effectiveFeeOf(s);
@@ -703,7 +748,11 @@ router.get('/balances', async (req, res) => {
         const key = `${s.id}-${y}-${m}`;
         if (!carriedSet.has(key)) {
           const ov  = dueMap.get(key);
-          const due = (ov !== undefined) ? ov : (atOrAfterCutoff(y, m) ? fee : 0);
+          // Explicit per-month override wins; otherwise summer-holiday
+          // months bill nothing, and normal months bill the fee.
+          const due = (ov !== undefined)
+            ? ov
+            : (holidayMonths.has(m) ? 0 : (atOrAfterCutoff(y, m) ? fee : 0));
           const pd  = paidMap.get(key) || 0;
           monthsDue  += due;
           monthsPaid += pd;

@@ -3904,6 +3904,13 @@ button[style*="background:linear-gradient"]{
       </div>
     </div>
 
+    <!-- Summer-holiday (non-billable) months -->
+    <div style="grid-column:1 / -1;border-top:1px dashed var(--glass-border);padding-top:14px;margin-top:4px;">
+      <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;" data-i18n="lbl_holiday_months">Holiday Months — No Fee Charged</label>
+      <div style="font-size:10.5px;color:var(--text-dim);margin-bottom:10px;line-height:1.5;" data-i18n="hint_holiday_months">Tick the months the school is closed. No fee is billed for these months for any student — in every year, past and future. Sartan and Asad are the summer holidays.</div>
+      <div id="set-holiday-months" style="display:flex;flex-wrap:wrap;gap:7px;direction:rtl;"></div>
+    </div>
+
   </div>
 </div>
 
@@ -4604,6 +4611,9 @@ const LANG = {
     th_scanned_days:'Scanned Days', th_present_days:'Present Days', th_absent_days:'Absent Days',
     hint_staff_attendance:'"Scanned Days" is auto-counted from gate scans. Adjust "Present Days" if needed, then Save — payroll uses the saved value.',
     status_paid:'Paid', status_pending:'Pending', status_advance_taken:'Advance Taken',
+    status_holiday:'Holiday',
+    lbl_holiday_months:'Holiday Months — No Fee Charged',
+    hint_holiday_months:'Tick the months the school is closed. No fee is billed for these months for any student — in every year, past and future. Sartan and Asad are the summer holidays.',
     btn_advance:'Advance', btn_pay:'Pay', btn_undo:'Undo', btn_close:'Close',
     btn_processing:'Processing...', btn_print_receipt:'Print receipt',
     btn_delete:'Delete', btn_remove:'Remove',
@@ -5035,6 +5045,9 @@ const LANG = {
     hint_staff_attendance:'«سکن شوې ورځې» د دروازې له سکن څخه په اتومات ډول شمیرل کیږي. که اړتیا وي «د حاضرۍ ورځې» سم کړئ، بیا یې خوندي کړئ — معاش به همدا ارزښت وکاروي.',
     lbl_tax_hint:'دولتي مالیه', lbl_advances_detail:'د پیش معاش تفصیل',
     status_paid:'ورکړل شو', status_pending:'پاتې', status_advance_taken:'پیش معاش اخیستل شوی',
+    status_holiday:'رخصتي',
+    lbl_holiday_months:'د رخصتۍ میاشتې — فیس نه اخیستل کیږي',
+    hint_holiday_months:'هغه میاشتې وټاکئ چې ښوونځی تړل شوی وي. په دې میاشتو کې د هیڅ زده‌کوونکي څخه فیس نه اخیستل کیږي — په هر کال کې، تیر او راتلونکی. سرطان او اسد د اوړي رخصتي دي.',
     btn_advance:'پیش معاش', btn_pay:'ورکړه', btn_undo:'بیرته', btn_close:'بندول',
     btn_processing:'پروسس کیږي...', btn_print_receipt:'د رسید چاپول',
     btn_delete:'ړنګول', btn_remove:'لرې کول',
@@ -8977,6 +8990,7 @@ async function openFeePanel(studentId) {
 }
 
 function _statusPill(st) {
+  if (st === 'holiday') return `<span style="font-size:9.5px;font-weight:800;padding:2px 9px;background:rgba(155,110,255,.15);color:#6e3fdb;border-radius:12px;">${t('status_holiday')||'Holiday'}</span>`;
   if (st === 'paid')    return `<span style="font-size:9.5px;font-weight:800;padding:2px 9px;background:rgba(34,197,113,.15);color:#178f4f;border-radius:12px;">${t('status_paid')||'Paid'}</span>`;
   if (st === 'partial') return `<span style="font-size:9.5px;font-weight:800;padding:2px 9px;background:rgba(255,170,61,.15);color:#8b5a0e;border-radius:12px;">${t('status_partial')||'Partial'}</span>`;
   return `<span style="font-size:9.5px;font-weight:800;padding:2px 9px;background:rgba(220,79,76,.15);color:#dc4f4c;border-radius:12px;">${t('status_unpaid')||'Unpaid'}</span>`;
@@ -11089,6 +11103,7 @@ async function loadSettingsPage() {
     setVal('set-currency',        s.currency           || '');
     setVal('set-currency-symbol', s.currency_symbol    || '');
     setVal('set-default-fee',     s.default_monthly_fee|| '');
+    renderHolidayMonths(s.non_billable_months);
     setVal('set-gov-scholarship-count',   s.gov_scholarship_count   || '');
     setVal('set-gov-scholarship-percent', s.gov_scholarship_percent || '');
     setVal('set-gov-office-name',         s.gov_office_name         || '');
@@ -11148,6 +11163,8 @@ async function saveSettings(section) {
     data.currency             = document.getElementById('set-currency').value.trim();
     data.currency_symbol      = document.getElementById('set-currency-symbol').value.trim();
     data.default_monthly_fee  = document.getElementById('set-default-fee').value;
+    data.non_billable_months = Array.from(document.querySelectorAll('.hol-month:checked'))
+                                    .map(c => c.value).join(',');
     data.gov_scholarship_count   = document.getElementById('set-gov-scholarship-count').value;
     data.gov_scholarship_percent = document.getElementById('set-gov-scholarship-percent').value;
     data.gov_office_name         = document.getElementById('set-gov-office-name').value.trim();
@@ -11200,6 +11217,32 @@ async function uploadLogo(input) {
     showAlert({ title: t('alert_title_saved'), message: t('msg_saved_ok'), type: 'success' });
   } catch(e) {
     showAlert({ title: t('alert_title_failed'), message: e.message, type: 'error' });
+  }
+}
+
+// ── Holiday (non-billable) month picker ──────────────────────
+// Months ticked here are never billed, for every student, in every year.
+function renderHolidayMonths(value) {
+  const host = document.getElementById('set-holiday-months');
+  if (!host) return;
+  // Undefined setting → the system default (Sartan + Asad). An explicitly
+  // saved empty string means "bill every month".
+  const raw = (value === undefined || value === null) ? '4,5' : String(value);
+  const on  = new Set(raw.split(',').map(x => parseInt(x.trim(), 10)).filter(Boolean));
+  host.innerHTML = '';
+  for (let m = 1; m <= 12; m++) {
+    const checked = on.has(m);
+    const el = document.createElement('label');
+    el.style.cssText = `display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:20px;cursor:pointer;font-size:12.5px;font-weight:700;font-family:var(--font-body);transition:var(--transition);border:1px solid ${checked ? 'rgba(220,79,76,.45)' : 'var(--glass-border)'};background:${checked ? 'rgba(220,79,76,.12)' : 'var(--glass)'};color:${checked ? '#c0392b' : 'var(--text-mid)'};`;
+    el.innerHTML = `<input type="checkbox" class="hol-month" value="${m}" ${checked ? 'checked' : ''} style="accent-color:#dc4f4c;cursor:pointer;">
+                    <span>${SHAMSI_MONTHS_DARI[m]}</span>`;
+    el.querySelector('input').addEventListener('change', function () {
+      const c = this.checked;
+      el.style.border     = '1px solid ' + (c ? 'rgba(220,79,76,.45)' : 'var(--glass-border)');
+      el.style.background = c ? 'rgba(220,79,76,.12)' : 'var(--glass)';
+      el.style.color      = c ? '#c0392b' : 'var(--text-mid)';
+    });
+    host.appendChild(el);
   }
 }
 
