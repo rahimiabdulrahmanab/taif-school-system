@@ -2137,6 +2137,9 @@ button[style*="background:linear-gradient"]{
     <button onclick="promoteYearEnd()" style="display:inline-flex;align-items:center;gap:9px;padding:11px 20px;background:linear-gradient(135deg,#22c571,#178f4f);border:none;border-radius:12px;color:#fff;font-family:var(--font-head);font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 8px 24px rgba(34,197,113,.30);transition:transform .2s ease;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
       <i class="fas fa-arrow-up-right-dots"></i> <span data-i18n="btn_promote_year">Promote / End of Year</span>
     </button>
+    <button onclick="undoLastPromotion()" title="Put every student back into the class they were in before the last promotion" style="display:inline-flex;align-items:center;gap:9px;padding:11px 20px;background:#fff;border:1.5px solid #e0574f;border-radius:12px;color:#c8443c;font-family:var(--font-head);font-size:13px;font-weight:800;cursor:pointer;transition:transform .2s ease;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+      <i class="fas fa-rotate-left"></i> <span data-i18n="btn_undo_promote">Undo Promotion</span>
+    </button>
     <button onclick="openClassForm()" style="display:inline-flex;align-items:center;gap:9px;padding:11px 22px;background:linear-gradient(135deg,#9b6eff,#6e3fdb);border:none;border-radius:12px;color:#fff;font-family:var(--font-head);font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 8px 24px rgba(155,110,255,.35);transition:transform .2s ease;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
       <i class="fas fa-plus"></i> <span data-i18n="btn_add_class">Add Class</span>
     </button>
@@ -4404,6 +4407,8 @@ const LANG = {
     tch_stat_total:'Total Teachers', tch_stat_with_login:'Portal Logins Set', tch_stat_payroll:'Monthly Payroll (AFN)',
     stf_stat_total:'Total Staff', stf_stat_payroll:'Monthly Payroll (AFN)',
     cls_stat_total:'Total Classes', cls_stat_students:'Enrolled Students', cls_stat_subjects:'Subjects Configured',
+    cls_group_prep:'University Entrance Preparation', cls_row_meta:'{c} classes · {s} students',
+    btn_promote_class:'Promote this class', confirm_promote_class_title:'Promote {name}?',
     cls_empty_title:'No Classes Yet', btn_manage_class:'Manage Class',
     btn_graduate:'Graduate', btn_promote_year:'Promote / End of Year',
     lbl_graduates:'Graduates',
@@ -4840,6 +4845,8 @@ const LANG = {
     tch_stat_total:'ټول ښوونکي', tch_stat_with_login:'د پورټال ننوتنې', tch_stat_payroll:'میاشتنۍ معاشات (افغانۍ)',
     stf_stat_total:'ټول کارکوونکي', stf_stat_payroll:'میاشتنۍ معاشات (افغانۍ)',
     cls_stat_total:'ټول ټولګي', cls_stat_students:'نوم لیکل شوي زده‌کوونکي', cls_stat_subjects:'تنظیم شوي مضامين',
+    cls_group_prep:'د پوهنتون آمادګي', cls_row_meta:'{c} ټولګي · {s} زده‌کوونکي',
+    btn_promote_class:'دا ټولګی پورته کول', confirm_promote_class_title:'{name} پورته کړو؟',
     cls_empty_title:'لا ټولګي نشته', btn_manage_class:'د ټولګي اداره',
     btn_graduate:'فراغت', btn_promote_year:'پورته کول / د کال پای',
     lbl_graduates:'فارغان',
@@ -6439,6 +6446,7 @@ function showConfirm({ title, message, confirmText = 'Confirm', cancelText = 'Ca
   cancelCallback  = onCancel || null;
   document.getElementById('cm-title').textContent   = title;
   document.getElementById('cm-message').textContent = message;
+  document.getElementById('cm-message').style.whiteSpace = '';   // callers may set pre-line
   document.getElementById('cm-ok').textContent      = confirmText;
   document.getElementById('cm-cancel').textContent  = cancelText;
 
@@ -7617,7 +7625,7 @@ async function renderClasses(list) {
     { from:'#3aaaaa', to:'#1f7a7a' },
     { from:'#ff7875', to:'#dc4f4c' },
   ];
-  grid.innerHTML = list.map((c, i) => {
+  const cardHTML = (c, i) => {
     const p = palettes[i % palettes.length];
     const initial = c.name ? c.name.charAt(0).toUpperCase() : '?';
     const stuCount = Number(c.student_count ?? c.cnt ?? 0);
@@ -7657,6 +7665,9 @@ async function renderClasses(list) {
           <button onclick="openStudentsDrawer(${c.id},'${(c.name||'').replace(/'/g,"\\'")}')" style="flex:1;padding:10px;background:linear-gradient(135deg,${p.from},${p.to});border:none;border-radius:10px;color:#fff;font-size:12.5px;font-family:var(--font-head);font-weight:800;cursor:pointer;box-shadow:0 4px 12px ${p.from}44;transition:transform .15s ease;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
             <i class="fas fa-users-cog"></i> ${t('btn_manage_class') || 'Manage Class'}
           </button>
+          ${!c.is_prep && c.grade_level && c.grade_level !== 'دولسم' ? `<button onclick="promoteYearEnd(${c.id})" title="${t('btn_promote_class')}" style="width:38px;height:38px;background:rgba(155,110,255,.10);border:1px solid rgba(155,110,255,.25);border-radius:10px;color:#6e3fdb;cursor:pointer;font-size:13px;transition:transform .15s ease;" onmouseover="this.style.transform='scale(1.08)';this.style.background='rgba(155,110,255,.18)'" onmouseout="this.style.transform='scale(1)';this.style.background='rgba(155,110,255,.10)'">
+            <i class="fas fa-arrow-up"></i>
+          </button>` : ''}
           ${c.grade_level === 'دولسم' ? `<button onclick="graduateClass(${c.id},'${(c.name||'').replace(/'/g,"\\'")}')" title="${t('btn_graduate')||'Graduate class'}" style="width:38px;height:38px;background:rgba(34,197,113,.10);border:1px solid rgba(34,197,113,.25);border-radius:10px;color:#178f4f;cursor:pointer;font-size:13px;transition:transform .15s ease;" onmouseover="this.style.transform='scale(1.08)';this.style.background='rgba(34,197,113,.18)'" onmouseout="this.style.transform='scale(1)';this.style.background='rgba(34,197,113,.10)'">
             <i class="fas fa-user-graduate"></i>
           </button>` : ''}
@@ -7669,6 +7680,48 @@ async function renderClasses(list) {
         </div>
       </div>
     </div>`;
+  };
+
+  // ── Lay the classes out as one ROW PER GRADE ──────────────────────
+  // اول at the top, then دوهم, … down to دولسم, with آمادګي (university
+  // entrance prep — outside the 1–12 ladder) in its own row at the end.
+  // The server already returns the list in this order; this only breaks
+  // it into labelled rows so each grade starts on a fresh line.
+  const groups = [];
+  list.forEach(c => {
+    const key = c.is_prep ? 'prep' : (c.grade_number != null ? c.grade_number : '?');
+    let g = groups.find(x => x.key === key);
+    if (!g) {
+      g = { key, is_prep: !!c.is_prep, grade: c.grade_level || '',
+            label_en: c.grade_label_en || '', number: c.grade_number, classes: [] };
+      groups.push(g);
+    }
+    g.classes.push(c);
+  });
+
+  grid.style.display = 'block';
+  grid.innerHTML = groups.map(g => {
+    const students = g.classes.reduce((s, c) => s + Number(c.student_count ?? c.cnt ?? 0), 0);
+    // One colour per grade row, so the grouping reads at a glance.
+    const p = g.is_prep ? { from: '#9b6eff', to: '#6e3fdb' }
+                        : palettes[((g.number || 1) - 1) % palettes.length];
+    const badge = g.is_prep ? '<i class="fas fa-star"></i>' : g.number;
+    const title = g.is_prep ? t('cls_group_prep') : (g.grade || '—');
+    const sub   = g.is_prep ? '' : (g.label_en || '');
+    const meta  = t('cls_row_meta').replace('{c}', g.classes.length).replace('{s}', students);
+
+    return `
+      <div style="margin-bottom:28px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:13px;padding-bottom:9px;border-bottom:2px solid ${p.from}22;">
+          <div style="width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,${p.from},${p.to});color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:13px;font-weight:800;flex-shrink:0;box-shadow:0 4px 10px ${p.from}44;">${badge}</div>
+          <div style="font-family:var(--font-head);font-size:16px;font-weight:800;color:#0f2845;direction:rtl;">${title}</div>
+          ${sub ? `<div style="font-size:12px;color:#6a7c93;font-weight:700;">${sub}</div>` : ''}
+          <div style="margin-left:auto;font-size:11.5px;color:#6a7c93;font-family:var(--font-mono);font-weight:700;white-space:nowrap;">${meta}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px;align-items:stretch;">
+          ${g.classes.map(c => cardHTML(c, ((g.number || 1) - 1))).join('')}
+        </div>
+      </div>`;
   }).join('');
 }
 
@@ -7736,47 +7789,157 @@ async function saveClass() {
   finally { btn.innerHTML = `<i class="fas fa-save"></i> ${t('btn_save_class')}`; btn.disabled = false; }
 }
 
-// Year-end promotion — every student moves up one grade; grade-12
-// (دولسم) students graduate. Section preserved. One click.
-function promoteYearEnd() {
+// Year-end promotion. Deliberately TWO steps: ask the server for a preview
+// first (dry run — writes nothing), show exactly what would move, and apply
+// only after that plan is confirmed. A single careless click on this button
+// is what once moved a whole grade into the wrong class.
+// classId omitted = the whole school. Pass a class id to move just that one
+// class up a grade — a class is a set of students, and moving one set at a
+// time is far safer than moving every set at once.
+async function promoteYearEnd(classId) {
+  const scoped = classId != null;
+  const cls    = scoped ? (allClasses || []).find(x => x.id === classId) : null;
+  const scopeBody = JSON.stringify(scoped ? { class_id: classId } : {});
+  let plan;
+  try {
+    const r = await fetch('/api/students/promote?dry_run=1', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: scopeBody,
+    });
+    plan = await r.json();
+    if (!r.ok) throw new Error(plan.error || 'Failed');
+  } catch (e) {
+    return showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' });
+  }
+
+  if (!plan.promoted && !plan.graduated) {
+    return showAlert({
+      title: t('alert_title_warning') || 'Nothing to promote',
+      message: scoped
+        ? 'No student would move. Either this class is empty, or the next grade has no class with the same section — create it first.'
+        : 'No student would move. Check that every class has its grade level set on the class card.',
+      type: 'warning',
+    });
+  }
+
+  const lines = [];
+  lines.push(`${plan.promoted} student(s) will move up ONE grade:`);
+  (plan.moves || []).forEach(m => lines.push(`    ${m.label} — ${m.count}`));
+
+  if (plan.graduated) {
+    lines.push('');
+    lines.push(`${plan.graduated} student(s) in the final grade will be ARCHIVED as graduates and will disappear from the active lists.`);
+  }
+  const missingTxt = (plan.missing_destinations || []).map(m => `${m.label} (${m.count})`).join(', ');
+  if (missingTxt) {
+    lines.push('');
+    lines.push(`Will NOT move — destination class does not exist: ${missingTxt}. Create those classes first if these students should move.`);
+  }
+  if (plan.skipped_untracked) {
+    lines.push('');
+    lines.push(`${plan.skipped_untracked} student(s) sit in a class with no grade level set and will not move.`);
+  }
+
+  lines.push('');
+  lines.push(plan.undoable
+    ? 'This run will be recorded and can be reversed with the Undo Promotion button.'
+    : 'WARNING: this database has no promotion history table, so this CANNOT be undone. Run db/migration_promotion_history.sql first.');
+  lines.push(scoped
+    ? 'Promoting the same class twice moves it up TWO grades. Check the list above before confirming.'
+    : 'Run this ONCE per year. Running it twice moves everyone up TWO grades.');
+
   showConfirm({
-    title:   t('confirm_promote_title') || 'Promote everyone one grade?',
-    message: t('confirm_promote_msg') || 'Every active student moves up one grade with their section (7-الف → 8-الف, 7-ب → 8-ب, …). Grade-12 students graduate. If a destination class (e.g. 8-الف) does not exist, those students stay put and are reported as skipped — create the missing class first, then run Promote again. This affects all students — do it only at year-end.',
-    confirmText: t('btn_promote_year') || 'Promote',
+    title:   scoped
+      ? ('Promote ' + (cls ? cls.name : 'this class') + '? — nothing has changed yet')
+      : 'Confirm promotion — nothing has changed yet',
+    message: lines.join('\n'),
+    confirmText: `Yes, promote ${plan.promoted}`,
     type: 'warning',
     onConfirm: async () => {
       try {
         const r = await fetch('/api/students/promote', {
-          method:'POST', headers:{'Content-Type':'application/json'}, body:'{}',
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: scopeBody,
         });
         const d = await r.json();
         if (!r.ok) throw new Error(d.error || 'Failed');
-        const movesTxt   = (d.moves||[]).map(m => `${m.label}: ${m.count}`).join(' · ');
-        const missingTxt = (d.missing_destinations||[]).map(m => `${m.label} (${m.count})`).join(', ');
-        const skipParts  = [];
-        if (missingTxt) skipParts.push(`missing destination class: ${missingTxt} — create then re-run`);
-        if (d.skipped_untracked) skipParts.push(`${d.skipped_untracked} students have no grade set on their class`);
-        const skipNote = skipParts.length ? `. Skipped: ${skipParts.join('; ')}` : '';
         showAlert({
-          title: missingTxt ? (t('alert_title_warning')||'Done with issues') : (t('alert_title_saved')||'Done'),
-          message: (t('msg_promoted') || '{p} promoted, {g} graduated.')
-                     .replace('{p}', d.promoted).replace('{g}', d.graduated)
-                   + skipNote
-                   + (movesTxt ? ' — ' + movesTxt : ''),
-          type: missingTxt ? 'warning' : 'success',
+          title: t('alert_title_saved') || 'Done',
+          message: `${d.promoted} promoted, ${d.graduated} graduated.`
+                 + (d.undoable ? ' This run can be undone with the Undo Promotion button.'
+                               : ' NOTE: this run was NOT recorded and cannot be undone.'),
+          type: 'success',
         });
         if (d.graduate_list && d.graduate_list.length) {
-          // Combine class + section in the printed Class column
-          const rows = d.graduate_list.map(r => ({
-            ...r,
-            class_name: (r.class_name || '') + (r.section ? ` — ${r.section}` : ''),
+          const rows = d.graduate_list.map(r2 => ({
+            ...r2,
+            class_name: (r2.class_name || '') + (r2.section ? ` — ${r2.section}` : ''),
           }));
           printGraduateList(t('lbl_graduates') || 'Graduates', rows);
         }
         await loadClasses();
-      } catch(e) { showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' }); }
+      } catch (e) {
+        showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' });
+      }
     },
   });
+  // Keep the line breaks of the plan readable in the dialog.
+  document.getElementById('cm-message').style.whiteSpace = 'pre-line';
+}
+
+// Reverse the most recent promotion run: every student in that run goes back
+// to the class they were in before it, and anyone it archived as a graduate
+// is restored. Nothing is deleted.
+async function undoLastPromotion() {
+  let history = [];
+  try {
+    const r = await fetch('/api/students/promote/history');
+    history = await r.json();
+  } catch (_) { /* fall through to the empty case below */ }
+
+  const open = (history || []).find(h => !h.undone);
+  if (!open) {
+    return showAlert({
+      title: 'Nothing to undo',
+      message: (history && history.length)
+        ? 'The last promotion has already been undone.'
+        : 'No promotion run is on record. Undo only covers runs made after db/migration_promotion_history.sql was applied — an earlier promotion has to be repaired from a database backup.',
+      type: 'warning',
+    });
+  }
+
+  const when = open.run_at ? new Date(open.run_at).toLocaleString() : 'unknown date';
+  showConfirm({
+    title: 'Undo the last promotion?',
+    message: [
+      `Run on ${when}${open.changed_by ? ' by ' + open.changed_by : ''}.`,
+      '',
+      `${open.promoted} student(s) will go back to the class they were in before that run.`,
+      open.graduated ? `${open.graduated} student(s) archived as graduates will be restored to the active lists.` : '',
+      '',
+      'Any manual class change made to these students since that run will be overwritten. Nothing is deleted.',
+    ].filter(Boolean).join('\n'),
+    confirmText: 'Undo promotion',
+    type: 'warning',
+    onConfirm: async () => {
+      try {
+        const r = await fetch('/api/students/promote/undo', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ batch_id: open.batch_id }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Failed');
+        showAlert({
+          title: t('alert_title_saved') || 'Restored',
+          message: `${d.restored} student(s) put back in their previous class`
+                 + (d.ungraduated ? `, ${d.ungraduated} graduate(s) restored to active.` : '.'),
+          type: 'success',
+        });
+        await loadClasses();
+      } catch (e) {
+        showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' });
+      }
+    },
+  });
+  document.getElementById('cm-message').style.whiteSpace = 'pre-line';
 }
 
 // Graduate a whole class — archive its students as Graduated and

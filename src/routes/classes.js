@@ -1,12 +1,17 @@
 const express = require('express');
 const pool    = require('../db.js');
+const { compareClasses, withGradeMeta } = require('../grades.js');
 const router  = express.Router();
 
 // GET all classes with student count and teachers list
 router.get('/', async (req, res) => {
   try {
-    const clsResult = await pool.query(`SELECT * FROM classes ORDER BY name`);
-    const classes   = clsResult.rows;
+    // Ordered by the Afghan grade ladder — اول first, دولسم last, sections
+    // in order inside each grade, and آمادګي (university-prep, off the
+    // ladder) after them all. Sorting by name alphabetically put grade 8
+    // above grade 1, which is what the old screen showed.
+    const clsResult = await pool.query(`SELECT * FROM classes`);
+    const classes   = clsResult.rows.map(withGradeMeta).sort(compareClasses);
 
     const enriched = await Promise.all(classes.map(async (c) => {
       const countRes = await pool.query(

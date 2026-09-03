@@ -352,11 +352,23 @@ router.post('/graduate', async (req, res) => {
 //  graduate (archived). Section is preserved when a matching class
 //  exists. Snapshot-based so order can't double-move anyone.
 // ══════════════════════════════════════════════════════════════
-const GRADE_ORDER = ['اول','دوهم','دریم','څلورم','پنځم','شپږم',
-                     'اووم','اتم','نهم','لسم','یوولسم','دولسم'];
+// The grade ladder lives in src/grades.js so the Classes screen and the
+// promotion logic can never disagree about what "one grade up" means.
+const { GRADE_ORDER } = require('../grades.js');
 
 router.post('/promote', async (req, res) => {
   try {
+    // Preview mode: ?dry_run=1 or { dry_run: true } computes the whole plan
+    // and returns it WITHOUT writing anything.
+    const dryRun = req.query.dry_run === '1' || req.query.dry_run === 'true'
+                || req.body?.dry_run === true;
+
+    // Optional scope: promote ONE class instead of the whole school. A class
+    // is a set of students, and moving one set up is far safer than moving
+    // every set at once — the office can do it class by class and check as
+    // it goes. Everything else (preview, audit trail, undo) is identical.
+    const scopeClassId = req.body?.class_id ?? req.query.class_id ?? null;
+
     const classesRes = await pool.query(
       'SELECT id, name, grade_level, section FROM classes');
     const classes = classesRes.rows;
@@ -372,13 +384,21 @@ router.post('/promote', async (req, res) => {
         c.grade_level === grade &&
         (c.section || '').trim() === (section || '').trim()) || null;
 
+    // is_active/graduated come along so the audit trail can record the
+    // exact state each student was in BEFORE the run — that is what an
+    // undo restores.
     const studentsRes = await pool.query(
-      `SELECT id, first_name, last_name, student_code, parent_name, class_id
-         FROM students WHERE is_active = TRUE`);
+      `SELECT id, first_name, last_name, student_code, parent_name, class_id,
+              is_active, COALESCE(graduated, FALSE) AS graduated, graduated_at
+         FROM students
+        WHERE is_active = TRUE
+          AND ($1::int IS NULL OR class_id = $1::int)`,
+      [scopeClassId ? parseInt(scopeClassId, 10) : null]);
 
     const moves = {};          // "fromName→toName" → count
     const promoteUpdates = []; // { studentId, destId }
     const graduateIds = [];
+    const graduateBefore = [];  // prior state of each graduate, for undo
     const graduateRows = [];
     const missingDest = {};    // "<grade> <section>" → count — destinations to create
     let skippedUntracked = 0;  // students whose class has no grade set
@@ -391,6 +411,9 @@ router.post('/promote', async (req, res) => {
 
       if (gi === GRADE_ORDER.length - 1) {            // دولسم → graduate
         graduateIds.push(s.id);
+        graduateBefore.push({ studentId: s.id, fromId: s.class_id,
+                              wasActive: s.is_active, wasGraduated: s.graduated,
+                              wasGraduatedAt: s.graduated_at });
         graduateRows.push({
           name: `${s.first_name} ${s.last_name}`,
           father_name: s.parent_name || '',
@@ -407,16 +430,75 @@ router.post('/promote', async (req, res) => {
         missingDest[k] = (missingDest[k] || 0) + 1;
         continue;
       }
-      promoteUpdates.push({ studentId: s.id, destId: dest.id });
+      promoteUpdates.push({ studentId: s.id, destId: dest.id, fromId: s.class_id,
+                            wasActive: s.is_active, wasGraduated: s.graduated,
+                            wasGraduatedAt: s.graduated_at });
       const k = `${cls.name}${cls.section ? ' ' + cls.section : ''} → ${dest.name}${dest.section ? ' ' + dest.section : ''}`;
       moves[k] = (moves[k] || 0) + 1;
     }
 
+    const missing = Object.entries(missingDest)
+      .map(([label, count]) => ({ label, count }));
+    const skipped = skippedUntracked + missing.reduce((s, m) => s + m.count, 0);
+
+    // Is the audit trail available? Without it a run cannot be undone, and
+    // the caller must be told so before anything is applied.
+    const undoable = (await pool.query(
+      `SELECT to_regclass('public.student_class_history') AS t`)).rows[0].t !== null;
+
+    // ── DRY RUN ───────────────────────────────────────────────────
+    // Preview only: report exactly what WOULD happen and change nothing.
+    // The admin screen calls this first so the plan can be confirmed.
+    if (dryRun) {
+      return res.json({
+        success:   true,
+        dry_run:   true,
+        applied:   false,
+        scope_class_id: scopeClassId ? parseInt(scopeClassId, 10) : null,
+        undoable,
+        promoted:  promoteUpdates.length,
+        graduated: graduateIds.length,
+        skipped,
+        skipped_untracked: skippedUntracked,
+        missing_destinations: missing,
+        moves:         Object.entries(moves).map(([label, count]) => ({ label, count })),
+        graduate_list: graduateRows,
+      });
+    }
+
     // Apply promotions + graduation atomically — a crash halfway through
     // would otherwise leave half the school moved up and half not.
+    const batchId = require('crypto').randomUUID();
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+
+      // Write the audit trail FIRST, in the same transaction: if history
+      // cannot be recorded, the promotion does not happen either.
+      if (undoable) {
+        const rows = [
+          ...promoteUpdates.map(u => ({ ...u, action: 'promote', toId: u.destId })),
+          ...graduateBefore.map(g => ({ ...g, action: 'graduate', toId: null })),
+        ];
+        if (rows.length) {
+          await client.query(`
+            INSERT INTO student_class_history
+              (batch_id, student_id, action, from_class_id, to_class_id,
+               was_active, was_graduated, was_graduated_at, changed_by)
+            SELECT $1, x.student_id, x.action, x.from_class_id, x.to_class_id,
+                   x.was_active, x.was_graduated, x.was_graduated_at, $2
+              FROM UNNEST($3::int[], $4::text[], $5::int[], $6::int[],
+                          $7::bool[], $8::bool[], $9::date[])
+                   AS x(student_id, action, from_class_id, to_class_id,
+                        was_active, was_graduated, was_graduated_at)`,
+            [batchId, (req.user && req.user.id) || null,
+             rows.map(r => r.studentId), rows.map(r => r.action),
+             rows.map(r => r.fromId ?? null), rows.map(r => r.toId ?? null),
+             rows.map(r => r.wasActive ?? null), rows.map(r => r.wasGraduated ?? null),
+             rows.map(r => r.wasGraduatedAt ?? null)]);
+        }
+      }
+
       for (const u of promoteUpdates) {
         await client.query('UPDATE students SET class_id = $1 WHERE id = $2',
           [u.destId, u.studentId]);
@@ -436,12 +518,12 @@ router.post('/promote', async (req, res) => {
       client.release();
     }
 
-    const missing = Object.entries(missingDest)
-      .map(([label, count]) => ({ label, count }));
-    const skipped = skippedUntracked + missing.reduce((s, m) => s + m.count, 0);
-
     res.json({
       success:         true,
+      applied:         true,
+      scope_class_id:  scopeClassId ? parseInt(scopeClassId, 10) : null,
+      batch_id:        undoable ? batchId : null,
+      undoable,
       promoted:        promoteUpdates.length,
       graduated:       graduateIds.length,
       skipped,
@@ -452,6 +534,115 @@ router.post('/promote', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  GET /api/students/promote/history — past promotion runs
+//  Newest first. Each row is one promote run that can be undone.
+// ══════════════════════════════════════════════════════════════
+router.get('/promote/history', async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT h.batch_id,
+             MIN(h.changed_at)                                   AS run_at,
+             COUNT(*) FILTER (WHERE h.action = 'promote') ::int   AS promoted,
+             COUNT(*) FILTER (WHERE h.action = 'graduate')::int   AS graduated,
+             COUNT(*) FILTER (WHERE h.undone_at IS NULL) ::int    AS still_applied,
+             MAX(h.undone_at)                                    AS undone_at,
+             MAX(u.full_name)                                    AS changed_by
+        FROM student_class_history h
+        LEFT JOIN admin_users u ON u.id = h.changed_by
+       GROUP BY h.batch_id
+       ORDER BY MIN(h.changed_at) DESC
+       LIMIT 20`);
+    res.json(r.rows.map(x => ({ ...x, undone: x.still_applied === 0 })));
+  } catch (err) {
+    if (/student_class_history/.test(err.message)) {
+      return res.json([]);   // migration not run yet — no history to show
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  POST /api/students/promote/undo — reverse a promotion run
+//  Body: { batch_id }  (omit to undo the most recent run)
+//
+//  Puts every student in the batch back into the class they were in
+//  before that run, and un-archives anyone the run graduated. Nothing
+//  is deleted: the history rows are kept and stamped undone_at.
+//
+//  NOTE: this restores the recorded previous class. If someone has
+//  manually moved a student since the run, that manual move is
+//  overwritten for the students in this batch.
+// ══════════════════════════════════════════════════════════════
+router.post('/promote/undo', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const wanted = req.body && req.body.batch_id ? String(req.body.batch_id) : null;
+
+    const pick = await client.query(
+      wanted
+        ? `SELECT batch_id FROM student_class_history
+            WHERE batch_id = $1 AND undone_at IS NULL LIMIT 1`
+        : `SELECT batch_id FROM student_class_history
+            WHERE undone_at IS NULL
+            ORDER BY changed_at DESC LIMIT 1`,
+      wanted ? [wanted] : []);
+
+    if (!pick.rows.length) {
+      return res.status(404).json({
+        error: wanted
+          ? 'That promotion run was not found, or it has already been undone.'
+          : 'There is no promotion run on record to undo.',
+      });
+    }
+    const batchId = pick.rows[0].batch_id;
+
+    await client.query('BEGIN');
+
+    // Students who were moved up a grade → back to their old class
+    const back = await client.query(`
+      UPDATE students s
+         SET class_id = h.from_class_id
+        FROM student_class_history h
+       WHERE h.batch_id = $1 AND h.undone_at IS NULL
+         AND h.action = 'promote' AND s.id = h.student_id`, [batchId]);
+
+    // Students the run archived as graduates → fully restored
+    const ungrad = await client.query(`
+      UPDATE students s
+         SET class_id     = h.from_class_id,
+             is_active    = COALESCE(h.was_active, TRUE),
+             graduated    = COALESCE(h.was_graduated, FALSE),
+             graduated_at = h.was_graduated_at
+        FROM student_class_history h
+       WHERE h.batch_id = $1 AND h.undone_at IS NULL
+         AND h.action = 'graduate' AND s.id = h.student_id`, [batchId]);
+
+    await client.query(
+      `UPDATE student_class_history SET undone_at = NOW()
+        WHERE batch_id = $1 AND undone_at IS NULL`, [batchId]);
+
+    await client.query('COMMIT');
+
+    res.json({
+      success:   true,
+      batch_id:  batchId,
+      restored:  back.rowCount,
+      ungraduated: ungrad.rowCount,
+    });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {}
+    if (/student_class_history/.test(err.message)) {
+      return res.status(400).json({
+        error: 'No promotion history in this database. Run db/migration_promotion_history.sql first — from then on every promotion can be undone.',
+      });
+    }
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
   }
 });
 
