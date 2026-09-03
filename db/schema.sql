@@ -3,6 +3,39 @@
 --  Run this file once in pgAdmin or psql to create all tables
 -- ═══════════════════════════════════════════════════════════════
 
+-- ═══════════════════════════════════════════════════════════════
+--  !! THIS SCRIPT DESTROYS DATA — IT IS FOR A **NEW** DATABASE ONLY !!
+--
+--  The whole file runs inside ONE transaction, and the guard below
+--  aborts it if any core table already holds rows. An abort rolls the
+--  DROPs back, so running this against a live school database leaves
+--  that database untouched instead of wiping it.
+--
+--  To set up an EXISTING database, do NOT run this file. Run the
+--  migrations instead — see README.md, "Database Setup".
+-- ═══════════════════════════════════════════════════════════════
+BEGIN;
+
+DO $guard$
+DECLARE
+  n BIGINT;
+  t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['students','teachers','staff','classes',
+                           'fee_payments','payroll','marks','attendance',
+                           'office_expenses','admin_users'] LOOP
+    IF to_regclass('public.' || t) IS NOT NULL THEN
+      EXECUTE format('SELECT count(*) FROM %I', t) INTO n;
+      IF n > 0 THEN
+        RAISE EXCEPTION
+          'REFUSING TO RUN: table "%" already holds % row(s). schema.sql drops every table, so it has been aborted and NOTHING was changed. To upgrade an existing database, run the db/migration_*.sql files instead.',
+          t, n;
+      END IF;
+    END IF;
+  END LOOP;
+END
+$guard$;
+
 -- Drop existing tables in safe order
 DROP TABLE IF EXISTS office_expenses     CASCADE;
 DROP TABLE IF EXISTS payroll_advances    CASCADE;
@@ -220,6 +253,8 @@ INSERT INTO settings (key, value) VALUES
   ('absence_alert_time', '09:00'),
   ('academic_year',      '2026'),
   ('currency',           'AFN');
+
+COMMIT;
 
 -- ═══════════════════════════════════════════════════════════
 -- VERIFICATION — run after setup to confirm all tables exist

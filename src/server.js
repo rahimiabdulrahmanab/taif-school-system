@@ -8,8 +8,11 @@ const CONFIG   = require('../school-config');
 const auth = require('./middleware/auth');
 const { todayShamsi } = require('./shamsi');
 
-// A forged token is game over, so refuse to silently run on the well-known
-// fallback secret outside local development.
+// A forged token is game over. The server still STARTS without JWT_SECRET so
+// a restart can never take the school offline, but it warns loudly: on the
+// fallback secret (which is public in this repo) anyone can mint an admin
+// token. If you would rather it hard-fail in production, add process.exit(1)
+// at the end of this block.
 if (!process.env.JWT_SECRET && (process.env.RENDER || process.env.NODE_ENV === 'production')) {
   console.error('╔══════════════════════════════════════════════════════════════╗');
   console.error('║  WARNING: JWT_SECRET is not set. The server is using the      ║');
@@ -120,45 +123,53 @@ app.get('/api/health', async (req, res) => {
 });
 
 // Dashboard stats
-app.get('/api/dashboard/stats', async (req, res) => {
+// The gate kiosk is a public screen with no login, and it reads the head-count
+// figures from here — so this endpoint stays reachable without a token. The
+// FINANCIAL figures are withheld from anonymous callers: they were previously
+// served to anyone who could reach the URL.
+app.get('/api/dashboard/stats', auth.optional, async (req, res) => {
   try {
     // "This month" is the current SHAMSI month — the whole fee system is
     // keyed on the Afghan calendar, so the dashboard must agree with it.
     const sh = todayShamsi();
+    const isAuthed = !!req.user;
     const [students, teachers, staff, present, feeMonth, outstanding] = await Promise.all([
       pool.query('SELECT COUNT(*) FROM students WHERE is_active = true'),
       pool.query('SELECT COUNT(*) FROM teachers WHERE is_active = true'),
       pool.query('SELECT COUNT(*) FROM staff    WHERE is_active = true'),
       pool.query("SELECT COUNT(*) FROM attendance WHERE scan_date = CURRENT_DATE AND person_type = 'student'"),
-      pool.query(
+      isAuthed ? pool.query(
         `SELECT COALESCE(SUM(amount),0) AS total FROM fee_payments
           WHERE payment_year = $1 AND payment_month = $2
             AND COALESCE(carried_forward, FALSE) = FALSE`,
-        [String(sh.year), String(sh.month)]),
-      pool.query(
+        [String(sh.year), String(sh.month)]) : { rows: [{ total: 0 }] },
+      isAuthed ? pool.query(
         `SELECT COUNT(*) FROM students WHERE is_active = true AND id NOT IN (
            SELECT DISTINCT student_id FROM fee_payments
             WHERE payment_year = $1 AND payment_month = $2)`,
-        [String(sh.year), String(sh.month)]),
+        [String(sh.year), String(sh.month)]) : { rows: [{ count: 0 }] },
     ]);
     const total_s   = parseInt(students.rows[0].count);
     const present_n = parseInt(present.rows[0].count);
-    res.json({
+    const out = {
       students:    total_s,
       teachers:    parseInt(teachers.rows[0].count),
       staff:       parseInt(staff.rows[0].count),
       present:     present_n,
       absent:      Math.max(0, total_s - present_n),
-      fee_month:   parseFloat(feeMonth.rows[0].total) || 0,
-      outstanding: parseInt(outstanding.rows[0].count),
-    });
+    };
+    if (isAuthed) {
+      out.fee_month   = parseFloat(feeMonth.rows[0].total) || 0;
+      out.outstanding = parseInt(outstanding.rows[0].count);
+    }
+    res.json(out);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // Dashboard — attendance trend (last 30 days)
-app.get('/api/dashboard/attendance-trend', async (req, res) => {
+app.get('/api/dashboard/attendance-trend', auth, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT scan_date::text, COUNT(*)::int AS count
@@ -172,7 +183,7 @@ app.get('/api/dashboard/attendance-trend', async (req, res) => {
 });
 
 // Dashboard — monthly fee collection for a Shamsi year (groups by payment_month/payment_year)
-app.get('/api/dashboard/fee-chart', async (req, res) => {
+app.get('/api/dashboard/fee-chart', auth, async (req, res) => {
   try {
     const year = req.query.year ? String(req.query.year) : null;
     const result = await pool.query(`
@@ -189,7 +200,7 @@ app.get('/api/dashboard/fee-chart', async (req, res) => {
 });
 
 // Dashboard — class-wise attendance today
-app.get('/api/dashboard/class-attendance', async (req, res) => {
+app.get('/api/dashboard/class-attendance', auth, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT c.name,
@@ -209,7 +220,7 @@ app.get('/api/dashboard/class-attendance', async (req, res) => {
 });
 
 // Dashboard scans
-app.get('/api/dashboard/scans', async (req, res) => {
+app.get('/api/dashboard/scans', auth, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT a.*, s.first_name, s.last_name, c.name as class_name, 'student' as person_type

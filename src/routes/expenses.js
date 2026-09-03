@@ -10,11 +10,20 @@ const CATEGORIES = [
 
 router.get('/', async (req, res) => {
   try {
-    const { month, year, category } = req.query;
-    const m = parseInt(month) || new Date().getMonth() + 1;
-    const y = parseInt(year)  || new Date().getFullYear();
-    let query  = `SELECT * FROM office_expenses WHERE EXTRACT(MONTH FROM expense_date)=$1 AND EXTRACT(YEAR FROM expense_date)=$2`;
-    const params = [m, y];
+    // The app is Shamsi-keyed: the UI converts the selected Shamsi month to a
+    // Gregorian date range and sends start_date/end_date. Filter on that range
+    // when given. month/year (Gregorian) stays supported for older callers.
+    const { month, year, category, start_date, end_date } = req.query;
+    let query, params;
+    if (start_date && end_date) {
+      query  = `SELECT * FROM office_expenses WHERE expense_date >= $1::date AND expense_date <= $2::date`;
+      params = [start_date, end_date];
+    } else {
+      const m = parseInt(month) || new Date().getMonth() + 1;
+      const y = parseInt(year)  || new Date().getFullYear();
+      query  = `SELECT * FROM office_expenses WHERE EXTRACT(MONTH FROM expense_date)=$1 AND EXTRACT(YEAR FROM expense_date)=$2`;
+      params = [m, y];
+    }
     if (category) { params.push(category); query += ` AND category=$${params.length}`; }
     query += ` ORDER BY expense_date DESC, id DESC`;
     const result = await pool.query(query, params);

@@ -177,16 +177,26 @@ router.get('/payroll', async (req, res) => {
 // ── Expense Report ────────────────────────────────────────────
 router.get('/expenses', async (req, res) => {
   try {
-    const { month, year } = req.query;
+    // Same rule as GET /api/expenses — the UI sends a Gregorian date range
+    // derived from the selected Shamsi month. Fall back to Gregorian
+    // month/year only when no range is supplied.
+    const { month, year, start_date, end_date } = req.query;
     const m = parseInt(month) || new Date().getMonth() + 1;
     const y = parseInt(year)  || new Date().getFullYear();
-    const result = await pool.query(`
-      SELECT * FROM office_expenses
-      WHERE EXTRACT(MONTH FROM expense_date)=$1 AND EXTRACT(YEAR FROM expense_date)=$2
-      ORDER BY expense_date DESC
-    `, [m, y]);
+    const result = (start_date && end_date)
+      ? await pool.query(`
+          SELECT * FROM office_expenses
+          WHERE expense_date >= $1::date AND expense_date <= $2::date
+          ORDER BY expense_date DESC
+        `, [start_date, end_date])
+      : await pool.query(`
+          SELECT * FROM office_expenses
+          WHERE EXTRACT(MONTH FROM expense_date)=$1 AND EXTRACT(YEAR FROM expense_date)=$2
+          ORDER BY expense_date DESC
+        `, [m, y]);
     const total = result.rows.reduce((s, e) => s + parseFloat(e.amount), 0);
-    res.json({ month: m, year: y, expenses: result.rows, total });
+    res.json({ month: m, year: y, start_date: start_date || null, end_date: end_date || null,
+               expenses: result.rows, total });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
