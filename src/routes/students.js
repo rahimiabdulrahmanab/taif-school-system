@@ -400,7 +400,8 @@ router.post('/promote', async (req, res) => {
     const graduateIds = [];
     const graduateBefore = [];  // prior state of each graduate, for undo
     const graduateRows = [];
-    const missingDest = {};    // "<grade> <section>" → count — destinations to create
+    const missingDest = {};    // label → count, for classes left where they are
+    const orphans = new Map(); // class_id → { cls, nextGrade, students[] }
     let skippedUntracked = 0;  // students whose class has no grade set
 
     for (const s of studentsRes.rows) {
@@ -426,8 +427,11 @@ router.post('/promote', async (req, res) => {
       const nextGrade = GRADE_ORDER[gi + 1];
       const dest = findDest(nextGrade, cls.section);
       if (!dest) {
-        const k = `${nextGrade}${cls.section ? ' ' + cls.section : ''}`;
-        missingDest[k] = (missingDest[k] || 0) + 1;
+        // Orphaned class: this section has no counterpart in the grade above
+        // (e.g. لسم (ج) when grade 11 has only الف and باء). Nothing is
+        // assumed here — the admin chooses a destination in the preview.
+        if (!orphans.has(cls.id)) orphans.set(cls.id, { cls, nextGrade, students: [] });
+        orphans.get(cls.id).students.push(s);
         continue;
       }
       promoteUpdates.push({ studentId: s.id, destId: dest.id, fromId: s.class_id,
@@ -436,6 +440,85 @@ router.post('/promote', async (req, res) => {
       const k = `${cls.name}${cls.section ? ' ' + cls.section : ''} → ${dest.name}${dest.section ? ' ' + dest.section : ''}`;
       moves[k] = (moves[k] || 0) + 1;
     }
+
+    // ── Orphaned classes ───────────────────────────────────────────────
+    // A section with no counterpart in the grade above. There is no safe
+    // default here, so the admin decides per class in the preview:
+    //   class:<id> → send them all to that one class
+    //   split      → spread across the next grade, emptiest section first
+    //   create     → create the missing section, move the class up intact
+    //   stay       → leave them where they are (what happens if not asked)
+    const decisions = (req.body && req.body.decisions) || {};
+    // Projected headcount per destination, so a split fills the emptiest first.
+    const projected = {};
+    promoteUpdates.forEach(u => { projected[u.destId] = (projected[u.destId] || 0) + 1; });
+
+    const needsDecision = [];
+    const createPlans   = [];
+
+    for (const [cid, o] of orphans) {
+      const siblings = classes.filter(c => c.grade_level === o.nextGrade);
+      const raw      = decisions[cid] !== undefined ? decisions[cid] : decisions[String(cid)];
+      const choice   = String(raw == null || raw === '' ? 'stay' : raw);
+      const newName  = (o.nextGrade + ' (' + (o.cls.section || '') + ')').replace(' ()', '');
+
+      needsDecision.push({
+        class_id:    cid,
+        class_name:  o.cls.name,
+        section:     o.cls.section || '',
+        grade_level: o.cls.grade_level,
+        next_grade:  o.nextGrade,
+        students:    o.students.length,
+        chosen:      choice,
+        options: [
+          ...siblings.map(c => ({ value: 'class:' + c.id, label: c.name,
+                                  current: projected[c.id] || 0 })),
+          ...(siblings.length > 1
+              ? [{ value: 'split', label: 'Split evenly across ' + o.nextGrade }] : []),
+          { value: 'create', label: 'Create ' + newName },
+          { value: 'stay',   label: 'Leave them where they are' },
+        ],
+      });
+
+      if (choice === 'create') {
+        createPlans.push({ name: newName, grade_level: o.nextGrade,
+                           section: o.cls.section || null, students: o.students });
+        moves[o.cls.name + ' → ' + newName + ' (new class)'] = o.students.length;
+        continue;
+      }
+
+      let targets = [];
+      if (choice === 'split') {
+        targets = siblings.slice();
+      } else if (choice.startsWith('class:')) {
+        const t = byId[parseInt(choice.slice(6), 10)];
+        if (t && t.grade_level === o.nextGrade) targets = [t];
+      }
+
+      if (!targets.length) {           // 'stay', or a choice we can't use
+        const k = o.cls.name + ' → ' + o.nextGrade + ' (no matching section)';
+        missingDest[k] = (missingDest[k] || 0) + o.students.length;
+        continue;
+      }
+
+      for (const s of o.students) {
+        // Always fill the emptiest destination, so sections stay balanced.
+        targets.sort((a, b) => (projected[a.id] || 0) - (projected[b.id] || 0));
+        const t = targets[0];
+        projected[t.id] = (projected[t.id] || 0) + 1;
+        promoteUpdates.push({ studentId: s.id, destId: t.id, fromId: s.class_id,
+                              wasActive: s.is_active, wasGraduated: s.graduated,
+                              wasGraduatedAt: s.graduated_at });
+        const mk = o.cls.name + ' → ' + t.name;
+        moves[mk] = (moves[mk] || 0) + 1;
+      }
+    }
+
+    // Students routed into a class that does not exist yet are counted here;
+    // they only join promoteUpdates once the class is created, inside the
+    // transaction below.
+    const createCount   = createPlans.reduce((n, p) => n + p.students.length, 0);
+    const promotedCount = promoteUpdates.length + createCount;
 
     const missing = Object.entries(missingDest)
       .map(([label, count]) => ({ label, count }));
@@ -456,7 +539,8 @@ router.post('/promote', async (req, res) => {
         applied:   false,
         scope_class_id: scopeClassId ? parseInt(scopeClassId, 10) : null,
         undoable,
-        promoted:  promoteUpdates.length,
+        needs_decision: needsDecision,
+        promoted:  promotedCount,
         graduated: graduateIds.length,
         skipped,
         skipped_untracked: skippedUntracked,
@@ -472,6 +556,22 @@ router.post('/promote', async (req, res) => {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+
+      // Any destination section the admin asked us to create is created
+      // first, inside the same transaction, so its students can be routed
+      // into it and recorded in the audit trail like every other move.
+      for (const p of createPlans) {
+        const ins = await client.query(
+          `INSERT INTO classes (name, grade_level, section)
+           VALUES ($1, $2, $3) RETURNING id`,
+          [p.name, p.grade_level, p.section]);
+        const newId = ins.rows[0].id;
+        for (const s of p.students) {
+          promoteUpdates.push({ studentId: s.id, destId: newId, fromId: s.class_id,
+                                wasActive: s.is_active, wasGraduated: s.graduated,
+                                wasGraduatedAt: s.graduated_at });
+        }
+      }
 
       // Write the audit trail FIRST, in the same transaction: if history
       // cannot be recorded, the promotion does not happen either.
@@ -513,6 +613,11 @@ router.post('/promote', async (req, res) => {
       await client.query('COMMIT');
     } catch (e) {
       try { await client.query('ROLLBACK'); } catch (_) {}
+      if (e.code === '23505') {
+        return res.status(400).json({
+          error: 'A class with that name already exists, so the new section could not be created. Nothing was changed. Rename the existing class or pick a different destination.',
+        });
+      }
       throw e;
     } finally {
       client.release();

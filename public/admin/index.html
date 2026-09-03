@@ -7796,93 +7796,171 @@ async function saveClass() {
 // classId omitted = the whole school. Pass a class id to move just that one
 // class up a grade — a class is a set of students, and moving one set at a
 // time is far safer than moving every set at once.
+//
+// Always two steps: ask the server for a PREVIEW (dry run, writes nothing),
+// let the admin resolve any class that has no section above it, and apply
+// only what was shown on screen.
 async function promoteYearEnd(classId) {
   const scoped = classId != null;
   const cls    = scoped ? (allClasses || []).find(x => x.id === classId) : null;
-  const scopeBody = JSON.stringify(scoped ? { class_id: classId } : {});
+  let decisions = {};          // orphan class_id -> chosen destination
+
+  const body = () => {
+    const b = {};
+    if (scoped) b.class_id = classId;
+    if (Object.keys(decisions).length) b.decisions = decisions;
+    return JSON.stringify(b);
+  };
+
+  async function fetchPlan() {
+    const r = await fetch('/api/students/promote?dry_run=1', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body(),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Failed');
+    return d;
+  }
+
   let plan;
   try {
-    const r = await fetch('/api/students/promote?dry_run=1', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: scopeBody,
-    });
-    plan = await r.json();
-    if (!r.ok) throw new Error(plan.error || 'Failed');
+    plan = await fetchPlan();
   } catch (e) {
     return showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' });
   }
 
-  if (!plan.promoted && !plan.graduated) {
+  if (!plan.promoted && !plan.graduated && !(plan.needs_decision || []).length) {
     return showAlert({
       title: t('alert_title_warning') || 'Nothing to promote',
       message: scoped
-        ? 'No student would move. Either this class is empty, or the next grade has no class with the same section — create it first.'
+        ? 'No student would move. Either this class is empty, or the next grade has no class with the same section.'
         : 'No student would move. Check that every class has its grade level set on the class card.',
       type: 'warning',
     });
   }
 
-  const lines = [];
-  lines.push(`${plan.promoted} student(s) will move up ONE grade:`);
-  (plan.moves || []).forEach(m => lines.push(`    ${m.label} — ${m.count}`));
-
-  if (plan.graduated) {
-    lines.push('');
-    lines.push(`${plan.graduated} student(s) in the final grade will be ARCHIVED as graduates and will disappear from the active lists.`);
-  }
-  const missingTxt = (plan.missing_destinations || []).map(m => `${m.label} (${m.count})`).join(', ');
-  if (missingTxt) {
-    lines.push('');
-    lines.push(`Will NOT move — destination class does not exist: ${missingTxt}. Create those classes first if these students should move.`);
-  }
-  if (plan.skipped_untracked) {
-    lines.push('');
-    lines.push(`${plan.skipped_untracked} student(s) sit in a class with no grade level set and will not move.`);
-  }
-
-  lines.push('');
-  lines.push(plan.undoable
-    ? 'This run will be recorded and can be reversed with the Undo Promotion button.'
-    : 'WARNING: this database has no promotion history table, so this CANNOT be undone. Run db/migration_promotion_history.sql first.');
-  lines.push(scoped
-    ? 'Promoting the same class twice moves it up TWO grades. Check the list above before confirming.'
-    : 'Run this ONCE per year. Running it twice moves everyone up TWO grades.');
-
-  showConfirm({
-    title:   scoped
-      ? ('Promote ' + (cls ? cls.name : 'this class') + '? — nothing has changed yet')
-      : 'Confirm promotion — nothing has changed yet',
-    message: lines.join('\n'),
-    confirmText: `Yes, promote ${plan.promoted}`,
-    type: 'warning',
+  showPromotePlan({
+    title: scoped ? ('Promote ' + (cls ? cls.name : 'this class') + '?') : 'Promote / End of Year',
+    plan,
+    refresh: async (newDecisions) => { decisions = newDecisions; return fetchPlan(); },
     onConfirm: async () => {
-      try {
-        const r = await fetch('/api/students/promote', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: scopeBody,
-        });
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.error || 'Failed');
-        showAlert({
-          title: t('alert_title_saved') || 'Done',
-          message: `${d.promoted} promoted, ${d.graduated} graduated.`
-                 + (d.undoable ? ' This run can be undone with the Undo Promotion button.'
-                               : ' NOTE: this run was NOT recorded and cannot be undone.'),
-          type: 'success',
-        });
-        if (d.graduate_list && d.graduate_list.length) {
-          const rows = d.graduate_list.map(r2 => ({
-            ...r2,
-            class_name: (r2.class_name || '') + (r2.section ? ` — ${r2.section}` : ''),
-          }));
-          printGraduateList(t('lbl_graduates') || 'Graduates', rows);
-        }
-        await loadClasses();
-      } catch (e) {
-        showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' });
+      const r = await fetch('/api/students/promote', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body(),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Failed');
+      showAlert({
+        title: t('alert_title_saved') || 'Done',
+        message: d.promoted + ' promoted, ' + d.graduated + ' graduated.'
+               + (d.undoable ? ' This run can be undone with the Undo Promotion button.'
+                             : ' NOTE: this run was NOT recorded and cannot be undone.'),
+        type: 'success',
+      });
+      if (d.graduate_list && d.graduate_list.length) {
+        printGraduateList(t('lbl_graduates') || 'Graduates', d.graduate_list.map(r2 => ({
+          ...r2, class_name: (r2.class_name || '') + (r2.section ? ' — ' + r2.section : ''),
+        })));
       }
+      await loadClasses();
     },
   });
-  // Keep the line breaks of the plan readable in the dialog.
-  document.getElementById('cm-message').style.whiteSpace = 'pre-line';
+}
+
+// The promotion preview. Shows every move that would happen, and for any
+// class with no matching section in the grade above it asks where those
+// students should go. Changing a choice re-runs the preview on the server,
+// so what is on screen is always the real plan — nothing is applied until
+// Confirm, and Confirm sends exactly the choices shown here.
+function showPromotePlan({ title, plan, refresh, onConfirm }) {
+  const old = document.getElementById('pp-modal');
+  if (old) old.remove();
+
+  const esc = (v) => String(v == null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+  const wrap = document.createElement('div');
+  wrap.id = 'pp-modal';
+  wrap.style.cssText = 'position:fixed;inset:0;z-index:1200;display:flex;align-items:center;justify-content:center;background:rgba(8,15,28,.55);backdrop-filter:blur(5px);';
+  document.body.appendChild(wrap);
+
+  const close = () => wrap.remove();
+
+  function render(p) {
+    const decisionsNeeded = p.needs_decision || [];
+    const moves = p.moves || [];
+
+    const moveRows = moves.length
+      ? moves.map(m => '<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 10px;border-radius:7px;background:#f5f9fc;margin-bottom:4px;font-size:12.5px;">'
+          + '<span style="direction:rtl;text-align:right;flex:1;">' + esc(m.label) + '</span>'
+          + '<b style="font-family:var(--font-mono);">' + m.count + '</b></div>').join('')
+      : '<div style="font-size:12.5px;color:#6a7c93;">No class-to-class moves.</div>';
+
+    const decisionRows = decisionsNeeded.map(d => {
+      const opts = (d.options || []).map(o =>
+        '<option value="' + esc(o.value) + '"' + (o.value === d.chosen ? ' selected' : '') + '>'
+        + esc(o.label) + (o.current != null ? ' — has ' + o.current : '') + '</option>').join('');
+      return '<div style="padding:11px 13px;border:1px solid rgba(255,170,61,.35);background:#fff9ed;border-radius:10px;margin-bottom:9px;">'
+        + '<div style="font-family:var(--font-head);font-size:13px;font-weight:800;color:#0f2845;direction:rtl;text-align:right;">'
+        + esc(d.class_name) + ' — ' + d.students + ' students</div>'
+        + '<div style="font-size:11.5px;color:#8a6d3b;margin:3px 0 8px;">No '
+        + esc(d.next_grade) + ' class with section ' + esc(d.section || '—') + '. Where should they go?</div>'
+        + '<select class="pp-dec" data-class-id="' + d.class_id + '" style="width:100%;padding:8px 10px;border:1px solid rgba(20,40,80,.15);border-radius:8px;font-size:12.5px;font-family:var(--font-body);background:#fff;cursor:pointer;">'
+        + opts + '</select></div>';
+    }).join('');
+
+    const warn = p.undoable
+      ? '<div style="font-size:12px;color:#178f4f;">This run will be recorded and can be reversed with Undo Promotion.</div>'
+      : '<div style="font-size:12px;color:#c8443c;font-weight:700;">This database has no promotion history table, so this CANNOT be undone. Run db/migration_promotion_history.sql first.</div>';
+
+    wrap.innerHTML =
+      '<div style="background:#fff;border-radius:18px;width:min(660px,calc(100vw - 32px));max-height:88vh;display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(8,15,28,.4);overflow:hidden;">'
+      + '<div style="padding:20px 22px 14px;border-bottom:1px solid rgba(20,40,80,.07);display:flex;align-items:center;gap:13px;">'
+      +   '<div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#ffaa3d,#d97706);color:#fff;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;"><i class="fas fa-exclamation-triangle"></i></div>'
+      +   '<div><div style="font-family:var(--font-head);font-size:17px;font-weight:800;color:#0f2845;">' + esc(title) + '</div>'
+      +   '<div style="font-size:12px;color:#6a7c93;">Nothing has changed yet — this is a preview.</div></div>'
+      + '</div>'
+      + '<div style="padding:16px 22px;overflow-y:auto;flex:1;">'
+      +   (decisionRows
+            ? '<div style="font-family:var(--font-head);font-size:12px;font-weight:800;color:#d97706;text-transform:uppercase;letter-spacing:.05em;margin-bottom:9px;">Needs a decision</div>' + decisionRows
+            : '')
+      +   '<div style="font-family:var(--font-head);font-size:12px;font-weight:800;color:#0f2845;text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;">'
+      +     p.promoted + ' students move up one grade</div>' + moveRows
+      +   (p.graduated ? '<div style="margin-top:12px;padding:10px 12px;border-radius:9px;background:rgba(34,197,113,.10);border:1px solid rgba(34,197,113,.25);font-size:12.5px;color:#12603a;"><b>' + p.graduated + '</b> students in the final grade will be ARCHIVED as graduates and will leave the active lists.</div>' : '')
+      +   ((p.missing_destinations || []).length ? '<div style="margin-top:10px;padding:10px 12px;border-radius:9px;background:#f5f9fc;font-size:12px;color:#475569;">Staying put: ' + p.missing_destinations.map(m => esc(m.label) + ' (' + m.count + ')').join(', ') + '</div>' : '')
+      +   (p.skipped_untracked ? '<div style="margin-top:8px;font-size:12px;color:#6a7c93;">' + p.skipped_untracked + ' students are in a class with no grade level set and will not move.</div>' : '')
+      +   '<div style="margin-top:14px;">' + warn + '</div>'
+      + '</div>'
+      + '<div style="padding:14px 22px;border-top:1px solid rgba(20,40,80,.07);display:flex;gap:10px;justify-content:flex-end;background:#fbfdff;">'
+      +   '<button id="pp-cancel" style="padding:10px 20px;background:#fff;border:1px solid rgba(20,40,80,.15);border-radius:10px;font-family:var(--font-head);font-size:13px;font-weight:700;color:#475569;cursor:pointer;">Cancel</button>'
+      +   '<button id="pp-ok" style="padding:10px 22px;background:linear-gradient(135deg,#ffaa3d,#d97706);border:none;border-radius:10px;color:#fff;font-family:var(--font-head);font-size:13px;font-weight:800;cursor:pointer;">Yes, promote ' + p.promoted + '</button>'
+      + '</div></div>';
+
+    wrap.querySelector('#pp-cancel').onclick = close;
+
+    // Changing a destination re-runs the preview on the server, so the plan
+    // on screen is always the plan that would actually be applied.
+    wrap.querySelectorAll('.pp-dec').forEach(sel => {
+      sel.onchange = async () => {
+        const d = {};
+        wrap.querySelectorAll('.pp-dec').forEach(s => { d[s.dataset.classId] = s.value; });
+        try { render(await refresh(d)); }
+        catch (e) { showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' }); }
+      };
+    });
+
+    wrap.querySelector('#pp-ok').onclick = async () => {
+      const btn = wrap.querySelector('#pp-ok');
+      btn.disabled = true;
+      btn.textContent = 'Working…';
+      try { await onConfirm(); close(); }
+      catch (e) {
+        close();
+        showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' });
+      }
+    };
+  }
+
+  render(plan);
 }
 
 // Reverse the most recent promotion run: every student in that run goes back
