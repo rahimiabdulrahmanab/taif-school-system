@@ -382,7 +382,7 @@ router.post('/graduate', async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 // The grade ladder lives in src/grades.js so the Classes screen and the
 // promotion logic can never disagree about what "one grade up" means.
-const { GRADE_ORDER } = require('../grades.js');
+const { GRADE_ORDER, gradeIndex, sameSection, normalize } = require('../grades.js');
 
 router.post('/promote', async (req, res) => {
   try {
@@ -407,10 +407,14 @@ router.post('/promote', async (req, res) => {
     // No fallback to "any class at that grade" — 7-الف must go to 8-الف,
     // never to 8-ب. If the target class doesn't exist, those students
     // are reported as skipped so the admin can create it first.
+    // Compared through grades.js's normaliser, so an invisible character or a
+    // stray space in grade_level/section can never silently drop a class out
+    // of the promotion.
     const findDest = (grade, section) =>
       classes.find(c =>
-        c.grade_level === grade &&
-        (c.section || '').trim() === (section || '').trim()) || null;
+        gradeIndex(c.grade_level) === gradeIndex(grade) &&
+        gradeIndex(grade) !== -1 &&
+        sameSection(c.section, section)) || null;
 
     // is_active/graduated come along so the audit trail can record the
     // exact state each student was in BEFORE the run — that is what an

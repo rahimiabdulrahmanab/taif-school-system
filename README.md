@@ -50,6 +50,7 @@ The installer will be in the `dist/` folder.
    | 4 | `db/migration_audit_fixes.sql`       | year-aware marks key (supersedes #3), one-scan-per-day rule |
    | 5 | `db/migration_parent_phone2.sql`     | second parent WhatsApp number |
    | 6 | `db/migration_promotion_history.sql` | promotion audit trail + undo |
+   | 7 | `db/migration_class_integrity.sql`   | rejects unknown grade levels, one class per grade+section |
 
 ### An EXISTING database that already holds school data
 

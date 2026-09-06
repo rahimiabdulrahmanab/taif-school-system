@@ -28,23 +28,45 @@ const GRADE_LABEL_EN = ['Preparatory',
                         'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10',
                         'Grade 11', 'Grade 12'];
 
+// Arabic-script text picks up invisible characters very easily — zero-width
+// joiners, bidi marks, a stray space, or a decomposed Unicode form. Any one
+// of them makes an exact string compare fail, and a class that fails the
+// compare is SILENTLY skipped by promotion. One class in this database
+// already has three U+200C characters in its name. So every comparison in
+// this module goes through here first.
+function normalize(v) {
+  return String(v == null ? '' : v)
+    .normalize('NFC')                                        // one canonical form
+    .replace(/[​-‏‪-‮⁦-⁩﻿]/g, '') // zero-width + bidi
+    .replace(/\s+/g, ' ')                                    // collapse whitespace
+    .trim();
+}
+
 // Position in the ladder: 0 = آمادګي, 1 = اول … 12 = دولسم.
-// -1 means the class has no grade set and promotion will skip it.
+// -1 means the class has no usable grade and promotion will skip it.
 function gradeIndex(grade) {
-  return GRADE_ORDER.indexOf(String(grade || '').trim());
+  const g = normalize(grade);
+  if (!g) return -1;
+  return GRADE_ORDER.findIndex(x => normalize(x) === g);
 }
 
 // Position of a section within a grade. Unknown sections sort last.
 function sectionIndex(section) {
-  const i = SECTION_ORDER.indexOf(String(section || '').trim());
+  const s = normalize(section);
+  const i = SECTION_ORDER.findIndex(x => normalize(x) === s);
   return i === -1 ? SECTION_ORDER.length : i;
+}
+
+// True when two sections are the same section, ignoring invisible junk.
+function sameSection(a, b) {
+  return normalize(a) === normalize(b);
 }
 
 // Pre-school. On the ladder, and promoted into اول — just labelled
 // differently on screen so nobody mistakes it for grade 1 itself.
 function isPrep(cls) {
   const g = cls && (cls.grade_level !== undefined ? cls.grade_level : cls);
-  return String(g || '').trim() === PREP_GRADE;
+  return normalize(g) === normalize(PREP_GRADE);
 }
 
 // No grade set at all: promotion cannot place these students.
@@ -92,6 +114,7 @@ function withGradeMeta(cls) {
 
 module.exports = {
   GRADE_ORDER, SECTION_ORDER, GRADE_LABEL_EN, PREP_GRADE,
-  gradeIndex, sectionIndex, isPrep, isUnassigned, nextGrade, isFinalGrade,
+  normalize, gradeIndex, sectionIndex, sameSection,
+  isPrep, isUnassigned, nextGrade, isFinalGrade,
   compareClasses, withGradeMeta,
 };

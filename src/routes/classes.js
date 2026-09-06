@@ -1,6 +1,6 @@
 const express = require('express');
 const pool    = require('../db.js');
-const { compareClasses, withGradeMeta } = require('../grades.js');
+const { compareClasses, withGradeMeta, normalize } = require('../grades.js');
 const router  = express.Router();
 
 // GET all classes with student count and teachers list
@@ -107,7 +107,7 @@ router.post('/', async (req, res) => {
     const result = await pool.query(`
       INSERT INTO classes (name, grade_level, section, description)
       VALUES ($1, $2, $3, $4) RETURNING *
-    `, [name, grade_level||null, section||null, description||null]);
+    `, [name, normalize(grade_level) || null, normalize(section) || null, description||null]);
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (err.code === '23505') return res.status(400).json({ error: 'A class with this name already exists' });
@@ -122,7 +122,7 @@ router.put('/:id', async (req, res) => {
     const result = await pool.query(`
       UPDATE classes SET name=$1, grade_level=$2, section=$3, description=$4
       WHERE id=$5 RETURNING *
-    `, [name, grade_level||null, section||null, description||null, req.params.id]);
+    `, [name, normalize(grade_level) || null, normalize(section) || null, description||null, req.params.id]);
     if (!result.rows.length) return res.status(404).json({ error: 'Not found' });
     res.json(result.rows[0]);
   } catch (err) {
