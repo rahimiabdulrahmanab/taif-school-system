@@ -67,6 +67,23 @@ function walkStart(enrolledAt) {
   return { startY: y, startM: m, curY: cur.year, curM: cur.month };
 }
 
+// Stamp the clerk's paper receipt number onto the rows a payment created.
+// Never throws: a missing column, or a missing number, simply means no tag.
+async function tagBookNo(rows, bookNo) {
+  if (!bookNo || !rows || !rows.length) return rows;
+  const ids = rows.map(r => r && r.id).filter(Boolean);
+  if (!ids.length) return rows;
+  try {
+    await pool.query(
+      `UPDATE fee_payments SET receipt_book_no = $1 WHERE id = ANY($2)`, [bookNo, ids]);
+    rows.forEach(r => { if (r) r.receipt_book_no = bookNo; });
+  } catch (e) {
+    if (!/receipt_book_no/.test(e.message || '')) throw e;
+    console.warn('[fees] receipt_book_no column missing — run db/migration_receipt_book_no.sql to record paper receipt numbers.');
+  }
+  return rows;
+}
+
 // ── GET all payments (with filters) ──────────────────────────
 router.get('/', async (req, res) => {
   try {
@@ -194,8 +211,14 @@ router.post('/', async (req, res) => {
     const {
       student_id, amount, payment_month, payment_year,
       payment_method, notes, months_paid, is_previous_debt,
-      apply_excess_to_debt,
+      apply_excess_to_debt, receipt_book_no,
     } = req.body;
+
+    // The number on the paper receipt the clerk hands the parent. One slip
+    // covers the whole payment, so the SAME number is written onto every
+    // month-row this payment creates. Blank is fine; it is a convenience for
+    // reconciliation, not an identifier — receipt_number is the identifier.
+    const bookNo = String(receipt_book_no == null ? '' : receipt_book_no).trim() || null;
 
     if (!student_id || !amount) {
       return res.status(400).json({ error: 'Student and amount are required' });
@@ -207,10 +230,11 @@ router.post('/', async (req, res) => {
         INSERT INTO fee_payments
           (student_id, amount, amount_paid, original_fee,
            payment_month, payment_year, payment_method, notes,
-           payment_date, is_previous_debt)
-        VALUES ($1, $2, $2, $2, NULL, NULL, $3, $4, (NOW() AT TIME ZONE 'Asia/Kabul')::date, TRUE)
+           payment_date, is_previous_debt, receipt_book_no)
+        VALUES ($1, $2, $2, $2, NULL, NULL, $3, $4, (NOW() AT TIME ZONE 'Asia/Kabul')::date, TRUE, $5)
         RETURNING *
       `, [student_id, parseFloat(amount), payment_method || 'cash', notes || null]);
+      await tagBookNo(r.rows, bookNo);
       return res.status(201).json({ success: true, payments: [r.rows[0]] });
     }
 
@@ -249,8 +273,8 @@ router.post('/', async (req, res) => {
           INSERT INTO fee_payments
             (student_id, amount, amount_paid, original_fee,
              payment_month, payment_year, payment_method, notes,
-             payment_date, is_previous_debt)
-          VALUES ($1, $2, $2, $2, NULL, NULL, $3, $4, (NOW() AT TIME ZONE 'Asia/Kabul')::date, TRUE)
+             payment_date, is_previous_debt, receipt_book_no)
+          VALUES ($1, $2, $2, $2, NULL, NULL, $3, $4, (NOW() AT TIME ZONE 'Asia/Kabul')::date, TRUE, $5)
           RETURNING *
         `, [student_id, excess, payment_method || 'cash',
             (notes ? notes + ' — ' : '') + 'excess applied to debt']);
@@ -274,6 +298,7 @@ router.post('/', async (req, res) => {
       return out;
     });
 
+    await tagBookNo(results, bookNo);
     res.status(201).json({ success: true, payments: results, excess });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -800,9 +825,7 @@ router.get('/daily', async (req, res) => {
       : kabulTodayISO();
 
     const rows = await pool.query(`
-      SELECT fp.id, fp.receipt_number, fp.amount, fp.payment_method, fp.notes,
-             fp.payment_month, fp.payment_year, fp.is_previous_debt,
-             fp.created_at,
+      SELECT fp.*,
              s.first_name, s.last_name, s.student_code,
              c.name AS class_name
         FROM fee_payments fp

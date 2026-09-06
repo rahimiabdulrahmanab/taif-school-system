@@ -2985,6 +2985,14 @@ button[style*="background:linear-gradient"]{
       </div>
     </div>
 
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:10px 12px;background:#f5f9fc;border:1px solid rgba(20,40,80,.07);border-radius:10px;">
+      <i class="fas fa-receipt" style="color:#6e3fdb;font-size:13px;"></i>
+      <label for="pay-book-no" style="font-size:11px;font-weight:800;color:#475569;font-family:var(--font-head);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;" data-i18n="lbl_receipt_book_no">Receipt book no.</label>
+      <input id="pay-book-no" type="text" autocomplete="off" placeholder="—"
+             style="flex:1;min-width:80px;padding:7px 10px;background:#fff;border:1px solid rgba(20,40,80,.12);border-radius:8px;font-family:var(--font-mono);font-size:13px;font-weight:700;color:#0f2845;outline:none;">
+      <span style="font-size:10.5px;color:#94a3b8;white-space:nowrap;" data-i18n="lbl_receipt_book_hint">optional — from the paper book</span>
+    </div>
+
     <div style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;" data-i18n="lbl_account_statement">Account Statement</div>
 
     <!-- Year-grouped month statement renders here -->
@@ -4545,6 +4553,7 @@ const LANG = {
     lbl_original:'Original', lbl_paid:'Paid',
     lbl_total_billed:'Total Billed', lbl_total_paid:'Total Paid', lbl_balance:'Balance',
     lbl_account_statement:'Account Statement', lbl_due:'Due',
+    lbl_receipt_book_no:'Receipt book no.', lbl_receipt_book_hint:'optional — from the paper book',
     lbl_opening_balance:'Opening Balance (before joining)',
     status_partial:'Partial', status_unpaid:'Unpaid',
     btn_set_due:'Set Due', btn_add_payment:'Add Payment',
@@ -4986,6 +4995,7 @@ const LANG = {
     lbl_original:'اصلي', lbl_paid:'ورکړل شوی',
     lbl_total_billed:'ټوله بیله', lbl_total_paid:'ټوله تادیه', lbl_balance:'پاتې',
     lbl_account_statement:'د حساب وضعیت', lbl_due:'وړ تادیه',
+    lbl_receipt_book_no:'د رسید کتاب نمبر', lbl_receipt_book_hint:'اختیاري — د کاغذي کتاب څخه',
     lbl_opening_balance:'پخوانی پاتې پور (د شاملیدو دمخه)',
     status_partial:'جزوي', status_unpaid:'نه دی ورکړل شوی',
     btn_set_due:'تادیه وټاکئ', btn_add_payment:'تادیه زیاته کړئ',
@@ -9206,8 +9216,8 @@ function openDailyCollection() {
     const monthNames = _lang === 'ps' ? SHAMSI_MONTHS_PASHTO : _lang === 'fa' ? SHAMSI_MONTHS_DARI : SHAMSI_MONTHS_EN;
     return '<table style="width:100%;border-collapse:collapse;font-size:12.5px;">'
       + '<thead><tr style="background:#f5f9fc;">'
-      + ['Receipt', 'Time', 'Student', 'Class', 'Paid for', 'Method', 'Amount']
-          .map((h, i) => `<th style="padding:9px 10px;text-align:${i === 6 ? 'right' : 'left'};font-family:var(--font-head);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#6a7c93;white-space:nowrap;">${h}</th>`).join('')
+      + ['Receipt', 'Book no.', 'Time', 'Student', 'Class', 'Paid for', 'Method', 'Amount']
+          .map((h, i) => `<th style="padding:9px 10px;text-align:${i === 7 ? 'right' : 'left'};font-family:var(--font-head);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#6a7c93;white-space:nowrap;">${h}</th>`).join('')
       + '</tr></thead><tbody>'
       + data.payments.map(p => {
           const time = p.created_at ? new Date(p.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
@@ -9215,6 +9225,7 @@ function openDailyCollection() {
             : (p.payment_month ? `${monthNames[parseInt(p.payment_month)] || p.payment_month} ${p.payment_year || ''}` : '—');
           return '<tr style="border-top:1px solid rgba(20,40,80,.06);">'
             + `<td style="padding:9px 10px;font-family:var(--font-mono);font-weight:700;color:#6e3fdb;white-space:nowrap;">${esc(p.receipt_number || '—')}</td>`
+            + `<td style="padding:9px 10px;font-family:var(--font-mono);font-weight:700;color:${p.receipt_book_no ? '#0f2845' : '#c9d3de'};white-space:nowrap;">${esc(p.receipt_book_no || '—')}</td>`
             + `<td style="padding:9px 10px;font-family:var(--font-mono);color:#6a7c93;white-space:nowrap;">${esc(time)}</td>`
             + `<td style="padding:9px 10px;"><div style="font-weight:700;color:#0f2845;">${esc((p.first_name || '') + ' ' + (p.last_name || ''))}</div><div style="font-family:var(--font-mono);font-size:11px;color:#94a3b8;">${esc(p.student_code || '')}</div></td>`
             + `<td style="padding:9px 10px;color:#475569;">${esc(p.class_name || '—')}</td>`
@@ -9281,7 +9292,7 @@ function openDailyCollection() {
     const monthNames = _lang === 'ps' ? SHAMSI_MONTHS_PASHTO : _lang === 'fa' ? SHAMSI_MONTHS_DARI : SHAMSI_MONTHS_EN;
     const label = `${sel.d} ${monthNames[sel.m] || ''} ${sel.y}`;
     const rows = data.payments.map((p, i) =>
-      `<tr><td>${i + 1}</td><td>${esc(p.receipt_number || '')}</td>`
+      `<tr><td>${i + 1}</td><td>${esc(p.receipt_number || '')}</td><td>${esc(p.receipt_book_no || '')}</td>`
       + `<td>${esc((p.first_name || '') + ' ' + (p.last_name || ''))}</td>`
       + `<td>${esc(p.student_code || '')}</td><td>${esc(p.class_name || '')}</td>`
       + `<td>${esc(p.payment_method || 'cash')}</td>`
@@ -9294,9 +9305,9 @@ function openDailyCollection() {
       th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;}
       th{background:#f0f4f8;} tfoot td{font-weight:800;background:#f8fafc;}</style></head><body>
       <h1>Daily Fee Collection</h1><div class="sub">${label} &nbsp;·&nbsp; ${data.count} payment(s)</div>
-      <table><thead><tr><th>#</th><th>Receipt</th><th>Student</th><th>Code</th><th>Class</th><th>Method</th><th style="text-align:right;">Amount</th></tr></thead>
+      <table><thead><tr><th>#</th><th>Receipt</th><th>Book no.</th><th>Student</th><th>Code</th><th>Class</th><th>Method</th><th style="text-align:right;">Amount</th></tr></thead>
       <tbody>${rows}</tbody>
-      <tfoot><tr><td colspan="6">TOTAL</td><td style="text-align:right;">${Number(data.total).toLocaleString()} AFN</td></tr></tfoot>
+      <tfoot><tr><td colspan="7">TOTAL</td><td style="text-align:right;">${Number(data.total).toLocaleString()} AFN</td></tr></tfoot>
       </table></body></html>`);
     w.document.close();
     w.print();
@@ -9503,6 +9514,9 @@ async function openFeePanel(studentId) {
     const s = data.student;
 
     document.getElementById('fee-student-id').value = studentId;
+    // Never carry a receipt book number over from the previous student.
+    const _bn = document.getElementById('pay-book-no');
+    if (_bn) _bn.value = '';
     document.getElementById('fee-panel-title').textContent = t('lbl_fee_collect') || 'Fee Account';
     document.getElementById('fee-panel-sub').textContent   = s.first_name + ' ' + s.last_name;
     document.getElementById('fee-student-name').textContent  = s.first_name + ' ' + s.last_name;
@@ -9683,6 +9697,12 @@ async function feeSetDue(year, month) {
   } catch(e) { showAlert({ title:t('alert_title_error'), message:e.message, type:'error' }); }
 }
 
+// The number written on the paper slip for the payment about to be recorded.
+function feeBookNo() {
+  const el = document.getElementById('pay-book-no');
+  return el ? el.value.trim() : '';
+}
+
 async function feeAddPayment(year, month) {
   const sid = document.getElementById('fee-student-id').value;
   const amt = parseFloat(document.getElementById(`pay-amt-${year}-${month}`).value);
@@ -9692,7 +9712,8 @@ async function feeAddPayment(year, month) {
     const r = await fetch('/api/fees', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ student_id: parseInt(sid), amount: amt, payment_method: mtd,
-                             months_paid: [{ year, month }] }),
+                             months_paid: [{ year, month }],
+                             receipt_book_no: feeBookNo() }),
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || 'Failed');
@@ -9711,7 +9732,8 @@ async function feeAddOpeningPayment() {
     const r = await fetch('/api/fees', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ student_id: parseInt(sid), amount: amt, payment_method: mtd,
-                             notes: 'Opening balance payment', is_previous_debt: true }),
+                             notes: 'Opening balance payment', is_previous_debt: true,
+                             receipt_book_no: feeBookNo() }),
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || 'Failed');
