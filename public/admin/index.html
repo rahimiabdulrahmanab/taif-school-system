@@ -5443,12 +5443,18 @@ function getCurrentShamsi() {
 
 // Days in a Shamsi month (1-6 = 31, 7-11 = 30, 12 = 29 or 30 in leap)
 function shamsiMonthDays(jy, jm) {
-  if (jm <= 6) return 31;
+  if (jm <= 6)  return 31;
   if (jm <= 11) return 30;
-  // Hoot: leap year if Shamsi year mod 33 in {1,5,9,13,17,22,26,30}
-  const m = ((jy - 979) % 33 + 33) % 33;
-  const leap = [1,5,9,13,17,22,26,30].includes(m);
-  return leap ? 30 : 29;
+  // حوت is 29 or 30 depending on the leap year. This used to be a hand
+  // written "year mod 33 in {1,5,9,13,17,22,26,30}" table, which disagreed
+  // with fromShamsi() for 10 of any 21 years — including 1405, where it
+  // claimed a 30th of حوت that does not exist. Derive it from the
+  // conversion instead, so the two can never drift apart:
+  // length = (1st of the next month) − (1st of this month).
+  const a = fromShamsi(jy, 12, 1);
+  const b = fromShamsi(jy + 1, 1, 1);
+  return Math.round(
+    (new Date(b.year, b.month - 1, b.day) - new Date(a.year, a.month - 1, a.day)) / 86400000);
 }
 
 // Returns ISO Gregorian date range covering a full Shamsi month
@@ -9169,6 +9175,17 @@ function openDailyCollection() {
     return `${g.year}-${p(g.month)}-${p(g.day)}`;
   };
 
+  // Step one day back or forward. Done via the Gregorian date so month
+  // lengths and year ends take care of themselves.
+  function stepDay(delta) {
+    const g  = fromShamsi(sel.y, sel.m, sel.d);
+    const dt = new Date(g.year, g.month - 1, g.day);
+    dt.setDate(dt.getDate() + delta);
+    const s = toShamsi(dt.getFullYear(), dt.getMonth() + 1, dt.getDate());
+    sel = { y: s.year, m: s.month, d: s.day };
+    load();
+  }
+
   let data = null;
 
   function dayOptions() {
@@ -9227,7 +9244,11 @@ function openDailyCollection() {
       +     `<select id="dc-month" style="padding:6px 9px;background:transparent;border:none;font-family:var(--font-body);font-size:13px;font-weight:700;color:#0f2845;cursor:pointer;outline:none;">${shamsiMonthOptions(sel.m)}</select>`
       +     `<select id="dc-year" style="padding:6px 9px;background:transparent;border:none;font-family:var(--font-mono);font-size:13px;font-weight:700;color:#0f2845;cursor:pointer;outline:none;">${shamsiYearOptions(sel.y)}</select>`
       +   '</div>'
-      +   '<button id="dc-today" style="padding:8px 14px;background:#f5f9fc;border:1px solid rgba(20,40,80,.10);border-radius:10px;font-family:var(--font-head);font-size:12px;font-weight:800;color:#475569;cursor:pointer;">Today</button>'
+      +   '<div style="display:flex;gap:4px;align-items:center;">'
+      +     '<button id="dc-prev" title="Previous day" style="width:34px;height:34px;background:#f5f9fc;border:1px solid rgba(20,40,80,.10);border-radius:9px;color:#475569;cursor:pointer;font-size:12px;"><i class="fas fa-chevron-left"></i></button>'
+      +     '<button id="dc-today" style="padding:8px 14px;background:#f5f9fc;border:1px solid rgba(20,40,80,.10);border-radius:10px;font-family:var(--font-head);font-size:12px;font-weight:800;color:#475569;cursor:pointer;">Today</button>'
+      +     '<button id="dc-next" title="Next day" style="width:34px;height:34px;background:#f5f9fc;border:1px solid rgba(20,40,80,.10);border-radius:9px;color:#475569;cursor:pointer;font-size:12px;"><i class="fas fa-chevron-right"></i></button>'
+      +   '</div>'
       + '</div>'
       + '<div style="padding:14px 22px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-bottom:1px solid rgba(20,40,80,.07);background:#fbfdff;">'
       +   `<div><div style="font-family:var(--font-mono);font-size:26px;font-weight:800;color:#178f4f;line-height:1;">${totalTxt}</div>`
@@ -9243,6 +9264,8 @@ function openDailyCollection() {
 
     wrap.querySelector('#dc-close').onclick = close;
     wrap.querySelector('#dc-print').onclick = printDay;
+    wrap.querySelector('#dc-prev').onclick = () => stepDay(-1);
+    wrap.querySelector('#dc-next').onclick = () => stepDay(1);
     wrap.querySelector('#dc-today').onclick = () => {
       const c = getCurrentShamsi();
       sel = { y: c.year, m: c.month, d: c.day };
