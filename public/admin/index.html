@@ -2203,6 +2203,12 @@ button[style*="background:linear-gradient"]{
         <button onclick="toggleAddPanel()" id="add-panel-btn" style="padding:6px 14px;background:linear-gradient(135deg,var(--accent),#3aaa85);border:none;border-radius:20px;color:#060D18;font-family:var(--font-head);font-size:12px;font-weight:800;cursor:pointer;box-shadow:0 4px 14px rgba(93,202,165,.35);">
           <i class="fas fa-plus"></i> <span id="add-panel-btn-label" data-i18n="btn_add_student">Add Student</span>
         </button>
+        <button onclick="drawerPromoteClass()" id="cls-drawer-promote" style="padding:6px 14px;background:rgba(155,110,255,.12);border:1px solid rgba(155,110,255,.30);border-radius:20px;color:#6e3fdb;font-size:12px;font-family:var(--font-head);font-weight:800;cursor:pointer;">
+          <i class="fas fa-arrow-up"></i> <span data-i18n="btn_promote_class">Promote this class</span>
+        </button>
+        <button onclick="drawerUndoClass()" id="cls-drawer-undo" style="display:none;padding:6px 14px;background:rgba(224,87,79,.12);border:1px solid rgba(224,87,79,.30);border-radius:20px;color:#c8443c;font-size:12px;font-family:var(--font-head);font-weight:800;cursor:pointer;">
+          <i class="fas fa-rotate-left"></i> <span data-i18n="btn_undo_class">Undo promotion for this class</span>
+        </button>
         <button onclick="closeDrawer()" style="padding:6px 14px;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;color:var(--text-mid);font-size:12px;font-family:var(--font-head);cursor:pointer;">
           <i class="fas fa-times"></i> Close
         </button>
@@ -8171,10 +8177,35 @@ async function deleteClass(id, btn) {
   });
 }
 
+// The drawer's Promote / Undo buttons. Close the drawer first: both actions
+// reload the class list underneath, and leaving a stale roster open on top
+// of it is how someone ends up acting on numbers that already changed.
+function drawerPromoteClass() {
+  const id = activeClassId;
+  closeDrawer();
+  promoteYearEnd(id);
+}
+
+function drawerUndoClass() {
+  const id   = activeClassId;
+  const name = document.getElementById('cls-drawer-title').textContent;
+  closeDrawer();
+  undoClassPromotion(id, name);
+}
+
 // ── Students drawer (centered modal) ─────────────────────────
 async function openStudentsDrawer(classId, className) {
   activeClassId = classId;
   document.getElementById('cls-drawer-title').textContent = className;
+
+  // Promote only makes sense for a class on the grade ladder that is not the
+  // final grade (that one graduates instead). Undo only appears when this
+  // class actually has a promotion left to reverse.
+  const _c = (allClasses || []).find(x => x.id === classId) || {};
+  const _pb = document.getElementById('cls-drawer-promote');
+  const _ub = document.getElementById('cls-drawer-undo');
+  if (_pb) _pb.style.display = (_c.grade_level && _c.grade_level !== 'دولسم') ? '' : 'none';
+  if (_ub) _ub.style.display = _c.undoable_students ? '' : 'none';
   document.getElementById('cls-drawer-overlay').style.display = 'block';
   document.getElementById('cls-students-drawer').style.display = 'block';
   switchDrawerTab('students');
