@@ -2312,6 +2312,7 @@ button[style*="background:linear-gradient"]{
         <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;" data-i18n="lbl_grade_level">ټولګی (Grade)</label>
         <select id="cls-grade" dir="rtl" style="width:100%;padding:10px 13px;background:rgba(255,255,255,.85);border:1px solid rgba(26,74,92,.12);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:14px;font-weight:600;outline:none;">
           <option value="" style="background:#f4f8fd;color:#18324a;">— غوره کړئ —</option>
+          <option value="آمادګي"   style="background:#f4f8fd;color:#18324a;">آمادګي (0)</option>
           <option value="اول"      style="background:#f4f8fd;color:#18324a;">اول (1)</option>
           <option value="دوهم"     style="background:#f4f8fd;color:#18324a;">دوهم (2)</option>
           <option value="دریم"     style="background:#f4f8fd;color:#18324a;">دریم (3)</option>
@@ -4407,8 +4408,10 @@ const LANG = {
     tch_stat_total:'Total Teachers', tch_stat_with_login:'Portal Logins Set', tch_stat_payroll:'Monthly Payroll (AFN)',
     stf_stat_total:'Total Staff', stf_stat_payroll:'Monthly Payroll (AFN)',
     cls_stat_total:'Total Classes', cls_stat_students:'Enrolled Students', cls_stat_subjects:'Subjects Configured',
-    cls_group_prep:'University Entrance Preparation', cls_row_meta:'{c} classes · {s} students',
+    cls_group_prep:'Preparatory — before Grade 1', cls_group_nograde:'No grade set',
+    cls_row_meta:'{c} classes · {s} students',
     btn_promote_class:'Promote this class', confirm_promote_class_title:'Promote {name}?',
+    btn_undo_class:'Undo promotion for this class',
     cls_empty_title:'No Classes Yet', btn_manage_class:'Manage Class',
     btn_graduate:'Graduate', btn_promote_year:'Promote / End of Year',
     lbl_graduates:'Graduates',
@@ -4845,8 +4848,10 @@ const LANG = {
     tch_stat_total:'ټول ښوونکي', tch_stat_with_login:'د پورټال ننوتنې', tch_stat_payroll:'میاشتنۍ معاشات (افغانۍ)',
     stf_stat_total:'ټول کارکوونکي', stf_stat_payroll:'میاشتنۍ معاشات (افغانۍ)',
     cls_stat_total:'ټول ټولګي', cls_stat_students:'نوم لیکل شوي زده‌کوونکي', cls_stat_subjects:'تنظیم شوي مضامين',
-    cls_group_prep:'د پوهنتون آمادګي', cls_row_meta:'{c} ټولګي · {s} زده‌کوونکي',
+    cls_group_prep:'د لومړي ټولګي آمادګي', cls_group_nograde:'ټولګی ټاکل شوی نه دی',
+    cls_row_meta:'{c} ټولګي · {s} زده‌کوونکي',
     btn_promote_class:'دا ټولګی پورته کول', confirm_promote_class_title:'{name} پورته کړو؟',
+    btn_undo_class:'د دې ټولګي پورته کول بیرته کول',
     cls_empty_title:'لا ټولګي نشته', btn_manage_class:'د ټولګي اداره',
     btn_graduate:'فراغت', btn_promote_year:'پورته کول / د کال پای',
     lbl_graduates:'فارغان',
@@ -7665,8 +7670,11 @@ async function renderClasses(list) {
           <button onclick="openStudentsDrawer(${c.id},'${(c.name||'').replace(/'/g,"\\'")}')" style="flex:1;padding:10px;background:linear-gradient(135deg,${p.from},${p.to});border:none;border-radius:10px;color:#fff;font-size:12.5px;font-family:var(--font-head);font-weight:800;cursor:pointer;box-shadow:0 4px 12px ${p.from}44;transition:transform .15s ease;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
             <i class="fas fa-users-cog"></i> ${t('btn_manage_class') || 'Manage Class'}
           </button>
-          ${!c.is_prep && c.grade_level && c.grade_level !== 'دولسم' ? `<button onclick="promoteYearEnd(${c.id})" title="${t('btn_promote_class')}" style="width:38px;height:38px;background:rgba(155,110,255,.10);border:1px solid rgba(155,110,255,.25);border-radius:10px;color:#6e3fdb;cursor:pointer;font-size:13px;transition:transform .15s ease;" onmouseover="this.style.transform='scale(1.08)';this.style.background='rgba(155,110,255,.18)'" onmouseout="this.style.transform='scale(1)';this.style.background='rgba(155,110,255,.10)'">
+          ${c.grade_level && c.grade_level !== 'دولسم' ? `<button onclick="promoteYearEnd(${c.id})" title="${t('btn_promote_class')}" style="width:38px;height:38px;background:rgba(155,110,255,.10);border:1px solid rgba(155,110,255,.25);border-radius:10px;color:#6e3fdb;cursor:pointer;font-size:13px;transition:transform .15s ease;" onmouseover="this.style.transform='scale(1.08)';this.style.background='rgba(155,110,255,.18)'" onmouseout="this.style.transform='scale(1)';this.style.background='rgba(155,110,255,.10)'">
             <i class="fas fa-arrow-up"></i>
+          </button>` : ''}
+          ${c.undoable_students ? `<button onclick="undoClassPromotion(${c.id},'${(c.name||'').replace(/'/g,"\\'")}')" title="${t('btn_undo_class')} (${c.undoable_students})" style="width:38px;height:38px;background:rgba(224,87,79,.10);border:1px solid rgba(224,87,79,.28);border-radius:10px;color:#c8443c;cursor:pointer;font-size:13px;transition:transform .15s ease;" onmouseover="this.style.transform='scale(1.08)';this.style.background='rgba(224,87,79,.18)'" onmouseout="this.style.transform='scale(1)';this.style.background='rgba(224,87,79,.10)'">
+            <i class="fas fa-rotate-left"></i>
           </button>` : ''}
           ${c.grade_level === 'دولسم' ? `<button onclick="graduateClass(${c.id},'${(c.name||'').replace(/'/g,"\\'")}')" title="${t('btn_graduate')||'Graduate class'}" style="width:38px;height:38px;background:rgba(34,197,113,.10);border:1px solid rgba(34,197,113,.25);border-radius:10px;color:#178f4f;cursor:pointer;font-size:13px;transition:transform .15s ease;" onmouseover="this.style.transform='scale(1.08)';this.style.background='rgba(34,197,113,.18)'" onmouseout="this.style.transform='scale(1)';this.style.background='rgba(34,197,113,.10)'">
             <i class="fas fa-user-graduate"></i>
@@ -7689,10 +7697,11 @@ async function renderClasses(list) {
   // it into labelled rows so each grade starts on a fresh line.
   const groups = [];
   list.forEach(c => {
-    const key = c.is_prep ? 'prep' : (c.grade_number != null ? c.grade_number : '?');
+    const key = c.is_unassigned || c.grade_number == null ? 'none' : c.grade_number;
     let g = groups.find(x => x.key === key);
     if (!g) {
-      g = { key, is_prep: !!c.is_prep, grade: c.grade_level || '',
+      g = { key, is_prep: !!c.is_prep, is_unassigned: key === 'none',
+            grade: c.grade_level || '',
             label_en: c.grade_label_en || '', number: c.grade_number, classes: [] };
       groups.push(g);
     }
@@ -7703,11 +7712,14 @@ async function renderClasses(list) {
   grid.innerHTML = groups.map(g => {
     const students = g.classes.reduce((s, c) => s + Number(c.student_count ?? c.cnt ?? 0), 0);
     // One colour per grade row, so the grouping reads at a glance.
-    const p = g.is_prep ? { from: '#9b6eff', to: '#6e3fdb' }
-                        : palettes[((g.number || 1) - 1) % palettes.length];
-    const badge = g.is_prep ? '<i class="fas fa-star"></i>' : g.number;
-    const title = g.is_prep ? t('cls_group_prep') : (g.grade || '—');
-    const sub   = g.is_prep ? '' : (g.label_en || '');
+    const p = g.is_unassigned ? { from: '#94a3b8', to: '#64748b' }
+            : g.is_prep       ? { from: '#9b6eff', to: '#6e3fdb' }
+            : palettes[(g.number - 1) % palettes.length];
+    const badge = g.is_unassigned ? '?'
+                : g.is_prep       ? '<i class="fas fa-seedling"></i>'
+                : g.number;
+    const title = g.is_unassigned ? t('cls_group_nograde') : (g.grade || '—');
+    const sub   = g.is_unassigned ? '' : (g.is_prep ? t('cls_group_prep') : (g.label_en || ''));
     const meta  = t('cls_row_meta').replace('{c}', g.classes.length).replace('{s}', students);
 
     return `
@@ -7719,7 +7731,7 @@ async function renderClasses(list) {
           <div style="margin-left:auto;font-size:11.5px;color:#6a7c93;font-family:var(--font-mono);font-weight:700;white-space:nowrap;">${meta}</div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px;align-items:stretch;">
-          ${g.classes.map(c => cardHTML(c, ((g.number || 1) - 1))).join('')}
+          ${g.classes.map(c => cardHTML(c, (g.is_prep || g.is_unassigned) ? 0 : Math.max(0, g.number - 1))).join('')}
         </div>
       </div>`;
   }).join('');
@@ -7961,6 +7973,39 @@ function showPromotePlan({ title, plan, refresh, onConfirm }) {
   }
 
   render(plan);
+}
+
+// Undo the promotion of ONE class, at any time. Puts back only the students
+// who were promoted out of this class, from the most recent run that still
+// affects it — other classes in that same run are left alone.
+async function undoClassPromotion(classId, className) {
+  showConfirm({
+    title: 'Undo promotion for ' + className + '?',
+    message: 'The students promoted out of ' + className + ' go back into it. '
+           + 'Anyone archived as a graduate in that run is restored to the active lists. '
+           + 'Other classes are not touched, and nothing is deleted.',
+    confirmText: 'Undo this class',
+    type: 'warning',
+    onConfirm: async () => {
+      try {
+        const r = await fetch('/api/students/promote/undo', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ class_id: classId }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Failed');
+        showAlert({
+          title: t('alert_title_saved') || 'Restored',
+          message: d.restored + ' student(s) put back into ' + className
+                 + (d.ungraduated ? ', ' + d.ungraduated + ' graduate(s) reactivated.' : '.'),
+          type: 'success',
+        });
+        await loadClasses();
+      } catch (e) {
+        showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' });
+      }
+    },
+  });
 }
 
 // Reverse the most recent promotion run: every student in that run goes back

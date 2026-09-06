@@ -297,51 +297,79 @@ router.get('/qr/bulk', async (req, res) => {
 //  graduate list (name, father, class) for printing.
 // ══════════════════════════════════════════════════════════════
 router.post('/graduate', async (req, res) => {
+  const client = await pool.connect();
   try {
     const { class_id } = req.body;
     if (!class_id) return res.status(400).json({ error: 'class_id is required' });
 
-    const cls = await pool.query('SELECT name, section FROM classes WHERE id = $1', [class_id]);
-    const className = cls.rows.length ? cls.rows[0].name : '';
+    const cls = await client.query('SELECT name, section FROM classes WHERE id = $1', [class_id]);
+    const className   = cls.rows.length ? cls.rows[0].name : '';
     const classSection = cls.rows.length ? (cls.rows[0].section || '') : '';
 
-    let graduated = [];
-    try {
-      const r = await pool.query(`
-        UPDATE students
-           SET graduated = TRUE, graduated_at = CURRENT_DATE, is_active = FALSE
-         WHERE class_id = $1 AND is_active = TRUE
-         RETURNING id, first_name, last_name, student_code, parent_name`,
-        [class_id]
-      );
-      graduated = r.rows;
-    } catch (e) {
-      // graduated columns missing → degrade to just deactivating
-      if (/graduated/.test(e.message)) {
-        const r = await pool.query(`
-          UPDATE students SET is_active = FALSE
-           WHERE class_id = $1 AND is_active = TRUE
-           RETURNING id, first_name, last_name, student_code, parent_name`,
-          [class_id]
-        );
-        graduated = r.rows;
-      } else { throw e; }
+    // Read the prior state BEFORE changing anything, so graduating a class
+    // can be undone exactly like a promotion. Until this was added, the
+    // Graduate button archived a whole class with no record of it at all —
+    // the same gap that made the September incident unrecoverable.
+    const before = await client.query(
+      `SELECT id, first_name, last_name, student_code, parent_name, class_id,
+              is_active, COALESCE(graduated, FALSE) AS graduated, graduated_at
+         FROM students
+        WHERE class_id = $1 AND is_active = TRUE`, [class_id]);
+
+    if (!before.rows.length) {
+      return res.json({ success: true, class_name: className, count: 0,
+                        students: [], undoable: false });
     }
+
+    const undoable = (await client.query(
+      `SELECT to_regclass('public.student_class_history') AS t`)).rows[0].t !== null;
+    const batchId  = require('crypto').randomUUID();
+    const ids      = before.rows.map(r => r.id);
+
+    await client.query('BEGIN');
+
+    if (undoable) {
+      await client.query(`
+        INSERT INTO student_class_history
+          (batch_id, student_id, action, from_class_id, to_class_id,
+           was_active, was_graduated, was_graduated_at, changed_by)
+        SELECT $1, x.student_id, 'graduate', $2::int, NULL,
+               x.was_active, x.was_graduated, x.was_graduated_at, $3
+          FROM UNNEST($4::int[], $5::bool[], $6::bool[], $7::date[])
+               AS x(student_id, was_active, was_graduated, was_graduated_at)`,
+        [batchId, class_id, (req.user && req.user.id) || null,
+         ids,
+         before.rows.map(r => r.is_active),
+         before.rows.map(r => r.graduated),
+         before.rows.map(r => r.graduated_at)]);
+    }
+
+    await client.query(`
+      UPDATE students
+         SET graduated = TRUE, graduated_at = CURRENT_DATE, is_active = FALSE
+       WHERE id = ANY($1)`, [ids]);
+
+    await client.query('COMMIT');
 
     res.json({
       success:    true,
       class_name: className,
-      count:      graduated.length,
-      students:   graduated.map(s => ({
-        name:        `${s.first_name} ${s.last_name}`,
-        father_name: s.parent_name || '',
-        class_name:  className,
-        section:     classSection,
+      count:      before.rows.length,
+      batch_id:   undoable ? batchId : null,
+      undoable,
+      students:   before.rows.map(s => ({
+        name:         `${s.first_name} ${s.last_name || ''}`.trim(),
+        father_name:  s.parent_name || '',
+        class_name:   className,
+        section:      classSection,
         student_code: s.student_code || '',
       })),
     });
   } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {}
     res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
   }
 });
 
@@ -671,8 +699,12 @@ router.get('/promote/history', async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════
-//  POST /api/students/promote/undo — reverse a promotion run
-//  Body: { batch_id }  (omit to undo the most recent run)
+//  POST /api/students/promote/undo — reverse a promotion
+//  Body: { batch_id, class_id }  — both optional.
+//    neither      → undo the most recent run, whole school
+//    class_id     → undo only the students promoted OUT of that class,
+//                   from the most recent run that still affects it
+//    batch_id     → target a specific run instead of the latest one
 //
 //  Puts every student in the batch back into the class they were in
 //  before that run, and un-archives anyone the run graduated. Nothing
@@ -685,22 +717,26 @@ router.get('/promote/history', async (req, res) => {
 router.post('/promote/undo', async (req, res) => {
   const client = await pool.connect();
   try {
-    const wanted = req.body && req.body.batch_id ? String(req.body.batch_id) : null;
+    const wanted  = req.body && req.body.batch_id ? String(req.body.batch_id) : null;
+    const classId = req.body && req.body.class_id != null && req.body.class_id !== ''
+      ? parseInt(req.body.class_id, 10) : null;
 
+    // Newest run that still has un-undone rows matching the scope.
     const pick = await client.query(
-      wanted
-        ? `SELECT batch_id FROM student_class_history
-            WHERE batch_id = $1 AND undone_at IS NULL LIMIT 1`
-        : `SELECT batch_id FROM student_class_history
-            WHERE undone_at IS NULL
-            ORDER BY changed_at DESC LIMIT 1`,
-      wanted ? [wanted] : []);
+      `SELECT batch_id FROM student_class_history
+        WHERE undone_at IS NULL
+          AND ($1::text IS NULL OR batch_id      = $1::text)
+          AND ($2::int  IS NULL OR from_class_id = $2::int)
+        ORDER BY changed_at DESC LIMIT 1`,
+      [wanted, classId]);
 
     if (!pick.rows.length) {
       return res.status(404).json({
-        error: wanted
-          ? 'That promotion run was not found, or it has already been undone.'
-          : 'There is no promotion run on record to undo.',
+        error: classId
+          ? 'This class has no promotion left to undo — it was never promoted, or it has already been put back.'
+          : wanted
+            ? 'That promotion run was not found, or it has already been undone.'
+            : 'There is no promotion run on record to undo.',
       });
     }
     const batchId = pick.rows[0].batch_id;
@@ -713,7 +749,8 @@ router.post('/promote/undo', async (req, res) => {
          SET class_id = h.from_class_id
         FROM student_class_history h
        WHERE h.batch_id = $1 AND h.undone_at IS NULL
-         AND h.action = 'promote' AND s.id = h.student_id`, [batchId]);
+         AND ($2::int IS NULL OR h.from_class_id = $2::int)
+         AND h.action = 'promote' AND s.id = h.student_id`, [batchId, classId]);
 
     // Students the run archived as graduates → fully restored
     const ungrad = await client.query(`
@@ -724,19 +761,22 @@ router.post('/promote/undo', async (req, res) => {
              graduated_at = h.was_graduated_at
         FROM student_class_history h
        WHERE h.batch_id = $1 AND h.undone_at IS NULL
-         AND h.action = 'graduate' AND s.id = h.student_id`, [batchId]);
+         AND ($2::int IS NULL OR h.from_class_id = $2::int)
+         AND h.action = 'graduate' AND s.id = h.student_id`, [batchId, classId]);
 
     await client.query(
       `UPDATE student_class_history SET undone_at = NOW()
-        WHERE batch_id = $1 AND undone_at IS NULL`, [batchId]);
+        WHERE batch_id = $1 AND undone_at IS NULL
+          AND ($2::int IS NULL OR from_class_id = $2::int)`, [batchId, classId]);
 
     await client.query('COMMIT');
 
     res.json({
-      success:   true,
-      batch_id:  batchId,
-      restored:  back.rowCount,
-      ungraduated: ungrad.rowCount,
+      success:      true,
+      batch_id:     batchId,
+      class_id:     classId,
+      restored:     back.rowCount,
+      ungraduated:  ungrad.rowCount,
     });
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch (_) {}

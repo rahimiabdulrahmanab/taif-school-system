@@ -13,6 +13,21 @@ router.get('/', async (req, res) => {
     const clsResult = await pool.query(`SELECT * FROM classes`);
     const classes   = clsResult.rows.map(withGradeMeta).sort(compareClasses);
 
+    // How many students are still sitting in a promotion that came OUT of
+    // each class, so a class card can offer its own undo. One query, not one
+    // per class. Degrades quietly if the history migration has not been run.
+    const undoMap = {};
+    try {
+      const u = await pool.query(
+        `SELECT from_class_id AS id, COUNT(*)::int AS n
+           FROM student_class_history
+          WHERE undone_at IS NULL AND from_class_id IS NOT NULL
+          GROUP BY from_class_id`);
+      u.rows.forEach(r => { undoMap[r.id] = r.n; });
+    } catch (e) {
+      if (!/student_class_history/.test(e.message || '')) throw e;
+    }
+
     const enriched = await Promise.all(classes.map(async (c) => {
       const countRes = await pool.query(
         `SELECT COUNT(*)::integer AS cnt FROM students WHERE class_id = $1`, [c.id]
@@ -36,8 +51,9 @@ router.get('/', async (req, res) => {
 
       return {
         ...c,
-        student_count: countRes.rows[0].cnt,
-        teachers:      teachersRes.rows,
+        student_count:     countRes.rows[0].cnt,
+        teachers:          teachersRes.rows,
+        undoable_students: undoMap[c.id] || 0,
       };
     }));
 
