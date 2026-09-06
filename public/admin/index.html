@@ -2985,14 +2985,6 @@ button[style*="background:linear-gradient"]{
       </div>
     </div>
 
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:10px 12px;background:#f5f9fc;border:1px solid rgba(20,40,80,.07);border-radius:10px;">
-      <i class="fas fa-receipt" style="color:#6e3fdb;font-size:13px;"></i>
-      <label for="pay-book-no" style="font-size:11px;font-weight:800;color:#475569;font-family:var(--font-head);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;" data-i18n="lbl_receipt_book_no">Receipt book no.</label>
-      <input id="pay-book-no" type="text" autocomplete="off" placeholder="—"
-             style="flex:1;min-width:80px;padding:7px 10px;background:#fff;border:1px solid rgba(20,40,80,.12);border-radius:8px;font-family:var(--font-mono);font-size:13px;font-weight:700;color:#0f2845;outline:none;">
-      <span style="font-size:10.5px;color:#94a3b8;white-space:nowrap;" data-i18n="lbl_receipt_book_hint">optional — from the paper book</span>
-    </div>
-
     <div style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;" data-i18n="lbl_account_statement">Account Statement</div>
 
     <!-- Year-grouped month statement renders here -->
@@ -4553,7 +4545,8 @@ const LANG = {
     lbl_original:'Original', lbl_paid:'Paid',
     lbl_total_billed:'Total Billed', lbl_total_paid:'Total Paid', lbl_balance:'Balance',
     lbl_account_statement:'Account Statement', lbl_due:'Due',
-    lbl_receipt_book_no:'Receipt book no.', lbl_receipt_book_hint:'optional — from the paper book',
+    lbl_receipt_book_no:'Receipt book no.', lbl_last_receipt:'Last used',
+    btn_record_payment:'Record payment', lbl_opening_balance:'Opening balance',
     lbl_opening_balance:'Opening Balance (before joining)',
     status_partial:'Partial', status_unpaid:'Unpaid',
     btn_set_due:'Set Due', btn_add_payment:'Add Payment',
@@ -4995,7 +4988,8 @@ const LANG = {
     lbl_original:'اصلي', lbl_paid:'ورکړل شوی',
     lbl_total_billed:'ټوله بیله', lbl_total_paid:'ټوله تادیه', lbl_balance:'پاتې',
     lbl_account_statement:'د حساب وضعیت', lbl_due:'وړ تادیه',
-    lbl_receipt_book_no:'د رسید کتاب نمبر', lbl_receipt_book_hint:'اختیاري — د کاغذي کتاب څخه',
+    lbl_receipt_book_no:'د رسید کتاب نمبر', lbl_last_receipt:'وروستی کارول شوی',
+    btn_record_payment:'تادیه ثبت کړئ', lbl_opening_balance:'پخوانی پور',
     lbl_opening_balance:'پخوانی پاتې پور (د شاملیدو دمخه)',
     status_partial:'جزوي', status_unpaid:'نه دی ورکړل شوی',
     btn_set_due:'تادیه وټاکئ', btn_add_payment:'تادیه زیاته کړئ',
@@ -6527,7 +6521,11 @@ function closeConfirm() {
 
 // Lightweight single-input prompt dialog (styled, not native prompt()).
 // showConfirmInput({ title, message, value, confirmText, onConfirm(value) })
-function showConfirmInput({ title, message, value = '', confirmText = 'Save', onConfirm }) {
+// numeric:true (the default) keeps the digits-only behaviour every existing
+// caller relies on — these prompts edit amounts. Pass numeric:false for text
+// like a receipt book number, which may carry a letter or a dash and must
+// never be silently stripped.
+function showConfirmInput({ title, message, value = '', confirmText = 'Save', onConfirm, numeric = true }) {
   const old = document.getElementById('ci-modal');
   if (old) old.remove();
   const wrap = document.createElement('div');
@@ -6537,7 +6535,7 @@ function showConfirmInput({ title, message, value = '', confirmText = 'Save', on
     <div style="background:#fff;border-radius:20px;padding:28px 26px 22px;max-width:380px;width:92%;box-shadow:0 30px 80px rgba(20,40,80,.20);">
       <div style="font-family:var(--font-head);font-size:16px;font-weight:800;color:#0f2845;text-align:center;margin-bottom:6px;">${title}</div>
       <div style="font-size:12.5px;color:#6a7c93;text-align:center;line-height:1.6;margin-bottom:16px;">${message||''}</div>
-      <input id="ci-input" type="text" inputmode="numeric" value="${String(value).replace(/"/g,'&quot;')}" style="width:100%;padding:11px 14px;background:#fff;border:2px solid rgba(93,202,165,.4);border-radius:12px;font-family:var(--font-mono);font-size:15px;font-weight:700;color:#0C1526;outline:none;box-sizing:border-box;margin-bottom:16px;text-align:center;" oninput="this.value=toWesternDigits(this.value).replace(/[^0-9.]/g,'')">
+      <input id="ci-input" type="text" inputmode="${numeric ? 'numeric' : 'text'}" value="${String(value).replace(/"/g,'&quot;')}" style="width:100%;padding:11px 14px;background:#fff;border:2px solid rgba(93,202,165,.4);border-radius:12px;font-family:var(--font-mono);font-size:15px;font-weight:700;color:#0C1526;outline:none;box-sizing:border-box;margin-bottom:16px;text-align:center;" oninput="${numeric ? "this.value=toWesternDigits(this.value).replace(/[^0-9.]/g,'')" : 'this.value=toWesternDigits(this.value)'}">
       <div style="display:flex;gap:10px;">
         <button id="ci-cancel" style="flex:1;padding:12px;background:#f5f9fc;border:1px solid rgba(20,40,80,.08);border-radius:12px;color:#6a7c93;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;">${t('lbl_cancel')||'Cancel'}</button>
         <button id="ci-ok" style="flex:1;padding:12px;background:linear-gradient(135deg,#5DCAA5,#3aaa85);border:none;border-radius:12px;color:#0a1f1a;font-family:var(--font-head);font-size:13px;font-weight:800;cursor:pointer;">${confirmText}</button>
@@ -9514,9 +9512,6 @@ async function openFeePanel(studentId) {
     const s = data.student;
 
     document.getElementById('fee-student-id').value = studentId;
-    // Never carry a receipt book number over from the previous student.
-    const _bn = document.getElementById('pay-book-no');
-    if (_bn) _bn.value = '';
     document.getElementById('fee-panel-title').textContent = t('lbl_fee_collect') || 'Fee Account';
     document.getElementById('fee-panel-sub').textContent   = s.first_name + ' ' + s.last_name;
     document.getElementById('fee-student-name').textContent  = s.first_name + ' ' + s.last_name;
@@ -9697,10 +9692,29 @@ async function feeSetDue(year, month) {
   } catch(e) { showAlert({ title:t('alert_title_error'), message:e.message, type:'error' }); }
 }
 
-// The number written on the paper slip for the payment about to be recorded.
-function feeBookNo() {
-  const el = document.getElementById('pay-book-no');
-  return el ? el.value.trim() : '';
+// The last receipt number the clerk entered this session. Shown as a
+// reminder so they do not lose their place in the book — never pre-filled,
+// because a pre-filled number is one that gets reused by accident.
+let _lastBookNo = '';
+
+// Ask the finance officer for the number on the paper receipt, then hand it
+// to `next`. Cancelling the prompt cancels the payment: no money is recorded
+// without the clerk confirming what they wrote on the slip.
+function askReceiptNo(what, next) {
+  showConfirmInput({
+    title:   t('lbl_receipt_book_no') || 'Receipt book no.',
+    message: what + (_lastBookNo
+      ? `<br><span style="color:#94a3b8;">${t('lbl_last_receipt') || 'Last used'}: ${_lastBookNo}</span>`
+      : ''),
+    value: '',
+    numeric: false,
+    confirmText: t('btn_record_payment') || 'Record payment',
+    onConfirm: (v) => {
+      const no = String(v == null ? '' : v).trim();
+      if (no) _lastBookNo = no;
+      next(no);
+    },
+  });
 }
 
 async function feeAddPayment(year, month) {
@@ -9708,18 +9722,27 @@ async function feeAddPayment(year, month) {
   const amt = parseFloat(document.getElementById(`pay-amt-${year}-${month}`).value);
   const mtd = document.getElementById(`pay-mtd-${year}-${month}`).value;
   if (!(amt > 0)) { showAlert({ title:t('alert_title_invalid'), message:t('msg_invalid_amount'), type:'warning' }); return; }
-  try {
-    const r = await fetch('/api/fees', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ student_id: parseInt(sid), amount: amt, payment_method: mtd,
-                             months_paid: [{ year, month }],
-                             receipt_book_no: feeBookNo() }),
-    });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error || 'Failed');
-    showAlert({ title:t('alert_title_saved'), message:`${amt.toLocaleString()} AFN — ${t('msg_payment_ok')||'Recorded'}`, type:'success' });
-    _feeRefresh();
-  } catch(e) { showAlert({ title:t('alert_title_error'), message:e.message, type:'error' }); }
+
+  const names = _lang === 'ps' ? SHAMSI_MONTHS_PASHTO : _lang === 'fa' ? SHAMSI_MONTHS_DARI : SHAMSI_MONTHS_EN;
+  askReceiptNo(`${amt.toLocaleString()} AFN · ${names[month] || ''} ${year}`, async (bookNo) => {
+    try {
+      const r = await fetch('/api/fees', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ student_id: parseInt(sid), amount: amt, payment_method: mtd,
+                               months_paid: [{ year, month }],
+                               receipt_book_no: bookNo }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Failed');
+      showAlert({
+        title: t('alert_title_saved'),
+        message: `${amt.toLocaleString()} AFN — ${t('msg_payment_ok')||'Recorded'}`
+               + (bookNo ? ` · ${t('lbl_receipt_book_no')||'Receipt'} ${bookNo}` : ''),
+        type: 'success',
+      });
+      _feeRefresh();
+    } catch(e) { showAlert({ title:t('alert_title_error'), message:e.message, type:'error' }); }
+  });
 }
 
 // Pay against the opening balance (debt from before joining)
@@ -9728,18 +9751,26 @@ async function feeAddOpeningPayment() {
   const amt = parseFloat(document.getElementById('open-pay-amt').value);
   const mtd = document.getElementById('open-pay-mtd').value;
   if (!(amt > 0)) { showAlert({ title:t('alert_title_invalid'), message:t('msg_invalid_amount'), type:'warning' }); return; }
-  try {
-    const r = await fetch('/api/fees', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ student_id: parseInt(sid), amount: amt, payment_method: mtd,
-                             notes: 'Opening balance payment', is_previous_debt: true,
-                             receipt_book_no: feeBookNo() }),
-    });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error || 'Failed');
-    showAlert({ title:t('alert_title_saved'), message:`${amt.toLocaleString()} AFN — ${t('msg_payment_ok')||'Recorded'}`, type:'success' });
-    _feeRefresh();
-  } catch(e) { showAlert({ title:t('alert_title_error'), message:e.message, type:'error' }); }
+
+  askReceiptNo(`${amt.toLocaleString()} AFN · ${t('lbl_opening_balance') || 'Opening balance'}`, async (bookNo) => {
+    try {
+      const r = await fetch('/api/fees', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ student_id: parseInt(sid), amount: amt, payment_method: mtd,
+                               notes: 'Opening balance payment', is_previous_debt: true,
+                               receipt_book_no: bookNo }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Failed');
+      showAlert({
+        title: t('alert_title_saved'),
+        message: `${amt.toLocaleString()} AFN — ${t('msg_payment_ok')||'Recorded'}`
+               + (bookNo ? ` · ${t('lbl_receipt_book_no')||'Receipt'} ${bookNo}` : ''),
+        type: 'success',
+      });
+      _feeRefresh();
+    } catch(e) { showAlert({ title:t('alert_title_error'), message:e.message, type:'error' }); }
+  });
 }
 
 function feeEditPayment(id, current) {
