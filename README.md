@@ -51,6 +51,7 @@ The installer will be in the `dist/` folder.
    | 5 | `db/migration_parent_phone2.sql`     | second parent WhatsApp number |
    | 6 | `db/migration_promotion_history.sql` | promotion audit trail + undo |
    | 7 | `db/migration_class_integrity.sql`   | rejects unknown grade levels, one class per grade+section |
+   | 8 | `db/migration_fee_receipts.sql`      | receipt serial per fee payment, day index for reconciliation |
 
 ### An EXISTING database that already holds school data
 

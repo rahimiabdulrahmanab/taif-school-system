@@ -2897,6 +2897,9 @@ button[style*="background:linear-gradient"]{
   <select id="fee-class-filter" onchange="loadFeeList()" style="padding:9px 13px;background:#f5f9fc;border:1px solid rgba(20,40,80,.06);border-radius:10px;color:#0f2845;font-family:var(--font-body);font-size:13px;font-weight:600;outline:none;cursor:pointer;min-width:140px;">
     <option value="">All Classes</option>
   </select>
+  <button onclick="openDailyCollection()" title="What was collected on one day — for end-of-day reconciliation" style="display:inline-flex;align-items:center;gap:8px;padding:9px 16px;background:linear-gradient(135deg,#5DCAA5,#3aaa85);border:none;border-radius:10px;color:#0a1f1a;font-family:var(--font-head);font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 4px 14px rgba(93,202,165,.30);">
+    <i class="fas fa-cash-register"></i> <span data-i18n="btn_daily_collection">Daily Collection</span>
+  </button>
   <div style="flex:1;min-width:160px;display:flex;align-items:center;gap:10px;background:#f5f9fc;border:1px solid rgba(20,40,80,.06);border-radius:10px;padding:9px 14px;">
     <i class="fas fa-search" style="color:#8aa0b5;font-size:13px;"></i>
     <input id="fee-search" type="text" placeholder="Search student..." oninput="feeSearchStudent()" data-ph="ph_search_student" style="background:none;border:none;outline:none;color:#0f2845;font-family:var(--font-body);font-size:13.5px;flex:1;min-width:0;font-weight:500;">
@@ -4415,6 +4418,7 @@ const LANG = {
     stf_stat_total:'Total Staff', stf_stat_payroll:'Monthly Payroll (AFN)',
     cls_stat_total:'Total Classes', cls_stat_students:'Enrolled Students', cls_stat_subjects:'Subjects Configured',
     cls_group_prep:'Preparatory — before Grade 1', cls_group_nograde:'No grade set',
+    btn_daily_collection:'Daily Collection',
     cls_row_meta:'{c} classes · {s} students',
     btn_promote_class:'Promote this class', confirm_promote_class_title:'Promote {name}?',
     btn_undo_class:'Undo promotion for this class',
@@ -4855,6 +4859,7 @@ const LANG = {
     stf_stat_total:'ټول کارکوونکي', stf_stat_payroll:'میاشتنۍ معاشات (افغانۍ)',
     cls_stat_total:'ټول ټولګي', cls_stat_students:'نوم لیکل شوي زده‌کوونکي', cls_stat_subjects:'تنظیم شوي مضامين',
     cls_group_prep:'د لومړي ټولګي آمادګي', cls_group_nograde:'ټولګی ټاکل شوی نه دی',
+    btn_daily_collection:'د ورځې راټولونه',
     cls_row_meta:'{c} ټولګي · {s} زده‌کوونکي',
     btn_promote_class:'دا ټولګی پورته کول', confirm_promote_class_title:'{name} پورته کړو؟',
     btn_undo_class:'د دې ټولګي پورته کول بیرته کول',
@@ -9133,6 +9138,163 @@ async function loadFeeSummary() {
       ? Number(sel.total_amount).toLocaleString() + ' AFN' : '0 AFN';
     document.getElementById('fee-paid-count').textContent = sel ? sel.payment_count : '0';
   } catch(e) {}
+}
+
+// ── Daily collection (end-of-day reconciliation) ──────────────
+// Everything actually taken in on one calendar day, with the receipt
+// serial for each, so the office can match the system against the paper
+// book before locking up. The date is picked in Shamsi and converted to
+// the Gregorian day the payment was filed under.
+function openDailyCollection() {
+  const old = document.getElementById('dc-modal');
+  if (old) old.remove();
+
+  const cur = getCurrentShamsi();
+  let sel = { y: cur.year, m: cur.month, d: cur.day };
+
+  const esc = (v) => String(v == null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+  const wrap = document.createElement('div');
+  wrap.id = 'dc-modal';
+  wrap.style.cssText = 'position:fixed;inset:0;z-index:1200;display:flex;align-items:center;justify-content:center;background:rgba(8,15,28,.55);backdrop-filter:blur(5px);';
+  document.body.appendChild(wrap);
+  const close = () => wrap.remove();
+
+  // Shamsi (y,m,d) -> the Gregorian YYYY-MM-DD the payment was stored under
+  const toISO = () => {
+    const g = fromShamsi(sel.y, sel.m, sel.d);
+    const p = n => String(n).padStart(2, '0');
+    return `${g.year}-${p(g.month)}-${p(g.day)}`;
+  };
+
+  let data = null;
+
+  function dayOptions() {
+    const days = shamsiMonthDays(sel.y, sel.m);
+    if (sel.d > days) sel.d = days;
+    let h = '';
+    for (let i = 1; i <= days; i++) h += `<option value="${i}"${i === sel.d ? ' selected' : ''}>${i}</option>`;
+    return h;
+  }
+
+  function rowsHTML() {
+    if (!data) return '<div style="padding:26px;text-align:center;color:#6a7c93;font-size:13px;">Loading…</div>';
+    if (!data.payments.length) {
+      return '<div style="padding:34px;text-align:center;color:#6a7c93;">'
+           + '<div style="font-size:26px;margin-bottom:8px;opacity:.4;"><i class="fas fa-receipt"></i></div>'
+           + '<div style="font-size:13.5px;font-weight:700;color:#0f2845;">No fee was collected on this day</div></div>';
+    }
+    const monthNames = _lang === 'ps' ? SHAMSI_MONTHS_PASHTO : _lang === 'fa' ? SHAMSI_MONTHS_DARI : SHAMSI_MONTHS_EN;
+    return '<table style="width:100%;border-collapse:collapse;font-size:12.5px;">'
+      + '<thead><tr style="background:#f5f9fc;">'
+      + ['Receipt', 'Time', 'Student', 'Class', 'Paid for', 'Method', 'Amount']
+          .map((h, i) => `<th style="padding:9px 10px;text-align:${i === 6 ? 'right' : 'left'};font-family:var(--font-head);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#6a7c93;white-space:nowrap;">${h}</th>`).join('')
+      + '</tr></thead><tbody>'
+      + data.payments.map(p => {
+          const time = p.created_at ? new Date(p.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+          const forWhat = p.is_previous_debt ? 'Previous debt'
+            : (p.payment_month ? `${monthNames[parseInt(p.payment_month)] || p.payment_month} ${p.payment_year || ''}` : '—');
+          return '<tr style="border-top:1px solid rgba(20,40,80,.06);">'
+            + `<td style="padding:9px 10px;font-family:var(--font-mono);font-weight:700;color:#6e3fdb;white-space:nowrap;">${esc(p.receipt_number || '—')}</td>`
+            + `<td style="padding:9px 10px;font-family:var(--font-mono);color:#6a7c93;white-space:nowrap;">${esc(time)}</td>`
+            + `<td style="padding:9px 10px;"><div style="font-weight:700;color:#0f2845;">${esc((p.first_name || '') + ' ' + (p.last_name || ''))}</div><div style="font-family:var(--font-mono);font-size:11px;color:#94a3b8;">${esc(p.student_code || '')}</div></td>`
+            + `<td style="padding:9px 10px;color:#475569;">${esc(p.class_name || '—')}</td>`
+            + `<td style="padding:9px 10px;color:#475569;white-space:nowrap;">${esc(forWhat)}</td>`
+            + `<td style="padding:9px 10px;color:#475569;">${esc(p.payment_method || 'cash')}</td>`
+            + `<td style="padding:9px 10px;text-align:right;font-family:var(--font-mono);font-weight:800;color:#0f2845;white-space:nowrap;">${Number(p.amount).toLocaleString()}</td>`
+            + '</tr>';
+        }).join('')
+      + '</tbody></table>';
+  }
+
+  function render() {
+    const monthNames = _lang === 'ps' ? SHAMSI_MONTHS_PASHTO : _lang === 'fa' ? SHAMSI_MONTHS_DARI : SHAMSI_MONTHS_EN;
+    const totalTxt = data ? Number(data.total).toLocaleString() + ' AFN' : '—';
+    const methods = data && data.by_method.length
+      ? data.by_method.map(m => `<span style="padding:5px 11px;border-radius:20px;background:#f5f9fc;border:1px solid rgba(20,40,80,.07);font-size:11.5px;font-weight:700;color:#475569;">${esc(m.method)}: <b style="font-family:var(--font-mono);color:#0f2845;">${Number(m.amount).toLocaleString()}</b></span>`).join(' ')
+      : '';
+
+    wrap.innerHTML =
+      '<div style="background:#fff;border-radius:18px;width:min(880px,calc(100vw - 32px));max-height:90vh;display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(8,15,28,.4);overflow:hidden;">'
+      + '<div style="padding:18px 22px 14px;border-bottom:1px solid rgba(20,40,80,.07);display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
+      +   '<div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#5DCAA5,#3aaa85);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;"><i class="fas fa-cash-register"></i></div>'
+      +   '<div style="flex:1;min-width:150px;"><div style="font-family:var(--font-head);font-size:17px;font-weight:800;color:#0f2845;">Daily Collection</div>'
+      +   '<div style="font-size:12px;color:#6a7c93;">Match the system against the day book</div></div>'
+      +   '<div dir="rtl" style="display:flex;gap:5px;background:#f5f9fc;border:1px solid rgba(20,40,80,.07);border-radius:10px;padding:4px;">'
+      +     `<select id="dc-day" style="padding:6px 9px;background:transparent;border:none;font-family:var(--font-mono);font-size:13px;font-weight:700;color:#0f2845;cursor:pointer;outline:none;">${dayOptions()}</select>`
+      +     `<select id="dc-month" style="padding:6px 9px;background:transparent;border:none;font-family:var(--font-body);font-size:13px;font-weight:700;color:#0f2845;cursor:pointer;outline:none;">${shamsiMonthOptions(sel.m)}</select>`
+      +     `<select id="dc-year" style="padding:6px 9px;background:transparent;border:none;font-family:var(--font-mono);font-size:13px;font-weight:700;color:#0f2845;cursor:pointer;outline:none;">${shamsiYearOptions(sel.y)}</select>`
+      +   '</div>'
+      +   '<button id="dc-today" style="padding:8px 14px;background:#f5f9fc;border:1px solid rgba(20,40,80,.10);border-radius:10px;font-family:var(--font-head);font-size:12px;font-weight:800;color:#475569;cursor:pointer;">Today</button>'
+      + '</div>'
+      + '<div style="padding:14px 22px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-bottom:1px solid rgba(20,40,80,.07);background:#fbfdff;">'
+      +   `<div><div style="font-family:var(--font-mono);font-size:26px;font-weight:800;color:#178f4f;line-height:1;">${totalTxt}</div>`
+      +   `<div style="font-size:11px;color:#6a7c93;text-transform:uppercase;letter-spacing:.05em;font-weight:700;font-family:var(--font-head);margin-top:4px;">Collected on ${esc(sel.d + ' ' + (monthNames[sel.m] || '') + ' ' + sel.y)}</div></div>`
+      +   `<div style="margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">${methods}`
+      +   `<span style="padding:5px 11px;border-radius:20px;background:rgba(93,202,165,.14);font-size:11.5px;font-weight:800;color:#12603a;">${data ? data.count : 0} payment(s)</span></div>`
+      + '</div>'
+      + `<div style="overflow-y:auto;flex:1;">${rowsHTML()}</div>`
+      + '<div style="padding:13px 22px;border-top:1px solid rgba(20,40,80,.07);display:flex;gap:10px;justify-content:flex-end;background:#fbfdff;">'
+      +   '<button id="dc-print" style="padding:9px 18px;background:#fff;border:1px solid rgba(20,40,80,.15);border-radius:10px;font-family:var(--font-head);font-size:13px;font-weight:700;color:#475569;cursor:pointer;"><i class="fas fa-print"></i> Print</button>'
+      +   '<button id="dc-close" style="padding:9px 20px;background:linear-gradient(135deg,#5DCAA5,#3aaa85);border:none;border-radius:10px;color:#0a1f1a;font-family:var(--font-head);font-size:13px;font-weight:800;cursor:pointer;">Close</button>'
+      + '</div></div>';
+
+    wrap.querySelector('#dc-close').onclick = close;
+    wrap.querySelector('#dc-print').onclick = printDay;
+    wrap.querySelector('#dc-today').onclick = () => {
+      const c = getCurrentShamsi();
+      sel = { y: c.year, m: c.month, d: c.day };
+      load();
+    };
+    wrap.querySelector('#dc-day').onchange   = e => { sel.d = parseInt(e.target.value); load(); };
+    wrap.querySelector('#dc-month').onchange = e => { sel.m = parseInt(e.target.value); load(); };
+    wrap.querySelector('#dc-year').onchange  = e => { sel.y = parseInt(e.target.value); load(); };
+  }
+
+  function printDay() {
+    if (!data || !data.payments.length) return;
+    const monthNames = _lang === 'ps' ? SHAMSI_MONTHS_PASHTO : _lang === 'fa' ? SHAMSI_MONTHS_DARI : SHAMSI_MONTHS_EN;
+    const label = `${sel.d} ${monthNames[sel.m] || ''} ${sel.y}`;
+    const rows = data.payments.map((p, i) =>
+      `<tr><td>${i + 1}</td><td>${esc(p.receipt_number || '')}</td>`
+      + `<td>${esc((p.first_name || '') + ' ' + (p.last_name || ''))}</td>`
+      + `<td>${esc(p.student_code || '')}</td><td>${esc(p.class_name || '')}</td>`
+      + `<td>${esc(p.payment_method || 'cash')}</td>`
+      + `<td style="text-align:right;">${Number(p.amount).toLocaleString()}</td></tr>`).join('');
+    const w = window.open('', '_blank');
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Daily Collection — ${label}</title>
+      <style>body{font-family:system-ui,sans-serif;padding:26px;color:#111;}
+      h1{font-size:18px;margin:0 0 4px;} .sub{color:#666;font-size:12px;margin-bottom:16px;}
+      table{width:100%;border-collapse:collapse;font-size:12px;}
+      th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;}
+      th{background:#f0f4f8;} tfoot td{font-weight:800;background:#f8fafc;}</style></head><body>
+      <h1>Daily Fee Collection</h1><div class="sub">${label} &nbsp;·&nbsp; ${data.count} payment(s)</div>
+      <table><thead><tr><th>#</th><th>Receipt</th><th>Student</th><th>Code</th><th>Class</th><th>Method</th><th style="text-align:right;">Amount</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr><td colspan="6">TOTAL</td><td style="text-align:right;">${Number(data.total).toLocaleString()} AFN</td></tr></tfoot>
+      </table></body></html>`);
+    w.document.close();
+    w.print();
+  }
+
+  async function load() {
+    data = null;
+    render();
+    try {
+      const r = await fetch('/api/fees/daily?date=' + toISO());
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Failed');
+      data = d;
+    } catch (e) {
+      data = { date: toISO(), count: 0, total: 0, by_method: [], payments: [] };
+      showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' });
+    }
+    render();
+  }
+
+  load();
 }
 
 async function loadFeeList() {

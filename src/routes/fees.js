@@ -1,7 +1,7 @@
 const express = require('express');
 const pool    = require('../db.js');
 const CONFIG  = require('../../school-config.js');
-const { toShamsi, todayShamsi } = require('../shamsi.js');
+const { toShamsi, todayShamsi, kabulTodayISO } = require('../shamsi.js');
 const { getHolidayMonths } = require('../holidays.js');
 const router  = express.Router();
 
@@ -208,7 +208,7 @@ router.post('/', async (req, res) => {
           (student_id, amount, amount_paid, original_fee,
            payment_month, payment_year, payment_method, notes,
            payment_date, is_previous_debt)
-        VALUES ($1, $2, $2, $2, NULL, NULL, $3, $4, NOW(), TRUE)
+        VALUES ($1, $2, $2, $2, NULL, NULL, $3, $4, (NOW() AT TIME ZONE 'Asia/Kabul')::date, TRUE)
         RETURNING *
       `, [student_id, parseFloat(amount), payment_method || 'cash', notes || null]);
       return res.status(201).json({ success: true, payments: [r.rows[0]] });
@@ -240,7 +240,7 @@ router.post('/', async (req, res) => {
             INSERT INTO fee_payments
               (student_id, amount, amount_paid, original_fee,
                payment_month, payment_year, payment_method, notes, payment_date)
-            VALUES ($1,$2,$2,$2,$3,$4,$5,$6,NOW())
+            VALUES ($1,$2,$2,$2,$3,$4,$5,$6,(NOW() AT TIME ZONE 'Asia/Kabul')::date)
             RETURNING *
           `, [student_id, fee, m.month, m.year, payment_method || 'cash', notes || null]);
           out.push(r.rows[0]);
@@ -250,7 +250,7 @@ router.post('/', async (req, res) => {
             (student_id, amount, amount_paid, original_fee,
              payment_month, payment_year, payment_method, notes,
              payment_date, is_previous_debt)
-          VALUES ($1, $2, $2, $2, NULL, NULL, $3, $4, NOW(), TRUE)
+          VALUES ($1, $2, $2, $2, NULL, NULL, $3, $4, (NOW() AT TIME ZONE 'Asia/Kabul')::date, TRUE)
           RETURNING *
         `, [student_id, excess, payment_method || 'cash',
             (notes ? notes + ' — ' : '') + 'excess applied to debt']);
@@ -264,7 +264,7 @@ router.post('/', async (req, res) => {
             INSERT INTO fee_payments
               (student_id, amount, amount_paid, original_fee,
                payment_month, payment_year, payment_method, notes, payment_date)
-            VALUES ($1,$2,$2,$2,$3,$4,$5,$6,NOW())
+            VALUES ($1,$2,$2,$2,$3,$4,$5,$6,(NOW() AT TIME ZONE 'Asia/Kabul')::date)
             RETURNING *
           `, [student_id, perMonthAmt, m.month, m.year,
               payment_method || 'cash', notes || null]);
@@ -324,9 +324,9 @@ router.post('/carry-forward', async (req, res) => {
         INSERT INTO fee_payments
           (student_id, amount, amount_paid, original_fee,
            payment_month, payment_year, payment_method, notes,
-           payment_date, carried_forward)
-        VALUES ($1, 0, 0, $2, $3, $4, 'carry', $5, NOW(), TRUE)
-      `, [student_id, fee, month, year, `Carried ${remaining} AFN forward to Total Due`]);
+           payment_date, carried_forward, receipt_number)
+        VALUES ($1, 0, 0, $2, $3, $4, 'carry', $5, $6::date, TRUE, NULL)
+      `, [student_id, fee, month, year, `Carried ${remaining} AFN forward to Total Due`, kabulTodayISO()]);
 
       await c.query(
         `UPDATE students SET previous_debt = COALESCE(previous_debt, 0) + $1 WHERE id = $2`,
@@ -399,9 +399,9 @@ router.post('/close-month', async (req, res) => {
           INSERT INTO fee_payments
             (student_id, amount, amount_paid, original_fee,
              payment_month, payment_year, payment_method, notes,
-             payment_date, carried_forward)
-          VALUES ($1, 0, 0, $2, $3, $4, 'carry', $5, NOW(), TRUE)
-        `, [s.id, fee, month, year, `Carried ${remaining} AFN forward to Total Due`]);
+             payment_date, carried_forward, receipt_number)
+          VALUES ($1, 0, 0, $2, $3, $4, 'carry', $5, $6::date, TRUE, NULL)
+        `, [s.id, fee, month, year, `Carried ${remaining} AFN forward to Total Due`, kabulTodayISO()]);
 
         await c.query(
           `UPDATE students SET previous_debt = COALESCE(previous_debt, 0) + $1 WHERE id = $2`,
@@ -782,6 +782,55 @@ router.get('/balances', async (req, res) => {
     });
 
     res.json(out);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── GET one day's collections ─────────────────────────────────
+// End-of-day reconciliation: everything actually taken in on a given
+// calendar day, with the receipt serial for each, so the office can match
+// the system against the paper book before locking up.
+//
+//   GET /api/fees/daily?date=YYYY-MM-DD   (Gregorian; the UI converts
+//                                          from the Shamsi day picked)
+// Defaults to the current Kabul day.
+router.get('/daily', async (req, res) => {
+  try {
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.date || ''))
+      ? req.query.date
+      : kabulTodayISO();
+
+    const rows = await pool.query(`
+      SELECT fp.id, fp.receipt_number, fp.amount, fp.payment_method, fp.notes,
+             fp.payment_month, fp.payment_year, fp.is_previous_debt,
+             fp.created_at,
+             s.first_name, s.last_name, s.student_code,
+             c.name AS class_name
+        FROM fee_payments fp
+        JOIN students s  ON s.id = fp.student_id
+        LEFT JOIN classes c ON c.id = s.class_id
+       WHERE fp.payment_date = $1::date
+         AND COALESCE(fp.carried_forward, FALSE) = FALSE
+       ORDER BY fp.created_at, fp.id`, [date]);
+
+    // Per-method totals — the office counts cash separately from transfers.
+    const byMethod = {};
+    let total = 0;
+    rows.rows.forEach(r => {
+      const amt = parseFloat(r.amount) || 0;
+      const m   = r.payment_method || 'cash';
+      byMethod[m] = (byMethod[m] || 0) + amt;
+      total += amt;
+    });
+
+    res.json({
+      date,
+      count:     rows.rows.length,
+      total:     +total.toFixed(2),
+      by_method: Object.entries(byMethod)
+                   .map(([method, amount]) => ({ method, amount: +amount.toFixed(2) }))
+                   .sort((a, b) => b.amount - a.amount),
+      payments:  rows.rows,
+    });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
