@@ -38,6 +38,9 @@ async function withTx(fn) {
 // Summer-holiday months are shared with payroll — see src/holidays.js
 const getNonBillableMonths = getHolidayMonths;
 
+// Gregorian YYYY-MM-DD, the only date shape this module accepts from a client.
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 // Compute the student's effective monthly fee (after discount).
 function effectiveFeeOf(s) {
   let fee = parseFloat(s.monthly_fee) || 0;
@@ -211,7 +214,7 @@ router.post('/', async (req, res) => {
     const {
       student_id, amount, payment_month, payment_year,
       payment_method, notes, months_paid, is_previous_debt,
-      apply_excess_to_debt, receipt_book_no,
+      apply_excess_to_debt, receipt_book_no, payment_date,
     } = req.body;
 
     // The number on the paper receipt the clerk hands the parent. One slip
@@ -219,6 +222,12 @@ router.post('/', async (req, res) => {
     // month-row this payment creates. Blank is fine; it is a convenience for
     // reconciliation, not an identifier — receipt_number is the identifier.
     const bookNo = String(receipt_book_no == null ? '' : receipt_book_no).trim() || null;
+
+    // The day the money was actually received. The office frequently enters
+    // payments a few days late, and the daily reconciliation must show them on
+    // the day they were taken, not the day they were typed. Null falls back to
+    // today in Kabul.
+    const payDate = DATE_RE.test(String(payment_date || '')) ? payment_date : null;
 
     if (!student_id || !amount) {
       return res.status(400).json({ error: 'Student and amount are required' });
@@ -230,10 +239,10 @@ router.post('/', async (req, res) => {
         INSERT INTO fee_payments
           (student_id, amount, amount_paid, original_fee,
            payment_month, payment_year, payment_method, notes,
-           payment_date, is_previous_debt, receipt_book_no)
-        VALUES ($1, $2, $2, $2, NULL, NULL, $3, $4, (NOW() AT TIME ZONE 'Asia/Kabul')::date, TRUE, $5)
+           payment_date, is_previous_debt)
+        VALUES ($1, $2, $2, $2, NULL, NULL, $3, $4, COALESCE($5::date, (NOW() AT TIME ZONE 'Asia/Kabul')::date), TRUE)
         RETURNING *
-      `, [student_id, parseFloat(amount), payment_method || 'cash', notes || null]);
+      `, [student_id, parseFloat(amount), payment_method || 'cash', notes || null, payDate]);
       await tagBookNo(r.rows, bookNo);
       return res.status(201).json({ success: true, payments: [r.rows[0]] });
     }
@@ -264,20 +273,20 @@ router.post('/', async (req, res) => {
             INSERT INTO fee_payments
               (student_id, amount, amount_paid, original_fee,
                payment_month, payment_year, payment_method, notes, payment_date)
-            VALUES ($1,$2,$2,$2,$3,$4,$5,$6,(NOW() AT TIME ZONE 'Asia/Kabul')::date)
+            VALUES ($1,$2,$2,$2,$3,$4,$5,$6,COALESCE($7::date, (NOW() AT TIME ZONE 'Asia/Kabul')::date))
             RETURNING *
-          `, [student_id, fee, m.month, m.year, payment_method || 'cash', notes || null]);
+          `, [student_id, fee, m.month, m.year, payment_method || 'cash', notes || null, payDate]);
           out.push(r.rows[0]);
         }
         const d = await c.query(`
           INSERT INTO fee_payments
             (student_id, amount, amount_paid, original_fee,
              payment_month, payment_year, payment_method, notes,
-             payment_date, is_previous_debt, receipt_book_no)
-          VALUES ($1, $2, $2, $2, NULL, NULL, $3, $4, (NOW() AT TIME ZONE 'Asia/Kabul')::date, TRUE, $5)
+             payment_date, is_previous_debt)
+          VALUES ($1, $2, $2, $2, NULL, NULL, $3, $4, COALESCE($5::date, (NOW() AT TIME ZONE 'Asia/Kabul')::date), TRUE)
           RETURNING *
         `, [student_id, excess, payment_method || 'cash',
-            (notes ? notes + ' — ' : '') + 'excess applied to debt']);
+            (notes ? notes + ' — ' : '') + 'excess applied to debt', payDate]);
         out.push(d.rows[0]);
       } else {
         // No excess routing → split evenly across the selected months.
@@ -288,10 +297,10 @@ router.post('/', async (req, res) => {
             INSERT INTO fee_payments
               (student_id, amount, amount_paid, original_fee,
                payment_month, payment_year, payment_method, notes, payment_date)
-            VALUES ($1,$2,$2,$2,$3,$4,$5,$6,(NOW() AT TIME ZONE 'Asia/Kabul')::date)
+            VALUES ($1,$2,$2,$2,$3,$4,$5,$6,COALESCE($7::date, (NOW() AT TIME ZONE 'Asia/Kabul')::date))
             RETURNING *
           `, [student_id, perMonthAmt, m.month, m.year,
-              payment_method || 'cash', notes || null]);
+              payment_method || 'cash', notes || null, payDate]);
           out.push(r.rows[0]);
         }
       }
