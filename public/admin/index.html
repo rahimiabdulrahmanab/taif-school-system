@@ -4550,6 +4550,8 @@ const LANG = {
     btn_today:'Today', lbl_backdated:'Back-dated',
     lbl_outstanding:'Outstanding', btn_collect:'Collect',
     lbl_collection_date:'Collection date', lbl_today_note:'today',
+    msg_payment_deleted:'The payment has been removed and the balance updated.',
+    msg_payment_updated:'Payment updated.',
     lbl_collect_due:'Collect what they still owe', grad_dues_total:'{n} graduate(s) still owe {a} AFN',
     lbl_opening_balance:'Opening Balance (before joining)',
     status_partial:'Partial', status_unpaid:'Unpaid',
@@ -4996,6 +4998,8 @@ const LANG = {
     btn_today:'نن', lbl_backdated:'پخوانۍ نېټه',
     lbl_outstanding:'پاتې پور', btn_collect:'راټولول',
     lbl_collection_date:'د راټولولو نېټه', lbl_today_note:'نن',
+    msg_payment_deleted:'تادیه لرې شوه او بیلانس تازه شو.',
+    msg_payment_updated:'تادیه تازه شوه.',
     lbl_collect_due:'پاتې پور راټولول', grad_dues_total:'{n} فارغ التحصیل لا هم {a} افغانۍ پور لري',
     lbl_opening_balance:'پخوانی پاتې پور (د شاملیدو دمخه)',
     status_partial:'جزوي', status_unpaid:'نه دی ورکړل شوی',
@@ -10034,6 +10038,11 @@ function editPaymentDialog(p, after) {
         if (!r.ok) throw new Error(d.error || 'Failed');
         close();
         if (after) after();
+        showAlert({
+          title:   t('alert_title_saved') || 'Saved',
+          message: (t('msg_payment_updated') || 'Payment updated.') + ' ' + amt.toLocaleString() + ' AFN',
+          type:    'success',
+        });
       } catch (e) {
         close();
         showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' });
@@ -10075,8 +10084,17 @@ function feeDeletePayment(id) {
     confirmText: t('confirm_yes_delete') || 'Delete', type: 'danger',
     onConfirm: async () => {
       try {
-        await fetch(`/api/fees/${id}`, { method:'DELETE' });
+        const r = await fetch(`/api/fees/${id}`, { method: 'DELETE' });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          throw new Error(d.error || ('Delete failed (' + r.status + ')'));
+        }
         _feeRefresh();
+        showAlert({
+          title:   t('alert_title_deleted') || 'Deleted',
+          message: t('msg_payment_deleted') || 'The payment has been removed and the balance updated.',
+          type:    'success',
+        });
       } catch(e) { showAlert({ title:t('alert_title_error'), message:e.message, type:'error' }); }
     }
   });
