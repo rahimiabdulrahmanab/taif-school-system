@@ -544,7 +544,11 @@ router.get('/statement/:student_id', async (req, res) => {
     const holidayMonths = await getNonBillableMonths();
 
     const byYear = {};
-    let y = cur.year, m = cur.month;
+    // Billing stops the month a student leaves — otherwise a graduate's
+    // statement keeps adding a month's fee for ever, and would disagree with
+    // the Outstanding figure on the Graduates screen, which already stops.
+    const { endY: stEndY, endM: stEndM } = walkEnd(s, cur.year, cur.month);
+    let y = stEndY, m = stEndM;
     while (y > sy || (y === sy && m >= sm)) {
       const k = `${y}-${m}`;
       const ov  = dueByKey[k];

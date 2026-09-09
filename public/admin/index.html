@@ -9569,7 +9569,18 @@ function feeSearchStudent() {
 let feeStatementData = null;
 const _feeOpenYears = {};   // which year sections are expanded
 
+// Move the fee dialog out of the Fee Collection page so it can be opened
+// from any screen. .page{display:none} hides everything inside a page that
+// is not active, which is why Collect on the Graduates list did nothing.
+function _liftFeePanel() {
+  ['fee-overlay', 'fee-panel'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.parentNode !== document.body) document.body.appendChild(el);
+  });
+}
+
 async function openFeePanel(studentId) {
+  _liftFeePanel();
   try {
     const res = await fetch(`/api/fees/statement/${studentId}`);
     const data = await res.json();
