@@ -505,7 +505,7 @@ router.get('/statement/:student_id', async (req, res) => {
     if (span > 240) { sy = cur.year; sm = cur.month - 239; while (sm <= 0) { sm += 12; sy -= 1; } }
 
     const pres = await pool.query(
-      `SELECT id, amount, payment_year, payment_month, payment_method, notes, payment_date
+      `SELECT *
          FROM fee_payments
         WHERE student_id = $1 AND payment_year IS NOT NULL AND payment_month IS NOT NULL
           AND COALESCE(is_previous_debt,FALSE)=FALSE
@@ -580,7 +580,7 @@ router.get('/statement/:student_id', async (req, res) => {
     // is_previous_debt pay it down. Shown as the statement's first line.
     const openingDue = Math.max(0, parseFloat(s.previous_debt) || 0);
     const opres = await pool.query(
-      `SELECT id, amount, payment_method, notes, payment_date
+      `SELECT *
          FROM fee_payments
         WHERE student_id = $1 AND COALESCE(is_previous_debt,FALSE)=TRUE
         ORDER BY payment_date`,
@@ -642,8 +642,12 @@ router.put('/:id', async (req, res) => {
         error: 'This row is a carry-forward marker, not a payment. Delete it to undo the carry, or adjust the amount on the Total Due instead.',
       });
     }
-    const { amount, payment_method, notes, payment_date } = req.body;
+    const { amount, payment_method, notes, payment_date, receipt_book_no } = req.body;
     const amt = (amount != null && amount !== '') ? parseFloat(amount) : null;
+    // Reject a malformed date rather than letting Postgres throw mid-update.
+    if (payment_date && !DATE_RE.test(String(payment_date))) {
+      return res.status(400).json({ error: 'payment_date must be YYYY-MM-DD' });
+    }
     const r = await pool.query(`
       UPDATE fee_payments SET
         amount         = COALESCE($1, amount),
@@ -654,6 +658,20 @@ router.put('/:id', async (req, res) => {
       WHERE id = $5
       RETURNING *`,
       [amt, payment_method || null, notes || null, payment_date || null, req.params.id]);
+
+    // Kept out of the statement above so an un-migrated database can still
+    // edit a payment — same reason tagBookNo exists.
+    if (receipt_book_no !== undefined) {
+      const no = String(receipt_book_no == null ? '' : receipt_book_no).trim() || null;
+      try {
+        await pool.query('UPDATE fee_payments SET receipt_book_no = $1 WHERE id = $2',
+          [no, req.params.id]);
+        r.rows[0].receipt_book_no = no;
+      } catch (e) {
+        if (!/receipt_book_no/.test(e.message || '')) throw e;
+      }
+    }
+
     res.json({ success: true, payment: r.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

@@ -9237,7 +9237,7 @@ function openDailyCollection() {
     const monthNames = _lang === 'ps' ? SHAMSI_MONTHS_PASHTO : _lang === 'fa' ? SHAMSI_MONTHS_DARI : SHAMSI_MONTHS_EN;
     return '<table style="width:100%;border-collapse:collapse;font-size:12.5px;">'
       + '<thead><tr style="background:#f5f9fc;">'
-      + ['Receipt', 'Book no.', 'Time', 'Student', 'Class', 'Paid for', 'Method', 'Amount']
+      + ['Receipt', 'Book no.', 'Time', 'Student', 'Class', 'Paid for', 'Method', 'Amount', '']
           .map((h, i) => `<th style="padding:9px 10px;text-align:${i === 7 ? 'right' : 'left'};font-family:var(--font-head);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#6a7c93;white-space:nowrap;">${h}</th>`).join('')
       + '</tr></thead><tbody>'
       + data.payments.map(p => {
@@ -9253,7 +9253,10 @@ function openDailyCollection() {
             + `<td style="padding:9px 10px;color:#475569;white-space:nowrap;">${esc(forWhat)}</td>`
             + `<td style="padding:9px 10px;color:#475569;">${esc(p.payment_method || 'cash')}</td>`
             + `<td style="padding:9px 10px;text-align:right;font-family:var(--font-mono);font-weight:800;color:#0f2845;white-space:nowrap;">${Number(p.amount).toLocaleString()}</td>`
-            + '</tr>';
+            + `<td style="padding:9px 10px;text-align:right;white-space:nowrap;">`
+            +   `<button class="dc-edit" data-id="${p.id}" title="${t('btn_edit') || 'Edit'}" style="width:26px;height:26px;border-radius:7px;background:rgba(91,158,247,.12);border:1px solid rgba(91,158,247,.30);color:#1a4fa0;cursor:pointer;font-size:11px;margin-left:4px;"><i class="fas fa-pen"></i></button>`
+            +   `<button class="dc-del" data-id="${p.id}" title="${t('btn_remove') || 'Delete'}" style="width:26px;height:26px;border-radius:7px;background:rgba(220,38,38,.10);border:1px solid rgba(220,38,38,.25);color:#dc2626;cursor:pointer;font-size:11px;"><i class="fas fa-trash"></i></button>`
+            + `</td></tr>`;
         }).join('')
       + '</tbody></table>';
   }
@@ -9296,6 +9299,42 @@ function openDailyCollection() {
 
     wrap.querySelector('#dc-close').onclick = close;
     wrap.querySelector('#dc-print').onclick = printDay;
+    // A wrong amount, day or receipt number is usually spotted here, during
+    // the end-of-day count — so it has to be fixable here, not only from the
+    // student's own fee panel.
+    wrap.querySelectorAll('.dc-edit').forEach(b => {
+      b.onclick = () => {
+        const p = (data.payments || []).find(x => String(x.id) === b.dataset.id);
+        if (p) editPaymentDialog(p, load);
+      };
+    });
+    wrap.querySelectorAll('.dc-del').forEach(b => {
+      b.onclick = () => {
+        const p = (data.payments || []).find(x => String(x.id) === b.dataset.id);
+        if (!p) return;
+        showConfirm({
+          title: t('confirm_del_payment') || 'Delete payment?',
+          message: (t('confirm_del_payment_msg') || 'This payment will be permanently removed.')
+                 + ' — ' + Number(p.amount).toLocaleString() + ' AFN, '
+                 + (p.first_name || '') + ' ' + (p.last_name || ''),
+          confirmText: t('confirm_yes_delete') || 'Delete',
+          type: 'danger',
+          onConfirm: async () => {
+            try {
+              const r = await fetch('/api/fees/' + p.id, { method: 'DELETE' });
+              if (!r.ok) {
+                const d = await r.json().catch(() => ({}));
+                throw new Error(d.error || 'Failed');
+              }
+              load();
+            } catch (e) {
+              showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' });
+            }
+          },
+        });
+      };
+    });
+
     wrap.querySelector('#dc-prev').onclick = () => stepDay(-1);
     wrap.querySelector('#dc-next').onclick = () => stepDay(1);
     wrap.querySelector('#dc-today').onclick = () => {
@@ -9872,26 +9911,148 @@ async function feeAddOpeningPayment() {
   });
 }
 
-function feeEditPayment(id, current) {
-  showConfirmInput({
-    title: t('lbl_edit_payment') || 'Edit Payment Amount',
-    message: t('msg_edit_payment') || 'Enter the corrected amount for this payment.',
-    value: Math.round(current),
-    confirmText: t('btn_save') || 'Save',
-    onConfirm: async (val) => {
-      const amt = parseFloat(val);
-      if (!(amt > 0)) { showAlert({ title:t('alert_title_invalid'), message:t('msg_invalid_amount'), type:'warning' }); return; }
+// Edit a recorded payment. Everything the clerk entered can be corrected:
+// the amount, the day it was taken, how it was paid, and the receipt book
+// number. Editing only the amount was not enough — a payment filed on the
+// wrong day quietly breaks the daily reconciliation, and until now there
+// was no way to move it.
+//
+// `p` is a payment row; `after` runs once the edit is saved.
+function editPaymentDialog(p, after) {
+  const old = document.getElementById('ep-modal');
+  if (old) old.remove();
+
+  const cur = getCurrentShamsi();
+  let sel = { y: cur.year, m: cur.month, d: cur.day };
+  if (p.payment_date) {
+    const d = new Date(p.payment_date);
+    if (!isNaN(d)) {
+      const s = toShamsi(d.getFullYear(), d.getMonth() + 1, d.getDate());
+      sel = { y: s.year, m: s.month, d: s.day };
+    }
+  }
+
+  const esc = v => String(v == null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+  const wrap = document.createElement('div');
+  wrap.id = 'ep-modal';
+  wrap.style.cssText = 'position:fixed;inset:0;z-index:10001;display:flex;align-items:center;justify-content:center;background:rgba(15,40,69,.55);backdrop-filter:blur(8px);';
+  document.body.appendChild(wrap);
+  const close = () => wrap.remove();
+
+  const dayOpts = () => {
+    const days = shamsiMonthDays(sel.y, sel.m);
+    if (sel.d > days) sel.d = days;
+    let h = '';
+    for (let i = 1; i <= days; i++) h += `<option value="${i}"${i === sel.d ? ' selected' : ''}>${i}</option>`;
+    return h;
+  };
+
+  const methods = ['cash', 'bank', 'transfer', 'other'];
+
+  function paint() {
+    const who = `${p.first_name || ''} ${p.last_name || ''}`.trim();
+    wrap.innerHTML = `
+      <div style="background:#fff;border-radius:20px;padding:24px 24px 20px;max-width:440px;width:94%;box-shadow:0 30px 80px rgba(20,40,80,.22);">
+        <div style="font-family:var(--font-head);font-size:16px;font-weight:800;color:#0f2845;text-align:center;">${t('lbl_edit_payment') || 'Edit payment'}</div>
+        <div style="font-size:12px;color:#6a7c93;text-align:center;margin:5px 0 4px;">${esc(who)}</div>
+        <div style="font-size:11px;color:#94a3b8;text-align:center;font-family:var(--font-mono);margin-bottom:16px;">${esc(p.receipt_number || '')}</div>
+
+        <label style="font-size:10.5px;font-weight:800;color:#6a7c93;font-family:var(--font-head);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px;">${t('lbl_amount_afn') || 'Amount'}</label>
+        <input id="ep-amt" type="text" inputmode="numeric" value="${Math.round(Number(p.amount) || 0)}"
+               style="width:100%;padding:10px 13px;background:#fff;border:2px solid rgba(93,202,165,.4);border-radius:11px;font-family:var(--font-mono);font-size:15px;font-weight:800;color:#0C1526;outline:none;box-sizing:border-box;text-align:center;margin-bottom:14px;"
+               oninput="this.value=toWesternDigits(this.value).replace(/[^0-9.]/g,'')">
+
+        <label style="font-size:10.5px;font-weight:800;color:#6a7c93;font-family:var(--font-head);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px;">${t('lbl_payment_date') || 'Payment date'}</label>
+        <div dir="rtl" style="display:flex;gap:6px;margin-bottom:14px;">
+          <select id="ep-day"   style="flex:1;padding:9px 6px;background:#fff;border:1px solid rgba(20,40,80,.14);border-radius:9px;font-family:var(--font-mono);font-size:13px;font-weight:700;color:#0f2845;outline:none;cursor:pointer;">${dayOpts()}</select>
+          <select id="ep-month" style="flex:2;padding:9px 6px;background:#fff;border:1px solid rgba(20,40,80,.14);border-radius:9px;font-family:var(--font-body);font-size:13px;font-weight:700;color:#0f2845;outline:none;cursor:pointer;">${shamsiMonthOptions(sel.m)}</select>
+          <select id="ep-year"  style="flex:1.4;padding:9px 6px;background:#fff;border:1px solid rgba(20,40,80,.14);border-radius:9px;font-family:var(--font-mono);font-size:13px;font-weight:700;color:#0f2845;outline:none;cursor:pointer;">${shamsiYearOptions(sel.y)}</select>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-bottom:18px;">
+          <div style="flex:1;">
+            <label style="font-size:10.5px;font-weight:800;color:#6a7c93;font-family:var(--font-head);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px;">${t('lbl_payment_method') || 'Method'}</label>
+            <select id="ep-mtd" style="width:100%;padding:9px 10px;background:#fff;border:1px solid rgba(20,40,80,.14);border-radius:9px;font-size:13px;font-weight:700;color:#0f2845;outline:none;cursor:pointer;">
+              ${methods.map(mm => `<option value="${mm}"${(p.payment_method || 'cash') === mm ? ' selected' : ''}>${mm}</option>`).join('')}
+            </select>
+          </div>
+          <div style="flex:1.2;">
+            <label style="font-size:10.5px;font-weight:800;color:#6a7c93;font-family:var(--font-head);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px;">${t('lbl_receipt_book_no') || 'Receipt book no.'}</label>
+            <input id="ep-book" type="text" autocomplete="off" value="${esc(p.receipt_book_no || '')}"
+                   style="width:100%;padding:9px 10px;background:#fff;border:1px solid rgba(20,40,80,.14);border-radius:9px;font-family:var(--font-mono);font-size:13px;font-weight:700;color:#0f2845;outline:none;box-sizing:border-box;text-align:center;"
+                   oninput="this.value=toWesternDigits(this.value)">
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;">
+          <button id="ep-cancel" type="button" style="flex:1;padding:12px;background:#f5f9fc;border:1px solid rgba(20,40,80,.08);border-radius:12px;color:#6a7c93;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;">${t('lbl_cancel') || 'Cancel'}</button>
+          <button id="ep-save" type="button" style="flex:1.3;padding:12px;background:linear-gradient(135deg,#5DCAA5,#3aaa85);border:none;border-radius:12px;color:#0a1f1a;font-family:var(--font-head);font-size:13px;font-weight:800;cursor:pointer;">${t('btn_save') || 'Save'}</button>
+        </div>
+      </div>`;
+
+    wrap.querySelector('#ep-cancel').onclick = close;
+    wrap.querySelector('#ep-day').onchange   = e => { sel.d = parseInt(e.target.value); };
+    wrap.querySelector('#ep-month').onchange = e => { sel.m = parseInt(e.target.value); paint(); };
+    wrap.querySelector('#ep-year').onchange  = e => { sel.y = parseInt(e.target.value); paint(); };
+
+    wrap.querySelector('#ep-save').onclick = async () => {
+      const amt = parseFloat(wrap.querySelector('#ep-amt').value);
+      if (!(amt > 0)) {
+        return showAlert({ title: t('alert_title_invalid'), message: t('msg_invalid_amount'), type: 'warning' });
+      }
+      const g   = fromShamsi(sel.y, sel.m, sel.d);
+      const pad = n => String(n).padStart(2, '0');
+      const btn = wrap.querySelector('#ep-save');
+      btn.disabled = true; btn.textContent = '…';
       try {
-        const r = await fetch(`/api/fees/${id}`, {
-          method:'PUT', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ amount: amt }),
+        const r = await fetch(`/api/fees/${p.id}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: amt,
+            payment_date: `${g.year}-${pad(g.month)}-${pad(g.day)}`,
+            payment_method: wrap.querySelector('#ep-mtd').value,
+            receipt_book_no: wrap.querySelector('#ep-book').value.trim(),
+          }),
         });
         const d = await r.json();
         if (!r.ok) throw new Error(d.error || 'Failed');
-        _feeRefresh();
-      } catch(e) { showAlert({ title:t('alert_title_error'), message:e.message, type:'error' }); }
+        close();
+        if (after) after();
+      } catch (e) {
+        close();
+        showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' });
+      }
+    };
+  }
+
+  paint();
+  wrap.addEventListener('click', e => { if (e.target === wrap) close(); });
+}
+
+// Called from the Collect Fee panel. The payment row is looked up in the
+// data already loaded there, so every field can be pre-filled.
+function feeEditPayment(id) {
+  const p = findStatementPayment(id);
+  if (!p) return showAlert({ title: t('alert_title_error'), message: 'Payment not found', type: 'error' });
+  const s = (feeStatementData && feeStatementData.student) || {};
+  editPaymentDialog({ ...p, first_name: s.first_name, last_name: s.last_name }, _feeRefresh);
+}
+
+// Payments are nested inside the statement: one list per month, plus the
+// opening-balance list. Find one by id wherever it sits.
+function findStatementPayment(id) {
+  const d = feeStatementData;
+  if (!d) return null;
+  for (const y of (d.years || [])) {
+    for (const mo of (y.months || [])) {
+      const hit = (mo.payments || []).find(p => p.id === id);
+      if (hit) return hit;
     }
-  });
+  }
+  return ((d.opening && d.opening.payments) || []).find(p => p.id === id) || null;
 }
 
 function feeDeletePayment(id) {
