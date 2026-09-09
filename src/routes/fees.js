@@ -87,6 +87,23 @@ async function tagBookNo(rows, bookNo) {
   return rows;
 }
 
+// A student stops being billed the month they leave. Without this a
+// graduated student keeps accruing a monthly fee for ever, so their unpaid
+// balance grows every month even though they are long gone — and the office
+// would be chasing money the school never charged.
+// Returns the last Shamsi month that should be billed.
+function walkEnd(s, curY, curM) {
+  if (!s || !s.graduated || !s.graduated_at) return { endY: curY, endM: curM };
+  const g = new Date(s.graduated_at);
+  if (isNaN(g)) return { endY: curY, endM: curM };
+  const gs = toShamsi(g.getFullYear(), g.getMonth() + 1, g.getDate());
+  // The month they graduated in is still billable; nothing after it is.
+  if (gs.year > curY || (gs.year === curY && gs.month >= curM)) {
+    return { endY: curY, endM: curM };
+  }
+  return { endY: gs.year, endM: gs.month };
+}
+
 // ── GET all payments (with filters) ──────────────────────────
 router.get('/', async (req, res) => {
   try {
@@ -155,10 +172,11 @@ router.get('/student/:student_id', async (req, res) => {
     // Auto-walk Shamsi months from enrolled_at → now
     const holidayMonths = await getNonBillableMonths();
     const { startY, startM, curY, curM } = walkStart(s.enrolled_at);
+    const { endY, endM } = walkEnd(s, curY, curM);
     const outstanding = [];
-    if (startY < curY || (startY === curY && startM <= curM)) {
+    if (startY < endY || (startY === endY && startM <= endM)) {
       let y = startY, m = startM;
-      while (y < curY || (y === curY && m <= curM)) {
+      while (y < endY || (y === endY && m <= endM)) {
         const key = `${y}-${m}`;
         if (!carriedMonths.has(key) && !holidayMonths.has(m)) {
           const paid    = +(paidByMonth[key] || 0).toFixed(2);
@@ -682,11 +700,19 @@ router.get('/balances', async (req, res) => {
 
     const cur = todayShamsi();
 
+    // Graduated students keep whatever they still owe. include_graduated=1
+    // brings them into the list so the office can actually collect it.
+    const withLeavers = req.query.include_graduated === '1'
+                     || req.query.include_graduated === 'true';
     const students = await pool.query(`
       SELECT id, monthly_fee, discount_type, discount_value, enrolled_at,
+             COALESCE(graduated, FALSE) AS graduated, graduated_at,
+             is_active,
              COALESCE(previous_debt, 0) AS previous_debt
-        FROM students WHERE is_active = true
-    `);
+        FROM students
+       WHERE is_active = true
+          OR ($1::bool AND COALESCE(graduated, FALSE) = TRUE)
+    `, [withLeavers]);
 
     // Aggregate non-debt, non-carried payments per (student, year, month)
     const paid = await pool.query(`
@@ -758,9 +784,11 @@ router.get('/balances', async (req, res) => {
       // payment lowers the outstanding total (even an overpayment on one
       // month or a payment on a pre-cutoff month becomes a credit against
       // the rest), and every elapsed unpaid month raises it.
+      const { endY, endM } = walkEnd(s, cur.year, cur.month);
+
       let monthsDue = 0, monthsPaid = 0, unpaidMonths = 0;
       let y = startY, m = startM;
-      while (y < cur.year || (y === cur.year && m <= cur.month)) {
+      while (y < endY || (y === endY && m <= endM)) {
         const key = `${s.id}-${y}-${m}`;
         if (!carriedSet.has(key)) {
           const ov  = dueMap.get(key);
@@ -805,6 +833,8 @@ router.get('/balances', async (req, res) => {
 
       return {
         student_id:      s.id,
+        graduated:       !!s.graduated,
+        graduated_at:    s.graduated_at || null,
         total_balance:   +totalBalance.toFixed(2),
         unpaid_months:   unpaidMonths,
         total_due:       totalDue,

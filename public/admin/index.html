@@ -2829,6 +2829,7 @@ button[style*="background:linear-gradient"]{
           <th data-i18n="sch_th_class">Class</th>
           <th data-i18n="lbl_student_code">Code</th>
           <th data-i18n="grad_th_date">Graduation Date</th>
+          <th style="text-align:right;" data-i18n="lbl_outstanding">Outstanding</th>
           <th style="text-align:center;" data-i18n="th_actions">Actions</th>
         </tr></thead>
         <tbody id="grad-tbody">
@@ -4547,6 +4548,8 @@ const LANG = {
     lbl_account_statement:'Account Statement', lbl_due:'Due',
     lbl_receipt_book_no:'Receipt book no.', lbl_last_receipt:'Last used',
     btn_today:'Today', lbl_backdated:'Back-dated',
+    lbl_outstanding:'Outstanding', btn_collect:'Collect',
+    lbl_collect_due:'Collect what they still owe', grad_dues_total:'{n} graduate(s) still owe {a} AFN',
     lbl_opening_balance:'Opening Balance (before joining)',
     status_partial:'Partial', status_unpaid:'Unpaid',
     btn_set_due:'Set Due', btn_add_payment:'Add Payment',
@@ -4990,6 +4993,8 @@ const LANG = {
     lbl_account_statement:'د حساب وضعیت', lbl_due:'وړ تادیه',
     lbl_receipt_book_no:'د رسید کتاب نمبر', lbl_last_receipt:'وروستی کارول شوی',
     btn_today:'نن', lbl_backdated:'پخوانۍ نېټه',
+    lbl_outstanding:'پاتې پور', btn_collect:'راټولول',
+    lbl_collect_due:'پاتې پور راټولول', grad_dues_total:'{n} فارغ التحصیل لا هم {a} افغانۍ پور لري',
     lbl_opening_balance:'پخوانی پاتې پور (د شاملیدو دمخه)',
     status_partial:'جزوي', status_unpaid:'نه دی ورکړل شوی',
     btn_set_due:'تادیه وټاکئ', btn_add_payment:'تادیه زیاته کړئ',
@@ -6875,11 +6880,26 @@ window.go = function(id, el) {
 // ── Graduates page ───────────────────────────────────────────
 let _allGraduates = [];
 
+let _gradDues = {};     // student_id -> outstanding balance
+
 async function loadGraduates() {
   try {
-    const r = await fetch('/api/students/list/graduates');
+    // The balance comes from the fee ledger, not from a second calculation
+    // here: a graduate's dues must match what the Collect Fee panel shows.
+    const [r, bRes] = await Promise.all([
+      fetch('/api/students/list/graduates'),
+      fetch('/api/fees/balances?include_graduated=1').catch(() => null),
+    ]);
     const data = await r.json();
     _allGraduates = Array.isArray(data) ? data : [];
+
+    _gradDues = {};
+    try {
+      const balances = bRes && bRes.ok ? await bRes.json() : [];
+      (Array.isArray(balances) ? balances : []).forEach(b => {
+        if (b.total_balance > 0) _gradDues[b.student_id] = b.total_balance;
+      });
+    } catch (_) { /* dues column simply shows — */ }
     // Year filter — distinct Shamsi years from graduated_at
     const yrSel = document.getElementById('grad-year-filter');
     const years = Array.from(new Set(_allGraduates.map(g => {
@@ -6946,7 +6966,7 @@ function renderGraduates() {
 
   const tb = document.getElementById('grad-tbody');
   if (!list.length) {
-    tb.innerHTML = `<tr><td colspan="7"><div class="empty"><i class="fas fa-user-graduate"></i><p>${t('grad_empty')||'No graduates yet.'}</p></div></td></tr>`;
+    tb.innerHTML = `<tr><td colspan="8"><div class="empty"><i class="fas fa-user-graduate"></i><p>${t('grad_empty')||'No graduates yet.'}</p></div></td></tr>`;
     return;
   }
 
@@ -6958,7 +6978,7 @@ function renderGraduates() {
     // Year header row
     const header = `
       <tr class="grad-year-hdr" style="background:linear-gradient(90deg,rgba(34,197,113,.10),rgba(34,197,113,.02));border-top:2px solid rgba(34,197,113,.20);cursor:pointer;" onclick="gradToggleYear(${yr})">
-        <td colspan="7" style="padding:11px 14px;">
+        <td colspan="8" style="padding:11px 14px;">
           <div style="display:flex;align-items:center;gap:10px;">
             <i class="fas fa-chevron-${open?'down':'right'}" style="color:#178f4f;font-size:11px;width:11px;"></i>
             <i class="fas fa-user-graduate" style="color:#178f4f;font-size:13px;"></i>
@@ -6979,6 +6999,7 @@ function renderGraduates() {
         ? `<img src="/uploads/students/${g.photo}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:1.5px solid var(--glass-border);">`
         : `<div style="width:32px;height:32px;border-radius:50%;background:rgba(34,197,113,.12);border:1.5px solid rgba(34,197,113,.30);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#178f4f;font-family:var(--font-head);">${ini}</div>`;
       const dShamsi = g.graduated_at ? shamsiDariPD(g.graduated_at) : '—';
+      const due = Number(_gradDues[g.id] || 0);
       return `<tr>
         <td style="text-align:center;color:#6a7c93;font-family:var(--font-mono);font-size:12px;">${counter}</td>
         <td><div style="display:flex;align-items:center;gap:10px;">${photo}<span style="font-weight:700;color:#0f2845;">${g.first_name||''} ${g.last_name||''}</span></div></td>
@@ -6986,7 +7007,9 @@ function renderGraduates() {
         <td style="font-weight:600;direction:rtl;text-align:right;">${_gradClassLabel(g)}</td>
         <td style="font-family:var(--font-mono);font-size:11.5px;color:#475569;">${g.student_code || '—'}</td>
         <td style="font-family:var(--font-mono);font-size:12px;color:#475569;direction:rtl;">${dShamsi}</td>
-        <td style="text-align:center;">
+        <td style="text-align:right;font-family:var(--font-mono);font-weight:800;white-space:nowrap;color:${due > 0 ? '#c8443c' : '#94a3b8'};">${due > 0 ? Math.round(due).toLocaleString() + ' AFN' : '—'}</td>
+        <td style="text-align:center;white-space:nowrap;">
+          ${due > 0 ? `<button onclick="openFeePanel(${g.id})" title="${t('lbl_collect_due')||'Collect what they still owe'}" style="padding:6px 11px;margin-left:4px;background:rgba(93,202,165,.16);border:1px solid rgba(93,202,165,.40);border-radius:20px;color:#12603a;font-size:11px;font-weight:800;font-family:var(--font-head);cursor:pointer;"><i class="fas fa-hand-holding-dollar"></i> ${t('btn_collect')||'Collect'}</button>` : ''}
           <button onclick="restoreGraduate(${g.id},'${(g.first_name||'').replace(/'/g,"\\'")} ${(g.last_name||'').replace(/'/g,"\\'")}')" title="${t('btn_restore')||'Restore'}" style="padding:6px 11px;background:rgba(91,158,247,.12);border:1px solid rgba(91,158,247,.30);border-radius:20px;color:#1a4fa0;font-size:11px;font-weight:700;font-family:var(--font-head);cursor:pointer;"><i class="fas fa-rotate-left"></i> ${t('btn_restore')||'Restore'}</button>
         </td>
       </tr>`;
@@ -9674,6 +9697,10 @@ function _feeRefresh() {
   openFeePanel(parseInt(sid));
   loadFeeList();
   loadFeeSummary();
+  // The Collect button also lives on the Graduates screen. Without this its
+  // Outstanding column keeps showing the amount from before the payment.
+  const gp = document.getElementById('pg-graduates');
+  if (gp && gp.classList.contains('active')) loadGraduates();
 }
 
 async function feeSetDue(year, month) {
