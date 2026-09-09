@@ -6520,6 +6520,7 @@ function showConfirm({ title, message, confirmText = 'Confirm', cancelText = 'Ca
   document.getElementById('cm-cancel').onclick = () => {
     const cc = cancelCallback; closeConfirm(); if (cc) cc();
   };
+  _liftToBody('confirm-modal', 'alert-modal');
   const modal = document.getElementById('confirm-modal');
   modal.style.display = 'flex';
 }
@@ -6581,6 +6582,7 @@ function showAlert({ title, message, type = 'error' }) {
     icon.innerHTML        = '<i class="fas fa-exclamation-triangle"></i>';
   }
 
+  _liftToBody('confirm-modal', 'alert-modal');
   document.getElementById('alert-modal').style.display = 'flex';
 }
 
@@ -9571,14 +9573,30 @@ function feeSearchStudent() {
 let feeStatementData = null;
 const _feeOpenYears = {};   // which year sections are expanded
 
-// Move the fee dialog out of the Fee Collection page so it can be opened
-// from any screen. .page{display:none} hides everything inside a page that
-// is not active, which is why Collect on the Graduates list did nothing.
-function _liftFeePanel() {
-  ['fee-overlay', 'fee-panel'].forEach(id => {
+// Move an overlay out to <body>.
+//
+// Why this is needed at all: .app is position:relative with z-index:1, so it
+// forms a stacking context. Anything inside it — including the confirm and
+// alert modals at z-index 9999 — is ranked only WITHIN .app, which as a whole
+// sits at level 1. The moment one overlay is moved to <body> it joins the root
+// context and outranks the entire app, however small its z-index.
+//
+// So overlays must not be split between the two: either all of them stay
+// inside .app, or all of them move out. They move out, because the fee dialog
+// has to be usable from screens other than Fee Collection and .page{display:none}
+// makes that impossible while it lives inside a page.
+function _liftToBody(...ids) {
+  ids.forEach(id => {
     const el = document.getElementById(id);
     if (el && el.parentNode !== document.body) document.body.appendChild(el);
   });
+}
+
+function _liftFeePanel() {
+  // The confirm and alert dialogs are lifted alongside the fee panel, so a
+  // "Delete payment?" prompt cannot end up painting behind the panel that
+  // opened it.
+  _liftToBody('fee-overlay', 'fee-panel', 'confirm-modal', 'alert-modal');
 }
 
 async function openFeePanel(studentId) {
