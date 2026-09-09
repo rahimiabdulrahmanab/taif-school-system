@@ -2986,6 +2986,8 @@ button[style*="background:linear-gradient"]{
       </div>
     </div>
 
+    <div id="fee-collect-date" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;padding:10px 12px;background:#f5f9fc;border:1px solid rgba(20,40,80,.07);border-radius:10px;"></div>
+
     <div style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;" data-i18n="lbl_account_statement">Account Statement</div>
 
     <!-- Year-grouped month statement renders here -->
@@ -4549,6 +4551,7 @@ const LANG = {
     lbl_receipt_book_no:'Receipt book no.', lbl_last_receipt:'Last used',
     btn_today:'Today', lbl_backdated:'Back-dated',
     lbl_outstanding:'Outstanding', btn_collect:'Collect',
+    lbl_collection_date:'Collection date', lbl_today_note:'today',
     lbl_collect_due:'Collect what they still owe', grad_dues_total:'{n} graduate(s) still owe {a} AFN',
     lbl_opening_balance:'Opening Balance (before joining)',
     status_partial:'Partial', status_unpaid:'Unpaid',
@@ -4994,6 +4997,7 @@ const LANG = {
     lbl_receipt_book_no:'د رسید کتاب نمبر', lbl_last_receipt:'وروستی کارول شوی',
     btn_today:'نن', lbl_backdated:'پخوانۍ نېټه',
     lbl_outstanding:'پاتې پور', btn_collect:'راټولول',
+    lbl_collection_date:'د راټولولو نېټه', lbl_today_note:'نن',
     lbl_collect_due:'پاتې پور راټولول', grad_dues_total:'{n} فارغ التحصیل لا هم {a} افغانۍ پور لري',
     lbl_opening_balance:'پخوانی پاتې پور (د شاملیدو دمخه)',
     status_partial:'جزوي', status_unpaid:'نه دی ورکړل شوی',
@@ -9574,6 +9578,7 @@ async function openFeePanel(studentId) {
     const s = data.student;
 
     document.getElementById('fee-student-id').value = studentId;
+    renderFeeCollectDate();
     document.getElementById('fee-panel-title').textContent = t('lbl_fee_collect') || 'Fee Account';
     document.getElementById('fee-panel-sub').textContent   = s.first_name + ' ' + s.last_name;
     document.getElementById('fee-student-name').textContent  = s.first_name + ' ' + s.last_name;
@@ -9758,102 +9763,101 @@ async function feeSetDue(year, month) {
   } catch(e) { showAlert({ title:t('alert_title_error'), message:e.message, type:'error' }); }
 }
 
-// The last values the clerk used this session. Shown as a reminder so they
-// do not lose their place in the receipt book, and so a run of back-dated
-// entries for the same day does not mean re-picking the date every time.
+// The last receipt number entered this session — shown as a reminder so the
+// clerk does not lose their place in the book. Never pre-filled.
 let _lastBookNo = '';
-let _lastPayDate = null;      // {y, m, d} in Shamsi
 
-// Ask for the payment date and the paper receipt number, then hand both to
-// `next`. Cancelling cancels the payment: no money is recorded without the
-// clerk confirming when it was taken and what they wrote on the slip.
+// ── Collection date for the Collect Fee panel ─────────────────
+// The date the money was received. It sits at the TOP of the panel and
+// governs every payment recorded while it is open, because a clerk
+// working through a stack of receipts is entering one day's takings —
+// the date is a property of the sitting, not of each payment. The
+// receipt number is the opposite, so that stays in the per-payment
+// prompt.
 //
-// The date matters because the office usually enters payments after the
-// fact — the Daily Collection panel keys on it, so a payment taken on
-// Saturday must be filed under Saturday even if typed on Monday.
-function askPaymentDetails(what, next) {
-  const old = document.getElementById('ap-modal');
-  if (old) old.remove();
+// Remembered across panels within the session: entering Saturday's
+// receipts for twelve students should mean setting Saturday once.
+let _collectDate = null;   // {y, m, d} Shamsi, null = today
 
-  const cur = getCurrentShamsi();
-  const sel = _lastPayDate ? { ..._lastPayDate } : { y: cur.year, m: cur.month, d: cur.day };
-
-  const wrap = document.createElement('div');
-  wrap.id = 'ap-modal';
-  wrap.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(15,40,69,.55);backdrop-filter:blur(8px);';
-  document.body.appendChild(wrap);
-  const close = () => wrap.remove();
-
-  const dayOpts = () => {
-    const days = shamsiMonthDays(sel.y, sel.m);
-    if (sel.d > days) sel.d = days;
-    let h = '';
-    for (let i = 1; i <= days; i++) h += `<option value="${i}"${i === sel.d ? ' selected' : ''}>${i}</option>`;
-    return h;
-  };
-
-  const isToday = () => sel.y === cur.year && sel.m === cur.month && sel.d === cur.day;
-
-  function paint() {
-    const names = _lang === 'ps' ? SHAMSI_MONTHS_PASHTO : _lang === 'fa' ? SHAMSI_MONTHS_DARI : SHAMSI_MONTHS_EN;
-    wrap.innerHTML = `
-      <div style="background:#fff;border-radius:20px;padding:24px 24px 20px;max-width:430px;width:94%;box-shadow:0 30px 80px rgba(20,40,80,.22);">
-        <div style="font-family:var(--font-head);font-size:16px;font-weight:800;color:#0f2845;text-align:center;">${t('btn_record_payment') || 'Record payment'}</div>
-        <div style="font-size:13px;color:#178f4f;text-align:center;font-family:var(--font-mono);font-weight:800;margin:6px 0 18px;">${what}</div>
-
-        <label style="font-size:10.5px;font-weight:800;color:#6a7c93;font-family:var(--font-head);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;">${t('lbl_payment_date') || 'Payment date'}</label>
-        <div dir="rtl" style="display:flex;gap:6px;margin-bottom:6px;">
-          <select id="ap-day"   style="flex:1;padding:9px 6px;background:#fff;border:1px solid rgba(20,40,80,.14);border-radius:9px;font-family:var(--font-mono);font-size:13px;font-weight:700;color:#0f2845;outline:none;cursor:pointer;">${dayOpts()}</select>
-          <select id="ap-month" style="flex:2;padding:9px 6px;background:#fff;border:1px solid rgba(20,40,80,.14);border-radius:9px;font-family:var(--font-body);font-size:13px;font-weight:700;color:#0f2845;outline:none;cursor:pointer;">${shamsiMonthOptions(sel.m)}</select>
-          <select id="ap-year"  style="flex:1.4;padding:9px 6px;background:#fff;border:1px solid rgba(20,40,80,.14);border-radius:9px;font-family:var(--font-mono);font-size:13px;font-weight:700;color:#0f2845;outline:none;cursor:pointer;">${shamsiYearOptions(sel.y)}</select>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;min-height:20px;">
-          <button id="ap-today" type="button" style="padding:4px 11px;background:#f5f9fc;border:1px solid rgba(20,40,80,.10);border-radius:14px;font-family:var(--font-head);font-size:11px;font-weight:800;color:#475569;cursor:pointer;">${t('btn_today') || 'Today'}</button>
-          ${isToday() ? '' : `<span style="font-size:11px;font-weight:700;color:#d97706;"><i class="fas fa-clock-rotate-left"></i> ${t('lbl_backdated') || 'Back-dated'} — ${sel.d} ${names[sel.m] || ''} ${sel.y}</span>`}
-        </div>
-
-        <label style="font-size:10.5px;font-weight:800;color:#6a7c93;font-family:var(--font-head);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;">${t('lbl_receipt_book_no') || 'Receipt book no.'}</label>
-        <input id="ap-book" type="text" autocomplete="off" value=""
-               style="width:100%;padding:11px 14px;background:#fff;border:2px solid rgba(93,202,165,.4);border-radius:12px;font-family:var(--font-mono);font-size:15px;font-weight:700;color:#0C1526;outline:none;box-sizing:border-box;text-align:center;"
-               oninput="this.value=toWesternDigits(this.value)">
-        <div style="font-size:11px;color:#94a3b8;text-align:center;margin:6px 0 16px;min-height:14px;">${_lastBookNo ? `${t('lbl_last_receipt') || 'Last used'}: ${_lastBookNo}` : ''}</div>
-
-        <div style="display:flex;gap:10px;">
-          <button id="ap-cancel" type="button" style="flex:1;padding:12px;background:#f5f9fc;border:1px solid rgba(20,40,80,.08);border-radius:12px;color:#6a7c93;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;">${t('lbl_cancel') || 'Cancel'}</button>
-          <button id="ap-ok" type="button" style="flex:1.4;padding:12px;background:linear-gradient(135deg,#5DCAA5,#3aaa85);border:none;border-radius:12px;color:#0a1f1a;font-family:var(--font-head);font-size:13px;font-weight:800;cursor:pointer;">${t('btn_record_payment') || 'Record payment'}</button>
-        </div>
-      </div>`;
-
-    const book = wrap.querySelector('#ap-book');
-    book.focus();
-
-    wrap.querySelector('#ap-cancel').onclick = close;
-    wrap.querySelector('#ap-today').onclick = () => {
-      sel.y = cur.year; sel.m = cur.month; sel.d = cur.day; paint();
-    };
-    wrap.querySelector('#ap-day').onchange   = e => { sel.d = parseInt(e.target.value); paint(); };
-    wrap.querySelector('#ap-month').onchange = e => { sel.m = parseInt(e.target.value); paint(); };
-    wrap.querySelector('#ap-year').onchange  = e => { sel.y = parseInt(e.target.value); paint(); };
-
-    const submit = () => {
-      const g   = fromShamsi(sel.y, sel.m, sel.d);
-      const pad = n => String(n).padStart(2, '0');
-      const no  = book.value.trim();
-      if (no) _lastBookNo = no;
-      _lastPayDate = { ...sel };
-      close();
-      next({ date: `${g.year}-${pad(g.month)}-${pad(g.day)}`, bookNo: no });
-    };
-    wrap.querySelector('#ap-ok').onclick = submit;
-    book.addEventListener('keydown', e => {
-      if (e.key === 'Enter')  submit();
-      if (e.key === 'Escape') close();
-    });
-  }
-
-  paint();
-  wrap.addEventListener('click', e => { if (e.target === wrap) close(); });
+function feeCollectSel() {
+  if (_collectDate) return { ..._collectDate };
+  const c = getCurrentShamsi();
+  return { y: c.year, m: c.month, d: c.day };
 }
+
+// The chosen day as the Gregorian YYYY-MM-DD the API stores.
+function feeCollectionDateISO() {
+  const s = feeCollectSel();
+  const g = fromShamsi(s.y, s.m, s.d);
+  const pad = n => String(n).padStart(2, '0');
+  return `${g.year}-${pad(g.month)}-${pad(g.day)}`;
+}
+
+function renderFeeCollectDate() {
+  const host = document.getElementById('fee-collect-date');
+  if (!host) return;
+  const sel = feeCollectSel();
+  const cur = getCurrentShamsi();
+  const today = sel.y === cur.year && sel.m === cur.month && sel.d === cur.day;
+
+  const days = shamsiMonthDays(sel.y, sel.m);
+  if (sel.d > days) sel.d = days;
+  let dayOpts = '';
+  for (let i = 1; i <= days; i++) dayOpts += `<option value="${i}"${i === sel.d ? ' selected' : ''}>${i}</option>`;
+
+  const names = _lang === 'ps' ? SHAMSI_MONTHS_PASHTO : _lang === 'fa' ? SHAMSI_MONTHS_DARI : SHAMSI_MONTHS_EN;
+
+  host.style.background = today ? '#f5f9fc' : '#fff8ed';
+  host.style.borderColor = today ? 'rgba(20,40,80,.07)' : 'rgba(217,119,6,.35)';
+  host.innerHTML =
+      `<i class="fas fa-calendar-day" style="color:${today ? '#3aaa85' : '#d97706'};font-size:13px;"></i>`
+    + `<span style="font-size:11px;font-weight:800;color:#475569;font-family:var(--font-head);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;">${t('lbl_collection_date') || 'Collection date'}</span>`
+    + `<div dir="rtl" style="display:flex;gap:5px;">`
+    +   `<select id="fcd-day"   style="padding:7px 9px;background:#fff;border:1px solid rgba(20,40,80,.14);border-radius:8px;font-family:var(--font-mono);font-size:13px;font-weight:700;color:#0f2845;outline:none;cursor:pointer;">${dayOpts}</select>`
+    +   `<select id="fcd-month" style="padding:7px 9px;background:#fff;border:1px solid rgba(20,40,80,.14);border-radius:8px;font-family:var(--font-body);font-size:13px;font-weight:700;color:#0f2845;outline:none;cursor:pointer;">${shamsiMonthOptions(sel.m)}</select>`
+    +   `<select id="fcd-year"  style="padding:7px 9px;background:#fff;border:1px solid rgba(20,40,80,.14);border-radius:8px;font-family:var(--font-mono);font-size:13px;font-weight:700;color:#0f2845;outline:none;cursor:pointer;">${shamsiYearOptions(sel.y)}</select>`
+    + `</div>`
+    + (today
+        ? `<span style="font-size:11px;color:#94a3b8;white-space:nowrap;">${t('lbl_today_note') || 'today'}</span>`
+        : `<span style="font-size:11.5px;font-weight:800;color:#b45309;white-space:nowrap;"><i class="fas fa-clock-rotate-left"></i> ${t('lbl_backdated') || 'Back-dated'} — ${sel.d} ${names[sel.m] || ''} ${sel.y}</span>`
+          + `<button type="button" id="fcd-today" style="padding:5px 11px;background:#fff;border:1px solid rgba(20,40,80,.14);border-radius:14px;font-family:var(--font-head);font-size:11px;font-weight:800;color:#475569;cursor:pointer;">${t('btn_today') || 'Today'}</button>`);
+
+  const set = (k, v) => { const s2 = feeCollectSel(); s2[k] = parseInt(v); _collectDate = s2; renderFeeCollectDate(); };
+  host.querySelector('#fcd-day').onchange   = e => set('d', e.target.value);
+  host.querySelector('#fcd-month').onchange = e => set('m', e.target.value);
+  host.querySelector('#fcd-year').onchange  = e => set('y', e.target.value);
+  const tb = host.querySelector('#fcd-today');
+  if (tb) tb.onclick = () => { _collectDate = null; renderFeeCollectDate(); };
+}
+
+// Ask only for the paper receipt number. The date is already decided at the
+// top of the panel, so it is shown here as confirmation rather than asked
+// for again.
+function askReceiptNo(what, next) {
+  const sel = feeCollectSel();
+  const cur = getCurrentShamsi();
+  const today = sel.y === cur.year && sel.m === cur.month && sel.d === cur.day;
+  const names = _lang === 'ps' ? SHAMSI_MONTHS_PASHTO : _lang === 'fa' ? SHAMSI_MONTHS_DARI : SHAMSI_MONTHS_EN;
+  const when = `${sel.d} ${names[sel.m] || ''} ${sel.y}`;
+
+  showConfirmInput({
+    title:   t('lbl_receipt_book_no') || 'Receipt book no.',
+    message: what
+      + `<br><span style="color:${today ? '#94a3b8' : '#b45309'};font-weight:${today ? '400' : '800'};">`
+      + (today ? when : `<i class="fas fa-clock-rotate-left"></i> ${t('lbl_backdated') || 'Back-dated'} — ${when}`)
+      + `</span>`
+      + (_lastBookNo ? `<br><span style="color:#94a3b8;">${t('lbl_last_receipt') || 'Last used'}: ${_lastBookNo}</span>` : ''),
+    value: '',
+    numeric: false,
+    confirmText: t('btn_record_payment') || 'Record payment',
+    onConfirm: (v) => {
+      const no = String(v == null ? '' : v).trim();
+      if (no) _lastBookNo = no;
+      next({ date: feeCollectionDateISO(), bookNo: no });
+    },
+  });
+}
+
 
 async function feeAddPayment(year, month) {
   const sid = document.getElementById('fee-student-id').value;
@@ -9862,7 +9866,7 @@ async function feeAddPayment(year, month) {
   if (!(amt > 0)) { showAlert({ title:t('alert_title_invalid'), message:t('msg_invalid_amount'), type:'warning' }); return; }
 
   const names = _lang === 'ps' ? SHAMSI_MONTHS_PASHTO : _lang === 'fa' ? SHAMSI_MONTHS_DARI : SHAMSI_MONTHS_EN;
-  askPaymentDetails(`${amt.toLocaleString()} AFN · ${names[month] || ''} ${year}`, async ({ date, bookNo }) => {
+  askReceiptNo(`${amt.toLocaleString()} AFN · ${names[month] || ''} ${year}`, async ({ date, bookNo }) => {
     try {
       const r = await fetch('/api/fees', {
         method:'POST', headers:{'Content-Type':'application/json'},
@@ -9890,7 +9894,7 @@ async function feeAddOpeningPayment() {
   const mtd = document.getElementById('open-pay-mtd').value;
   if (!(amt > 0)) { showAlert({ title:t('alert_title_invalid'), message:t('msg_invalid_amount'), type:'warning' }); return; }
 
-  askPaymentDetails(`${amt.toLocaleString()} AFN · ${t('lbl_opening_balance') || 'Opening balance'}`, async ({ date, bookNo }) => {
+  askReceiptNo(`${amt.toLocaleString()} AFN · ${t('lbl_opening_balance') || 'Opening balance'}`, async ({ date, bookNo }) => {
     try {
       const r = await fetch('/api/fees', {
         method:'POST', headers:{'Content-Type':'application/json'},
