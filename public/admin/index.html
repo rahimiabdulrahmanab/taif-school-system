@@ -4550,6 +4550,7 @@ const LANG = {
     btn_today:'Today', lbl_backdated:'Back-dated',
     lbl_outstanding:'Outstanding', btn_collect:'Collect',
     lbl_collection_date:'Collection date', lbl_today_note:'today',
+    lbl_auto_receipt:'assigned automatically — change it if your book differs',
     msg_payment_deleted:'The payment has been removed and the balance updated.',
     msg_payment_updated:'Payment updated.',
     lbl_collect_due:'Collect what they still owe', grad_dues_total:'{n} graduate(s) still owe {a} AFN',
@@ -4998,6 +4999,7 @@ const LANG = {
     btn_today:'نن', lbl_backdated:'پخوانۍ نېټه',
     lbl_outstanding:'پاتې پور', btn_collect:'راټولول',
     lbl_collection_date:'د راټولولو نېټه', lbl_today_note:'نن',
+    lbl_auto_receipt:'په اتوماتيک ډول ټاکل شوی — که ستاسو کتاب توپير لري بدل يې کړئ',
     msg_payment_deleted:'تادیه لرې شوه او بیلانس تازه شو.',
     msg_payment_updated:'تادیه تازه شوه.',
     lbl_collect_due:'پاتې پور راټولول', grad_dues_total:'{n} فارغ التحصیل لا هم {a} افغانۍ پور لري',
@@ -9806,9 +9808,20 @@ let _lastPayDate = null;      // {y, m, d} in Shamsi
 // The date matters because the office usually enters payments after the
 // fact — the Daily Collection panel keys on it, so a payment taken on
 // Saturday must be filed under Saturday even if typed on Monday.
-function askPaymentDetails(what, next) {
+async function askPaymentDetails(what, next) {
   const old = document.getElementById('ap-modal');
   if (old) old.remove();
+
+  // The receipt book number is issued by the server: 001, 002, 003 … 010,
+  // 011 … It is the highest number used so far plus one, so it survives a
+  // page reload and cannot repeat if two people are entering payments. It
+  // stays editable — a new paper book may start at its own number, and from
+  // then on the counting simply follows the book.
+  let autoNo = '';
+  try {
+    const r = await fetch('/api/fees/next-receipt-no');
+    if (r.ok) { const d = await r.json(); autoNo = d.next || ''; }
+  } catch (_) { /* leave it blank; the server assigns one on save anyway */ }
 
   const cur = getCurrentShamsi();
   const sel = _lastPayDate ? { ..._lastPayDate } : { y: cur.year, m: cur.month, d: cur.day };
@@ -9848,10 +9861,10 @@ function askPaymentDetails(what, next) {
         </div>
 
         <label style="font-size:10.5px;font-weight:800;color:#6a7c93;font-family:var(--font-head);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;">${t('lbl_receipt_book_no') || 'Receipt book no.'}</label>
-        <input id="ap-book" type="text" autocomplete="off" value=""
+        <input id="ap-book" type="text" autocomplete="off" value="${autoNo}"
                style="width:100%;padding:11px 14px;background:#fff;border:2px solid rgba(93,202,165,.4);border-radius:12px;font-family:var(--font-mono);font-size:15px;font-weight:700;color:#0C1526;outline:none;box-sizing:border-box;text-align:center;"
                oninput="this.value=toWesternDigits(this.value)">
-        <div style="font-size:11px;color:#94a3b8;text-align:center;margin:6px 0 16px;min-height:14px;">${_lastBookNo ? `${t('lbl_last_receipt') || 'Last used'}: ${_lastBookNo}` : ''}</div>
+        <div style="font-size:11px;color:#94a3b8;text-align:center;margin:6px 0 16px;min-height:14px;">${autoNo ? (t('lbl_auto_receipt') || 'assigned automatically — change it if your book differs') : (_lastBookNo ? `${t('lbl_last_receipt') || 'Last used'}: ${_lastBookNo}` : '')}</div>
 
         <div style="display:flex;gap:10px;">
           <button id="ap-cancel" type="button" style="flex:1;padding:12px;background:#f5f9fc;border:1px solid rgba(20,40,80,.08);border-radius:12px;color:#6a7c93;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer;">${t('lbl_cancel') || 'Cancel'}</button>

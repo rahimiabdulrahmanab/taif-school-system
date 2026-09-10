@@ -70,10 +70,40 @@ function walkStart(enrolledAt) {
   return { startY: y, startM: m, curY: cur.year, curM: cur.month };
 }
 
+// The next receipt book number: highest purely-numeric one used so far, plus
+// one, padded to three digits (001, 002 … 010, 011 … 100). Derived from the
+// data rather than a database sequence on purpose — if a clerk overrides it to
+// match a new paper book (say 500), numbering simply continues from there
+// instead of drifting away from the book on the desk.
+// Returns null when the column does not exist yet.
+async function nextReceiptBookNo() {
+  try {
+    const r = await pool.query(
+      `SELECT COALESCE(MAX(receipt_book_no::bigint), 0) + 1 AS n
+         FROM fee_payments
+        WHERE receipt_book_no ~ '^[0-9]+$'`);
+    return String(r.rows[0].n).padStart(3, '0');
+  } catch (e) {
+    if (/receipt_book_no/.test(e.message || '')) return null;
+    throw e;
+  }
+}
+
+// ── GET the number the next payment will be given ─────────────
+// The Record Payment dialog shows this pre-filled. It only reads.
+router.get('/next-receipt-no', async (req, res) => {
+  try {
+    res.json({ next: await nextReceiptBookNo() });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Stamp the clerk's paper receipt number onto the rows a payment created.
 // Never throws: a missing column, or a missing number, simply means no tag.
 async function tagBookNo(rows, bookNo) {
-  if (!bookNo || !rows || !rows.length) return rows;
+  if (!rows || !rows.length) return rows;
+  // Nothing typed → assign the next number automatically.
+  if (!bookNo) bookNo = await nextReceiptBookNo();
+  if (!bookNo) return rows;
   const ids = rows.map(r => r && r.id).filter(Boolean);
   if (!ids.length) return rows;
   try {
