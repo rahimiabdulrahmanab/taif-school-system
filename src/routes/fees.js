@@ -127,11 +127,20 @@ function walkEnd(s, curY, curM) {
   const g = new Date(s.graduated_at);
   if (isNaN(g)) return { endY: curY, endM: curM };
   const gs = toShamsi(g.getFullYear(), g.getMonth() + 1, g.getDate());
-  // The month they graduated in is still billable; nothing after it is.
-  if (gs.year > curY || (gs.year === curY && gs.month >= curM)) {
+
+  // Billing stops BEFORE the month the student left. A school does not
+  // charge a leaver for the month they walked out in — Taif's grade 12
+  // finished on 13 سنبله and the office does not want سنبله on their bill.
+  // To charge the leaving month instead, use gs.month here rather than
+  // gs.month - 1.
+  let endY = gs.year, endM = gs.month - 1;
+  if (endM < 1) { endM = 12; endY -= 1; }
+
+  // Never bill further ahead than today, whatever the graduation date says.
+  if (endY > curY || (endY === curY && endM > curM)) {
     return { endY: curY, endM: curM };
   }
-  return { endY: gs.year, endM: gs.month };
+  return { endY, endM };
 }
 
 // ── GET all payments (with filters) ──────────────────────────
