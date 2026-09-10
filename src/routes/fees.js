@@ -122,10 +122,22 @@ async function tagBookNo(rows, bookNo) {
 // balance grows every month even though they are long gone — and the office
 // would be chasing money the school never charged.
 // Returns the last Shamsi month that should be billed.
+// A graduated student is NEVER charged another monthly fee. Not for the
+// month they left in, not for any month after it, however long ago they
+// left. What they may still owe is what they had already run up while they
+// were a student, plus any opening balance the school recorded — that stays
+// visible and collectable on the Graduates screen.
+//
+// NOTHING = a sentinel meaning "bill no months at all", used when a student
+// is marked graduated but carries no graduation date, so a missing date can
+// never quietly start the fees running again.
+const NOTHING = { endY: -1, endM: -1 };
+
 function walkEnd(s, curY, curM) {
-  if (!s || !s.graduated || !s.graduated_at) return { endY: curY, endM: curM };
+  if (!s || !s.graduated) return { endY: curY, endM: curM };   // still a student
+  if (!s.graduated_at) return NOTHING;                          // graduated, date unknown
   const g = new Date(s.graduated_at);
-  if (isNaN(g)) return { endY: curY, endM: curM };
+  if (isNaN(g)) return NOTHING;
   const gs = toShamsi(g.getFullYear(), g.getMonth() + 1, g.getDate());
 
   // Billing stops BEFORE the month the student left. A school does not
