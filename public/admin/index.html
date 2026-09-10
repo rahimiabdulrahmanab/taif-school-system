@@ -4552,6 +4552,8 @@ const LANG = {
     lbl_collection_date:'Collection date', lbl_today_note:'today',
     lbl_auto_receipt:'assigned automatically — change it if your book differs',
     msg_book_no_lost:'receipt number NOT saved — run db/migration_receipt_book_no.sql',
+    msg_load_failed:'Could not load the graduate list.',
+    btn_retry:'Click the refresh button at the top to try again.',
     msg_payment_deleted:'The payment has been removed and the balance updated.',
     msg_payment_updated:'Payment updated.',
     lbl_collect_due:'Collect what they still owe', grad_dues_total:'{n} graduate(s) still owe {a} AFN',
@@ -5002,6 +5004,8 @@ const LANG = {
     lbl_collection_date:'د راټولولو نېټه', lbl_today_note:'نن',
     lbl_auto_receipt:'په اتوماتيک ډول ټاکل شوی — که ستاسو کتاب توپير لري بدل يې کړئ',
     msg_book_no_lost:'د رسید نمبر ثبت نه شو — migration چل کړئ',
+    msg_load_failed:'د فارغانو لیست بار نه شو.',
+    btn_retry:'بیا هڅه کولو لپاره پورته د تازه کولو تڼۍ کلیک کړئ.',
     msg_payment_deleted:'تادیه لرې شوه او بیلانس تازه شو.',
     msg_payment_updated:'تادیه تازه شوه.',
     lbl_collect_due:'پاتې پور راټولول', grad_dues_total:'{n} فارغ التحصیل لا هم {a} افغانۍ پور لري',
@@ -6893,25 +6897,48 @@ window.go = function(id, el) {
 let _allGraduates = [];
 
 let _gradDues = {};     // student_id -> outstanding balance
+let _gradLoaded = false; // did the list actually arrive? empty != failed
+
+// Paint a message into the graduates table body. Used for the loading and
+// failed states so neither is mistaken for "there are no graduates".
+function gradNotice(icon, text, sub) {
+  const tb = document.getElementById('grad-tbody');
+  if (!tb) return;
+  tb.innerHTML = `<tr><td colspan="8"><div class="empty">`
+    + `<i class="fas ${icon}"></i><p>${text}</p>`
+    + (sub ? `<p style="font-size:12px;color:#94a3b8;margin-top:4px;">${sub}</p>` : '')
+    + `</div></td></tr>`;
+}
 
 async function loadGraduates() {
+  // Never leave the old rows or a false "No graduates yet" on screen while
+  // the request is in flight — on a cold free-tier instance the first call
+  // can take the better part of a minute.
+  _gradLoaded = false;
+  gradNotice('fa-spinner fa-spin', t('lbl_loading') || 'Loading…');
+
   try {
-    // The balance comes from the fee ledger, not from a second calculation
-    // here: a graduate's dues must match what the Collect Fee panel shows.
-    const [r, bRes] = await Promise.all([
-      fetch('/api/students/list/graduates'),
-      fetch('/api/fees/balances?include_graduated=1').catch(() => null),
-    ]);
+    // The graduate list is fetched on its own and rendered as soon as it
+    // arrives. The balances call is far heavier (it prices every student in
+    // the school) and is deliberately NOT awaited here: coupling the two
+    // meant one slow or failed money query blanked the whole page.
+    const r = await fetch('/api/students/list/graduates');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     const data = await r.json();
     _allGraduates = Array.isArray(data) ? data : [];
+    _gradLoaded = true;
 
+    // Outstanding fills in when it is ready; the names are already on screen.
     _gradDues = {};
-    try {
-      const balances = bRes && bRes.ok ? await bRes.json() : [];
-      (Array.isArray(balances) ? balances : []).forEach(b => {
-        if (b.total_balance > 0) _gradDues[b.student_id] = b.total_balance;
-      });
-    } catch (_) { /* dues column simply shows — */ }
+    fetch('/api/fees/balances?include_graduated=1')
+      .then(b => (b && b.ok) ? b.json() : [])
+      .then(balances => {
+        (Array.isArray(balances) ? balances : []).forEach(b => {
+          if (b.total_balance > 0) _gradDues[b.student_id] = b.total_balance;
+        });
+        if (_gradLoaded) renderGraduates();
+      })
+      .catch(() => { /* the column just keeps showing — */ });
     // Year filter — distinct Shamsi years from graduated_at
     const yrSel = document.getElementById('grad-year-filter');
     const years = Array.from(new Set(_allGraduates.map(g => {
@@ -6929,7 +6956,14 @@ async function loadGraduates() {
     secSel.innerHTML = `<option value="">${t('opt_all_sections')||'All sections'}</option>` +
       sections.map(s => `<option value="${s}">${s}</option>`).join('');
     renderGraduates();
-  } catch(e) { console.error('loadGraduates error:', e); }
+  } catch(e) {
+    console.error('loadGraduates error:', e);
+    _gradLoaded = false;
+    gradNotice('fa-triangle-exclamation',
+      t('msg_load_failed') || 'Could not load the graduate list.',
+      (e && e.message ? e.message + ' — ' : '') +
+      (t('btn_retry') || 'Click the refresh button at the top to try again.'));
+  }
 }
 
 const _gradYearOpen = {};   // { 1405: true } — expanded year sections
@@ -6948,6 +6982,11 @@ function _gradClassLabel(g) {
 }
 
 function renderGraduates() {
+  // Nothing has been loaded (still fetching, or the fetch failed). Leave the
+  // notice that is already on screen rather than replacing it with the
+  // "No graduates yet" empty state, which would be a lie.
+  if (!_gradLoaded) return;
+
   const q  = (document.getElementById('grad-search').value || '').toLowerCase().trim();
   const yf = document.getElementById('grad-year-filter').value;
   const sf = (document.getElementById('grad-section-filter').value || '').trim();
