@@ -4551,6 +4551,7 @@ const LANG = {
     lbl_outstanding:'Outstanding', btn_collect:'Collect',
     lbl_collection_date:'Collection date', lbl_today_note:'today',
     lbl_auto_receipt:'assigned automatically — change it if your book differs',
+    msg_book_no_lost:'receipt number NOT saved — run db/migration_receipt_book_no.sql',
     msg_payment_deleted:'The payment has been removed and the balance updated.',
     msg_payment_updated:'Payment updated.',
     lbl_collect_due:'Collect what they still owe', grad_dues_total:'{n} graduate(s) still owe {a} AFN',
@@ -5000,6 +5001,7 @@ const LANG = {
     lbl_outstanding:'پاتې پور', btn_collect:'راټولول',
     lbl_collection_date:'د راټولولو نېټه', lbl_today_note:'نن',
     lbl_auto_receipt:'په اتوماتيک ډول ټاکل شوی — که ستاسو کتاب توپير لري بدل يې کړئ',
+    msg_book_no_lost:'د رسید نمبر ثبت نه شو — migration چل کړئ',
     msg_payment_deleted:'تادیه لرې شوه او بیلانس تازه شو.',
     msg_payment_updated:'تادیه تازه شوه.',
     lbl_collect_due:'پاتې پور راټولول', grad_dues_total:'{n} فارغ التحصیل لا هم {a} افغانۍ پور لري',
@@ -9920,11 +9922,20 @@ async function feeAddPayment(year, month) {
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Failed');
+
+      // Report what the server actually STORED, not what we sent. If a number
+      // was shown in the dialog but comes back empty it was not recorded, and
+      // the clerk has to know — they have already written it on the paper slip.
+      // This is exactly how 001 and 002 went missing before the column existed.
+      const savedNo = (d.payments && d.payments[0] && d.payments[0].receipt_book_no) || '';
+      const lostNo  = !!bookNo && !savedNo;
+
       showAlert({
-        title: t('alert_title_saved'),
+        title: lostNo ? (t('alert_title_warning') || 'Recorded, but…') : t('alert_title_saved'),
         message: `${amt.toLocaleString()} AFN — ${t('msg_payment_ok')||'Recorded'}`
-               + (bookNo ? ` · ${t('lbl_receipt_book_no')||'Receipt'} ${bookNo}` : ''),
-        type: 'success',
+               + (savedNo ? ` · ${t('lbl_receipt_book_no')||'Receipt'} ${savedNo}` : '')
+               + (lostNo ? ' — ' + (t('msg_book_no_lost') || 'receipt number NOT saved') : ''),
+        type: lostNo ? 'warning' : 'success',
       });
       _feeRefresh();
     } catch(e) { showAlert({ title:t('alert_title_error'), message:e.message, type:'error' }); }
