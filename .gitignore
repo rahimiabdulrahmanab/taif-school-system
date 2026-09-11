@@ -4,3 +4,4 @@ src/uploads/
 .wa-session/
 .wwebjs_cache/
 dist/
+vendor/

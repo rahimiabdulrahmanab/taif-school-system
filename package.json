@@ -29,7 +29,8 @@
       "package.json",
       "node_modules/**/*",
       "!node_modules/.cache",
-      "!dist"
+      "!dist",
+      "!vendor"
     ],
     "win": {
       "target": [
@@ -47,7 +48,13 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Taif School System"
-    }
+    },
+    "extraResources": [
+      {
+        "from": "vendor/chrome-win64",
+        "to": "chrome"
+      }
+    ]
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

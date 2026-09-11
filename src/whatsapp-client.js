@@ -18,6 +18,12 @@ function findChrome() {
   const candidates = [];
 
   if (process.env.PUPPETEER_EXECUTABLE_PATH) candidates.push(process.env.PUPPETEER_EXECUTABLE_PATH);
+
+  // The desktop app ships Chromium beside itself, under resources/chrome.
+  if (process.resourcesPath) {
+    candidates.push(path.join(process.resourcesPath, 'chrome', 'chrome.exe'));
+    candidates.push(path.join(process.resourcesPath, 'chrome', 'chrome'));
+  }
   try { candidates.push(require('puppeteer').executablePath()); } catch (_) {}
 
   // Every cache root worth checking, including the project-local one the
