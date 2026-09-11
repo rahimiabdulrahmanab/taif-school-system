@@ -3651,7 +3651,47 @@ button[style*="background:linear-gradient"]{
   </div>
 </div>
 
-<!-- Info banner — replaces the old QR/connect panel -->
+<!-- ── School phone: pair once, then send to everyone at once ── -->
+<div id="wa-conn" style="margin-bottom:16px;padding:16px 20px;background:#fff;border:1px solid rgba(20,40,80,.08);border-radius:14px;box-shadow:0 4px 14px rgba(20,40,80,.05);"></div>
+
+<!-- Bulk sending — only usable once the phone is paired -->
+<div id="wa-bulk" style="display:none;margin-bottom:20px;padding:18px 22px;background:#fff;border:1px solid rgba(37,211,102,.30);border-radius:14px;box-shadow:0 4px 14px rgba(20,40,80,.05);">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+    <div style="width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#25D366,#128C7E);display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;"><i class="fas fa-paper-plane"></i></div>
+    <div>
+      <div style="font-family:var(--font-head);font-size:15px;font-weight:800;color:#0f2845;" data-i18n="wa_bulk_title">Send to many parents at once</div>
+      <div style="font-size:12px;color:#6a7c93;" data-i18n="wa_bulk_sub">Sent by the school's own paired phone — no window opens for each parent</div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+    <select id="wa-bulk-target" onchange="waBulkTargetChanged()" style="padding:10px 13px;background:#f5f9fc;border:1px solid rgba(20,40,80,.10);border-radius:10px;font-size:13px;font-weight:700;color:#0f2845;outline:none;cursor:pointer;">
+      <option value="all">All parents</option>
+      <option value="absent">Parents of students absent today</option>
+      <option value="class">One class</option>
+    </select>
+    <select id="wa-bulk-class" onchange="waBulkPreview()" style="display:none;padding:10px 13px;background:#f5f9fc;border:1px solid rgba(20,40,80,.10);border-radius:10px;font-size:13px;font-weight:700;color:#0f2845;outline:none;cursor:pointer;min-width:150px;"></select>
+    <span id="wa-bulk-count" style="font-size:12.5px;color:#6a7c93;font-weight:700;"></span>
+  </div>
+
+  <textarea id="wa-bulk-message" rows="4" placeholder="Type the message every parent will receive…" style="width:100%;box-sizing:border-box;padding:12px 13px;background:#f5f9fc;border:1px solid rgba(20,40,80,.10);border-radius:10px;font-family:var(--font-body);font-size:13px;line-height:1.6;outline:none;resize:vertical;"></textarea>
+  <div style="font-size:11.5px;color:#94a3b8;margin:6px 0 12px;">
+    <b>{name}</b> · <b>{class}</b> · <b>{code}</b> <span data-i18n="wa_placeholders">are replaced with each child's own details</span>
+  </div>
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+    <button onclick="waBulkSend()" id="wa-bulk-send" style="padding:11px 22px;background:linear-gradient(135deg,#25D366,#128C7E);border:none;border-radius:10px;color:#fff;font-family:var(--font-head);font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 6px 16px rgba(37,211,102,.30);">
+      <i class="fab fa-whatsapp"></i> <span data-i18n="wa_bulk_send">Send to all of them</span>
+    </button>
+    <button onclick="waBulkCancel()" id="wa-bulk-cancel" style="display:none;padding:11px 18px;background:#fff;border:1px solid rgba(220,38,38,.30);border-radius:10px;color:#dc2626;font-family:var(--font-head);font-size:13px;font-weight:800;cursor:pointer;">
+      <i class="fas fa-stop"></i> <span data-i18n="btn_stop">Stop</span>
+    </button>
+  </div>
+
+  <div id="wa-bulk-progress" style="display:none;margin-top:14px;"></div>
+</div>
+
+<!-- Info banner — the wa.me route, which needs no pairing -->
 <div style="margin-bottom:20px;padding:18px 22px;background:linear-gradient(135deg,rgba(37,211,102,.10),rgba(37,211,102,.04));border:1px solid rgba(37,211,102,.25);border-radius:14px;display:flex;align-items:flex-start;gap:14px;">
   <div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#25D366,#128C7E);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;flex-shrink:0;box-shadow:0 6px 16px rgba(37,211,102,.30);">
     <i class="fab fa-whatsapp"></i>
@@ -4552,6 +4592,21 @@ const LANG = {
     lbl_collection_date:'Collection date', lbl_today_note:'today',
     lbl_auto_receipt:'assigned automatically — change it if your book differs',
     msg_book_no_lost:'receipt number NOT saved — run db/migration_receipt_book_no.sql',
+    wa_connected:'School phone connected', wa_disconnected:'School phone not connected',
+    wa_connected_sub:'Messages are sent straight from the school number',
+    wa_disconnected_sub:'Connect it to send to many parents at once',
+    wa_connect:'Connect the school phone', wa_disconnect:'Disconnect',
+    wa_scan:'Scan the QR code with the school phone', wa_starting:'Starting…',
+    wa_scan_hint:'WhatsApp on the phone → Settings → Linked devices → Link a device',
+    wa_connect_started:'Starting WhatsApp. The QR code appears here in a few seconds.',
+    wa_disconnect_msg:'Bulk sending will stop working until the phone is paired again.',
+    wa_bulk_title:'Send to many parents at once',
+    wa_bulk_sub:'Sent by the school’s own paired phone — no window opens for each parent',
+    wa_bulk_send:'Send to all of them', wa_bulk_confirm:'Send to every parent in this group?',
+    wa_bulk_confirm_msg:'Messages go out about two seconds apart from the school number. You can stop it at any time.',
+    wa_parents_reached:'parents will receive this', wa_need_message:'Type the message first.',
+    wa_placeholders:'are replaced with each child’s own details',
+    wa_sent:'sent', wa_failed:'failed', wa_stopped:'Stopped', btn_stop:'Stop',
     msg_load_failed:'Could not load the graduate list.',
     btn_retry:'Click the refresh button at the top to try again.',
     msg_payment_deleted:'The payment has been removed and the balance updated.',
@@ -5004,6 +5059,21 @@ const LANG = {
     lbl_collection_date:'د راټولولو نېټه', lbl_today_note:'نن',
     lbl_auto_receipt:'په اتوماتيک ډول ټاکل شوی — که ستاسو کتاب توپير لري بدل يې کړئ',
     msg_book_no_lost:'د رسید نمبر ثبت نه شو — migration چل کړئ',
+    wa_connected:'د ښوونځي ټېلیفون وصل دی', wa_disconnected:'د ښوونځي ټېلیفون وصل نه دی',
+    wa_connected_sub:'پیغامونه مستقیم د ښوونځي له شمېرې لېږل کېږي',
+    wa_disconnected_sub:'وصل يې کړئ ترڅو ټولو والدینو ته يوځل پیغام ولېږئ',
+    wa_connect:'د ښوونځي ټېلیفون وصل کړئ', wa_disconnect:'بېلول',
+    wa_scan:'د ښوونځي په ټېلیفون QR کوډ سکن کړئ', wa_starting:'پیلېږي…',
+    wa_scan_hint:'واټساپ → ترتیبات → تړل شوي وسایل → وسیله وتړئ',
+    wa_connect_started:'واټساپ پیلېږي. QR کوډ به څو ثانیو کې دلته ښکاره شي.',
+    wa_disconnect_msg:'تر بیا وصلولو پورې به ډله ییز لېږل کار ونه کړي.',
+    wa_bulk_title:'ډېرو والدینو ته يوځل پیغام',
+    wa_bulk_sub:'د ښوونځي له خپلې تړل شوې شمېرې لېږل کېږي',
+    wa_bulk_send:'ټولو ته ولېږه', wa_bulk_confirm:'په دې ډله کې ټولو والدینو ته ولېږل شي؟',
+    wa_bulk_confirm_msg:'پیغامونه شاوخوا هرې دوه ثانیې وروسته لېږل کېږي. هر وخت يې ودرولی شئ.',
+    wa_parents_reached:'والدین به يې ترلاسه کړي', wa_need_message:'لومړی پیغام ولیکئ.',
+    wa_placeholders:'د هر زده‌کوونکي په خپلو معلوماتو بدلېږي',
+    wa_sent:'ولېږل شو', wa_failed:'ناکام', wa_stopped:'ودرېد', btn_stop:'ودروه',
     msg_load_failed:'د فارغانو لیست بار نه شو.',
     btn_retry:'بیا هڅه کولو لپاره پورته د تازه کولو تڼۍ کلیک کړئ.',
     msg_payment_deleted:'تادیه لرې شوه او بیلانس تازه شو.',
@@ -10363,6 +10433,8 @@ window.go = function(id, el) {
 };
 
 async function initWhatsApp() {
+  // Show whether the school phone is paired, and the bulk panel if it is.
+  waRefreshStatus();
   try {
     const [tplRes, stuRes, clsRes] = await Promise.all([
       fetch('/api/whatsapp/templates'),
@@ -10554,6 +10626,203 @@ function fillTemplateForStudent(template, s) {
 
 // ═══════════════════════════════════════════════════
 //  WHATSAPP — Deep-link approach (no QR connection needed)
+// ── School phone pairing + bulk sending ───────────────────────
+// The wa.me links below still work and need no pairing. This is the other
+// mode the school asked for: pair the school's own phone once, then the
+// server sends to every parent in a category without a window opening for
+// each one.
+let _waPoll = null;      // status poll while pairing
+let _waJobPoll = null;   // progress poll while a bulk send runs
+
+function waEsc(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+async function waRefreshStatus() {
+  const host = document.getElementById('wa-conn');
+  if (!host) return;
+  let st = { status: 'disconnected', connected: false, qr: null };
+  try {
+    const r = await fetch('/api/whatsapp/status');
+    if (r.ok) st = await r.json();
+  } catch (_) { /* show as disconnected */ }
+
+  const dot = st.connected ? '#25D366' : (st.status === 'qr' || st.status === 'initializing' ? '#d97706' : '#94a3b8');
+  const label = st.connected ? (t('wa_connected') || 'School phone connected')
+             : st.status === 'qr' ? (t('wa_scan') || 'Scan the QR code with the school phone')
+             : st.status === 'initializing' ? (t('wa_starting') || 'Starting…')
+             : (t('wa_disconnected') || 'School phone not connected');
+
+  host.innerHTML =
+      `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">`
+    +   `<span style="width:10px;height:10px;border-radius:50%;background:${dot};box-shadow:0 0 0 4px ${dot}22;"></span>`
+    +   `<div style="flex:1;min-width:180px;">`
+    +     `<div style="font-family:var(--font-head);font-size:14px;font-weight:800;color:#0f2845;">${waEsc(label)}</div>`
+    +     `<div style="font-size:12px;color:#6a7c93;">${st.connected
+              ? (t('wa_connected_sub') || 'Messages are sent straight from the school number')
+              : (t('wa_disconnected_sub') || 'Connect it to send to many parents at once')}</div>`
+    +   `</div>`
+    +   (st.connected
+          ? `<button onclick="waDisconnect()" style="padding:9px 18px;background:#fff;border:1px solid rgba(220,38,38,.30);border-radius:10px;color:#dc2626;font-family:var(--font-head);font-size:13px;font-weight:800;cursor:pointer;">${t('wa_disconnect') || 'Disconnect'}</button>`
+          : `<button onclick="waConnect()" style="padding:9px 20px;background:linear-gradient(135deg,#25D366,#128C7E);border:none;border-radius:10px;color:#fff;font-family:var(--font-head);font-size:13px;font-weight:800;cursor:pointer;"><i class="fab fa-whatsapp"></i> ${t('wa_connect') || 'Connect the school phone'}</button>`)
+    + `</div>`
+    + (st.qr
+        ? `<div style="margin-top:14px;text-align:center;">`
+          + `<img src="${st.qr}" alt="WhatsApp QR" style="width:220px;height:220px;border-radius:12px;border:1px solid rgba(20,40,80,.10);">`
+          + `<div style="font-size:12px;color:#6a7c93;margin-top:8px;">${t('wa_scan_hint') || 'WhatsApp on the phone → Settings → Linked devices → Link a device'}</div>`
+          + `</div>`
+        : '');
+
+  // Show the bulk panel only when a phone is actually paired.
+  const bulk = document.getElementById('wa-bulk');
+  if (bulk) bulk.style.display = st.connected ? 'block' : 'none';
+  if (st.connected) waBulkPreview();
+
+  // Poll while pairing is in progress; stop once settled.
+  const pairing = st.status === 'qr' || st.status === 'initializing';
+  if (pairing && !_waPoll) _waPoll = setInterval(waRefreshStatus, 3000);
+  if (!pairing && _waPoll) { clearInterval(_waPoll); _waPoll = null; }
+}
+
+async function waConnect() {
+  try {
+    const r = await fetch('/api/whatsapp/connect', { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Failed');
+    showAlert({ title: t('wa_connect') || 'Connecting',
+                message: t('wa_connect_started') || 'Starting WhatsApp. The QR code appears here in a few seconds.',
+                type: 'info' });
+    setTimeout(waRefreshStatus, 1500);
+  } catch (e) { showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' }); }
+}
+
+async function waDisconnect() {
+  showConfirm({
+    title: t('wa_disconnect') || 'Disconnect the school phone?',
+    message: t('wa_disconnect_msg') || 'Bulk sending will stop working until the phone is paired again.',
+    confirmText: t('wa_disconnect') || 'Disconnect', type: 'warning',
+    onConfirm: async () => {
+      try { await fetch('/api/whatsapp/disconnect', { method: 'POST' }); } catch (_) {}
+      waRefreshStatus();
+    },
+  });
+}
+
+function waBulkTarget() {
+  const type = (document.getElementById('wa-bulk-target') || {}).value || 'all';
+  const cls  = (document.getElementById('wa-bulk-class') || {}).value;
+  return type === 'class' ? { type, class_id: parseInt(cls) } : { type };
+}
+
+function waBulkTargetChanged() {
+  const isClass = (document.getElementById('wa-bulk-target') || {}).value === 'class';
+  const sel = document.getElementById('wa-bulk-class');
+  if (sel) {
+    sel.style.display = isClass ? '' : 'none';
+    if (isClass && !sel.options.length) {
+      sel.innerHTML = (allClasses || []).map(c => `<option value="${c.id}">${waEsc(c.name)}</option>`).join('');
+    }
+  }
+  waBulkPreview();
+}
+
+// Say how many parents the chosen category actually reaches, before sending.
+async function waBulkPreview() {
+  const out = document.getElementById('wa-bulk-count');
+  if (!out) return;
+  out.textContent = '…';
+  try {
+    const r = await fetch('/api/whatsapp/recipients', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target: waBulkTarget() }),
+    });
+    const d = await r.json();
+    out.textContent = r.ok
+      ? `${d.count} ${t('wa_parents_reached') || 'parents will receive this'}`
+      : (d.error || '');
+  } catch (_) { out.textContent = ''; }
+}
+
+async function waBulkSend() {
+  const message = (document.getElementById('wa-bulk-message') || {}).value || '';
+  if (!message.trim()) {
+    return showAlert({ title: t('alert_title_invalid') || 'Message needed',
+                       message: t('wa_need_message') || 'Type the message first.', type: 'warning' });
+  }
+  const count = (document.getElementById('wa-bulk-count') || {}).textContent || '';
+  showConfirm({
+    title: t('wa_bulk_confirm') || 'Send to every parent in this group?',
+    message: (count ? count + '. ' : '')
+           + (t('wa_bulk_confirm_msg') || 'Messages go out about two seconds apart from the school number. You can stop it at any time.'),
+    confirmText: t('wa_bulk_send') || 'Send', type: 'warning',
+    onConfirm: async () => {
+      try {
+        const r = await fetch('/api/whatsapp/send-bulk', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message, target: waBulkTarget() }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Failed');
+        document.getElementById('wa-bulk-cancel').style.display = '';
+        waJobPollStart();
+      } catch (e) { showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' }); }
+    },
+  });
+}
+
+async function waBulkCancel() {
+  try { await fetch('/api/whatsapp/send-bulk/cancel', { method: 'POST' }); } catch (_) {}
+}
+
+function waJobPollStart() {
+  if (_waJobPoll) clearInterval(_waJobPoll);
+  waJobPoll();
+  _waJobPoll = setInterval(waJobPoll, 1500);
+}
+
+async function waJobPoll() {
+  const box = document.getElementById('wa-bulk-progress');
+  if (!box) return;
+  let j;
+  try {
+    const r = await fetch('/api/whatsapp/send-bulk/status');
+    j = await r.json();
+  } catch (_) { return; }
+
+  const done = j.sent + j.failed;
+  const pct  = j.total ? Math.round(done / j.total * 100) : 0;
+  box.style.display = 'block';
+  box.innerHTML =
+      `<div style="height:8px;background:#eef4f9;border-radius:5px;overflow:hidden;">`
+    +   `<div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#25D366,#128C7E);transition:width .4s ease;"></div>`
+    + `</div>`
+    + `<div style="display:flex;justify-content:space-between;gap:10px;margin-top:7px;font-size:12.5px;font-weight:700;">`
+    +   `<span style="color:#0f2845;">${done} / ${j.total} ${j.running ? '· ' + waEsc(j.current || '') : ''}</span>`
+    +   `<span><span style="color:#178f4f;">${j.sent} ${t('wa_sent') || 'sent'}</span>`
+    +   (j.failed ? ` · <span style="color:#c8443c;">${j.failed} ${t('wa_failed') || 'failed'}</span>` : '') + `</span>`
+    + `</div>`
+    + (!j.running && j.failed
+        ? `<div style="margin-top:8px;max-height:120px;overflow:auto;font-size:11.5px;color:#c8443c;">`
+          + j.results.filter(x => !x.ok).map(x => `${waEsc(x.name)} — ${waEsc(x.error || 'failed')}`).join('<br>')
+          + `</div>`
+        : '');
+
+  if (!j.running) {
+    clearInterval(_waJobPoll); _waJobPoll = null;
+    const cancel = document.getElementById('wa-bulk-cancel');
+    if (cancel) cancel.style.display = 'none';
+    if (j.total) {
+      showAlert({
+        title: j.cancelled ? (t('wa_stopped') || 'Stopped') : (t('alert_title_saved') || 'Done'),
+        message: `${j.sent} ${t('wa_sent') || 'sent'}` + (j.failed ? `, ${j.failed} ${t('wa_failed') || 'failed'}` : ''),
+        type: j.failed ? 'warning' : 'success',
+      });
+    }
+  }
+}
+
 //  Each "Send" opens wa.me URL → WhatsApp Desktop / Web pre-filled.
 //  Admin presses Enter in WhatsApp to actually deliver the message.
 // ═══════════════════════════════════════════════════
