@@ -1,7 +1,11 @@
 const express = require('express');
 const pool    = require('../db.js');
 const wa      = require('../whatsapp-client');
-const { kabulTodayISO } = require('../shamsi.js');
+const { kabulTodayISO, todayShamsi } = require('../shamsi.js');
+const CONFIG = require('../../school-config.js');
+// Dari month names, matching what the rest of the app shows parents.
+const SHAMSI_MONTHS = ['', 'حمل', 'ثور', 'جوزا', 'سرطان', 'اسد', 'سنبله',
+                       'میزان', 'عقرب', 'قوس', 'جدی', 'دلو', 'حوت'];
 const { computeBalances } = require('./fees.js');
 const router  = express.Router();
 
@@ -220,7 +224,7 @@ function usablePhone(clean) {
 async function resolveRecipients(target, opts = {}) {
   const t = (target && target.type) || 'all';
   const base = `
-    SELECT s.id, s.first_name, s.last_name, s.student_code,
+    SELECT s.id, s.first_name, s.last_name, s.student_code, s.parent_name,
            COALESCE(NULLIF(s.parent_phone, ''), s.parent_phone2) AS phone,
            c.name AS class_name
       FROM students s
@@ -269,6 +273,12 @@ async function resolveRecipients(target, opts = {}) {
   sql += ` ORDER BY c.name, s.first_name`;
   const r = await pool.query(sql, params);
 
+  // {date} and {month} in the templates should read as the school writes
+  // dates — Shamsi, not the server's Gregorian calendar.
+  const nowS = todayShamsi();
+  const monthLabel = (SHAMSI_MONTHS[nowS.month] || '') + ' ' + nowS.year;
+  const todayLabel = nowS.day + ' ' + monthLabel;
+
   // {due} in a fee reminder must say what this family actually owes, and it
   // comes from the same ledger the Fee Collection screen reads.
   const dueBy = {};
@@ -282,8 +292,11 @@ async function resolveRecipients(target, opts = {}) {
       student_id: x.id,
       name: `${x.first_name} ${x.last_name || ''}`.trim(),
       class_name: x.class_name || '',
+      parent_name: x.parent_name || '',
       code: x.student_code || '',
       due: dueBy[x.id] || 0,
+      today_label: todayLabel,
+      month_label: monthLabel,
       phone: normalisePhone(x.phone),
     }))
     .filter(x => opts.keepUnusable || usablePhone(x.phone));
@@ -291,12 +304,28 @@ async function resolveRecipients(target, opts = {}) {
 
 // {name} {class} {code} are filled in per parent, so one template greets
 // every family by their own child's name.
+// Fill in one family's details. Both naming styles are supported: the short
+// {name} used in the bulk box, and the longer {student_name} the built-in
+// templates were written with — otherwise choosing "Absence Alert" would
+// have sent parents the literal text "{parent_name}".
 function personalise(message, r) {
-  return String(message || '')
-    .replace(/\{name\}/g,  r.name)
-    .replace(/\{class\}/g, r.class_name)
-    .replace(/\{code\}/g,  r.code)
-    .replace(/\{due\}/g,   Math.round(r.due || 0).toLocaleString());
+  const amount = Math.round(r.due || 0).toLocaleString();
+  const map = {
+    name:         r.name,
+    student_name: r.name,
+    parent_name:  r.parent_name || r.name,
+    class:        r.class_name,
+    class_name:   r.class_name,
+    code:         r.code,
+    student_code: r.code,
+    due:          amount,
+    amount:       amount,
+    date:         r.today_label || '',
+    month:        r.month_label || '',
+    school:       (CONFIG && CONFIG.name) || '',
+  };
+  return String(message || '').replace(/\{(\w+)\}/g, (whole, key) =>
+    Object.prototype.hasOwnProperty.call(map, key) ? map[key] : whole);
 }
 
 // ── GET who a category would reach, without sending ───────────

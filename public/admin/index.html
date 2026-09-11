@@ -3664,6 +3664,10 @@ button[style*="background:linear-gradient"]{
     </div>
   </div>
 
+  <div style="font-size:11px;font-weight:800;color:#6a7c93;font-family:var(--font-head);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px;" data-i18n="wa_pick_message">1 · Pick the message</div>
+  <div id="wa-bulk-templates" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;"></div>
+
+  <div style="font-size:11px;font-weight:800;color:#6a7c93;font-family:var(--font-head);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px;" data-i18n="wa_pick_who">2 · Who receives it</div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
     <select id="wa-bulk-target" onchange="waBulkTargetChanged()" style="padding:10px 13px;background:#f5f9fc;border:1px solid rgba(20,40,80,.10);border-radius:10px;font-size:13px;font-weight:700;color:#0f2845;outline:none;cursor:pointer;">
       <option value="all">All parents</option>
@@ -3675,6 +3679,7 @@ button[style*="background:linear-gradient"]{
     <span id="wa-bulk-count" style="font-size:12.5px;color:#6a7c93;font-weight:700;"></span>
   </div>
 
+  <div style="font-size:11px;font-weight:800;color:#6a7c93;font-family:var(--font-head);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px;" data-i18n="wa_check_message">3 · Check it, then send</div>
   <textarea id="wa-bulk-message" rows="4" placeholder="Type the message every parent will receive…" style="width:100%;box-sizing:border-box;padding:12px 13px;background:#f5f9fc;border:1px solid rgba(20,40,80,.10);border-radius:10px;font-family:var(--font-body);font-size:13px;line-height:1.6;outline:none;resize:vertical;"></textarea>
   <div style="font-size:11.5px;color:#94a3b8;margin:6px 0 12px;">
     <b>{name}</b> · <b>{class}</b> · <b>{code}</b> · <b>{due}</b> <span data-i18n="wa_placeholders">are replaced with each child's own details</span>
@@ -4609,6 +4614,8 @@ const LANG = {
     wa_placeholders:'are replaced with each child’s own details',
     wa_sent:'sent', wa_failed:'failed', wa_stopped:'Stopped', btn_stop:'Stop',
     wa_big_send:'That is a large number of messages from one WhatsApp number in one go. Sending to a single class at a time is safer.',
+    wa_pick_message:'1 · Pick the message', wa_pick_who:'2 · Who receives it',
+    wa_check_message:'3 · Check it, then send',
     wa_failed_title:'Could not start WhatsApp',
     wa_no_response:'The server did not produce a QR code. This usually means it cannot run WhatsApp — use the desktop app on the school computer.',
     msg_load_failed:'Could not load the graduate list.',
@@ -5079,6 +5086,8 @@ const LANG = {
     wa_placeholders:'د هر زده‌کوونکي په خپلو معلوماتو بدلېږي',
     wa_sent:'ولېږل شو', wa_failed:'ناکام', wa_stopped:'ودرېد', btn_stop:'ودروه',
     wa_big_send:'دا د یوې واټساپ شمېرې څخه ډېر پیغامونه دي. یو ټولګی په یو وار لېږل خوندي دي.',
+    wa_pick_message:'۱ · پیغام وټاکئ', wa_pick_who:'۲ · چا ته ورځي',
+    wa_check_message:'۳ · وګورئ، بیا ولېږئ',
     wa_failed_title:'واټساپ پیل نه شو',
     wa_no_response:'سرور QR کوډ رانه وړ. ښايي دلته واټساپ نه شي چلېدلی — د ښوونځي په کمپیوټر کې ډیسکټاپ اپ وکاروئ.',
     msg_load_failed:'د فارغانو لیست بار نه شو.',
@@ -10638,6 +10647,43 @@ function fillTemplateForStudent(template, s) {
 // mode the school asked for: pair the school's own phone once, then the
 // server sends to every parent in a category without a window opening for
 // each one.
+// One click fills the message. The office should not be writing the same
+// absence notice every morning — pick the template, pick who, send.
+// Choosing "Absence Alert" also selects the absentees, because that is
+// always who that message is for.
+let _waTemplates = [];
+
+async function waLoadTemplates() {
+  const host = document.getElementById('wa-bulk-templates');
+  if (!host) return;
+  try {
+    const r = await fetch('/api/whatsapp/templates');
+    _waTemplates = r.ok ? await r.json() : [];
+  } catch (_) { _waTemplates = []; }
+
+  host.innerHTML = _waTemplates.map((tpl, i) =>
+    `<button type="button" onclick="waUseTemplate(${i})"
+       style="padding:8px 14px;background:#fff;border:1px solid ${tpl.color}55;border-radius:20px;
+              color:${tpl.color};font-family:var(--font-head);font-size:12px;font-weight:800;cursor:pointer;">
+       <i class="${tpl.icon}"></i> ${waEsc(tpl.name)}</button>`).join('');
+}
+
+function waUseTemplate(i) {
+  const tpl = _waTemplates[i];
+  if (!tpl) return;
+  const box = document.getElementById('wa-bulk-message');
+  if (box) box.value = tpl.template || '';
+
+  // The message and the audience belong together: an absence alert goes to
+  // the absentees, a fee receipt to the families who owe.
+  const target = document.getElementById('wa-bulk-target');
+  if (target) {
+    if (tpl.id === 'absence_alert') target.value = 'absent';
+    else if (tpl.id === 'fee_receipt') target.value = 'unpaid';
+    waBulkTargetChanged();
+  }
+}
+
 let _waPoll = null;      // status poll while pairing
 let _waJobPoll = null;   // progress poll while a bulk send runs
 
@@ -10711,7 +10757,7 @@ async function waRefreshStatus() {
   // Show the bulk panel only when a phone is actually paired.
   const bulk = document.getElementById('wa-bulk');
   if (bulk) bulk.style.display = st.connected ? 'block' : 'none';
-  if (st.connected) waBulkPreview();
+  if (st.connected) { waLoadTemplates(); waBulkPreview(); }
 
   // Poll while pairing is in progress; stop once settled.
   const pairing = st.status === 'qr' || st.status === 'initializing';
