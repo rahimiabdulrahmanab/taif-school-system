@@ -2,6 +2,7 @@ const express = require('express');
 const pool    = require('../db.js');
 const wa      = require('../whatsapp-client');
 const { kabulTodayISO } = require('../shamsi.js');
+const { computeBalances } = require('./fees.js');
 const router  = express.Router();
 
 // ── GET status ────────────────────────────────────────────────
@@ -189,18 +190,37 @@ async function resolveRecipients(target) {
     if (!target.class_id) throw new Error('class_id is required for a class message');
     params.push(target.class_id);
     sql += ` AND s.class_id = $${params.length}`;
+  } else if (t === 'unpaid') {
+    // Parents of students who still owe money. Who owes what is decided by
+    // the fee ledger itself, not recalculated here, so a reminder can never
+    // quote a different figure from the Fee Collection screen.
+    const balances = await computeBalances({});
+    const owing = balances.filter(b => b.total_balance > 0).map(b => b.student_id);
+    if (!owing.length) return [];
+    params.push(owing);
+    sql += ` AND s.id = ANY($${params.length}::int[])`;
   } else if (t !== 'all') {
     throw new Error('Unknown recipient category: ' + t);
   }
 
   sql += ` ORDER BY c.name, s.first_name`;
   const r = await pool.query(sql, params);
+
+  // {due} in a fee reminder must say what this family actually owes, and it
+  // comes from the same ledger the Fee Collection screen reads.
+  const dueBy = {};
+  try {
+    const balances = await computeBalances({});
+    balances.forEach(b => { dueBy[b.student_id] = b.total_balance; });
+  } catch (_) { /* {due} simply renders as 0 */ }
+
   return r.rows
     .map(x => ({
       student_id: x.id,
       name: `${x.first_name} ${x.last_name || ''}`.trim(),
       class_name: x.class_name || '',
       code: x.student_code || '',
+      due: dueBy[x.id] || 0,
       phone: normalisePhone(x.phone),
     }))
     .filter(x => x.phone.length >= 10);
@@ -212,7 +232,8 @@ function personalise(message, r) {
   return String(message || '')
     .replace(/\{name\}/g,  r.name)
     .replace(/\{class\}/g, r.class_name)
-    .replace(/\{code\}/g,  r.code);
+    .replace(/\{code\}/g,  r.code)
+    .replace(/\{due\}/g,   Math.round(r.due || 0).toLocaleString());
 }
 
 // ── GET who a category would reach, without sending ───────────

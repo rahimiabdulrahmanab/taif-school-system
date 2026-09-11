@@ -3668,6 +3668,7 @@ button[style*="background:linear-gradient"]{
     <select id="wa-bulk-target" onchange="waBulkTargetChanged()" style="padding:10px 13px;background:#f5f9fc;border:1px solid rgba(20,40,80,.10);border-radius:10px;font-size:13px;font-weight:700;color:#0f2845;outline:none;cursor:pointer;">
       <option value="all">All parents</option>
       <option value="absent">Parents of students absent today</option>
+      <option value="unpaid">Parents who still owe fees</option>
       <option value="class">One class</option>
     </select>
     <select id="wa-bulk-class" onchange="waBulkPreview()" style="display:none;padding:10px 13px;background:#f5f9fc;border:1px solid rgba(20,40,80,.10);border-radius:10px;font-size:13px;font-weight:700;color:#0f2845;outline:none;cursor:pointer;min-width:150px;"></select>
@@ -3676,7 +3677,7 @@ button[style*="background:linear-gradient"]{
 
   <textarea id="wa-bulk-message" rows="4" placeholder="Type the message every parent will receive…" style="width:100%;box-sizing:border-box;padding:12px 13px;background:#f5f9fc;border:1px solid rgba(20,40,80,.10);border-radius:10px;font-family:var(--font-body);font-size:13px;line-height:1.6;outline:none;resize:vertical;"></textarea>
   <div style="font-size:11.5px;color:#94a3b8;margin:6px 0 12px;">
-    <b>{name}</b> · <b>{class}</b> · <b>{code}</b> <span data-i18n="wa_placeholders">are replaced with each child's own details</span>
+    <b>{name}</b> · <b>{class}</b> · <b>{code}</b> · <b>{due}</b> <span data-i18n="wa_placeholders">are replaced with each child's own details</span>
   </div>
 
   <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">

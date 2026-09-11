@@ -766,17 +766,13 @@ router.delete('/:id', async (req, res) => {
 });
 
 // ── GET per-student cumulative balances ───────────────────────
-router.get('/balances', async (req, res) => {
-  try {
-    const periodYear  = parseInt(req.query.year);
-    const periodMonth = parseInt(req.query.month);
-
+// Every student's running balance. Exported below so anything that needs to
+// know who owes money — the Fee Collection screen, the Graduates screen, the
+// WhatsApp fee reminders — asks this one function rather than keeping its own
+// copy of the rules about holidays, discounts, carry-forwards and leavers.
+async function computeBalances({ periodYear, periodMonth, withLeavers } = {}) {
+  {
     const cur = todayShamsi();
-
-    // Graduated students keep whatever they still owe. include_graduated=1
-    // brings them into the list so the office can actually collect it.
-    const withLeavers = req.query.include_graduated === '1'
-                     || req.query.include_graduated === 'true';
     const students = await pool.query(`
       SELECT id, monthly_fee, discount_type, discount_value, enrolled_at,
              COALESCE(graduated, FALSE) AS graduated, graduated_at,
@@ -918,7 +914,18 @@ router.get('/balances', async (req, res) => {
       };
     });
 
-    res.json(out);
+    return out;
+  }
+}
+
+router.get('/balances', async (req, res) => {
+  try {
+    res.json(await computeBalances({
+      periodYear:  parseInt(req.query.year),
+      periodMonth: parseInt(req.query.month),
+      withLeavers: req.query.include_graduated === '1'
+                || req.query.include_graduated === 'true',
+    }));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -991,3 +998,5 @@ router.get('/summary/monthly', async (req, res) => {
 });
 
 module.exports = router;
+// Shared so other routes can ask who owes money without duplicating the rules.
+module.exports.computeBalances = computeBalances;
