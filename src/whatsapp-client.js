@@ -66,7 +66,9 @@ async function initialize() {
 
   client = new Client({
     authStrategy: new LocalAuth({
-      dataPath: path.join(process.cwd(), '.wa-session'),
+      // Set by the desktop app to a writable per-user folder; on a server
+      // the working directory is fine.
+      dataPath: process.env.WA_SESSION_DIR || path.join(process.cwd(), '.wa-session'),
     }),
     puppeteer: {
       headless: true,

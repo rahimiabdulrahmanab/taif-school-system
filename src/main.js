@@ -31,6 +31,11 @@ function startServer() {
   const appRoot    = path.join(__dirname, '..');
   const envVars    = loadEnv();
 
+  // app.getPath('userData') is per-user and writable, and survives updates:
+  // %APPDATA%Taif School System on Windows. The install directory is not
+  // writable once packaged, so the WhatsApp session must not live there.
+  const dataDir = app.getPath('userData');
+
   serverProcess = fork(serverPath, [], {
     cwd: appRoot,
     env: {
@@ -38,6 +43,8 @@ function startServer() {
       ...envVars,
       ELECTRON: 'true',
       NODE_ENV:  'production',
+      WA_SESSION_DIR: path.join(dataDir, 'wa-session'),
+      UPLOADS_DIR:    path.join(dataDir, 'uploads'),
     },
     silent: false,
   });
