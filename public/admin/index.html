@@ -5355,8 +5355,19 @@ const LANG = {
     confirm_del_item_msg:'"{name}" ړنګ کړئ؟ دا کار بیرته نه شي کیدای.',
   },
 };
-if (!localStorage.getItem('lang')) localStorage.setItem('lang', 'en');
-let _lang = localStorage.getItem('lang');
+// English is the default language. A machine that had Pashto saved from an
+// earlier build is put back to English once, because "it opens in Pashto"
+// was never a choice anyone made recently — it was a toggle from months ago
+// that localStorage kept. After that reset the toggle is remembered again,
+// so anyone who prefers Pashto still keeps it.
+try {
+  if (localStorage.getItem('lang_default_en') !== '1') {
+    localStorage.setItem('lang', 'en');
+    localStorage.setItem('lang_default_en', '1');
+  }
+} catch (_) {}
+let _lang = 'en';
+try { _lang = localStorage.getItem('lang') || 'en'; } catch (_) {}
 function t(key) { return (LANG[_lang]||LANG.en)[key] || (LANG.en)[key] || key; }
 
 function applyLang(lang) {
