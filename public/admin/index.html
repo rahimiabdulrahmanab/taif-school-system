@@ -10678,6 +10678,7 @@ async function waRefreshStatus() {
     + (st.error
         ? `<div style="margin-top:12px;padding:11px 13px;background:#fff4f4;border:1px solid rgba(220,38,38,.25);border-radius:10px;font-size:12.5px;color:#b91c1c;line-height:1.55;">`
           + `<b>${t('wa_failed_title') || 'Could not start WhatsApp'}:</b> ${waEsc(st.error)}`
+          + `<div id="wa-diag" style="margin-top:9px;padding-top:9px;border-top:1px solid rgba(220,38,38,.18);font-family:var(--font-mono);font-size:11px;color:#7f1d1d;white-space:pre-wrap;">…</div>`
           + `</div>`
         : '')
     + (st.qr
@@ -10686,6 +10687,24 @@ async function waRefreshStatus() {
           + `<div style="font-size:12px;color:#6a7c93;margin-top:8px;">${t('wa_scan_hint') || 'WhatsApp on the phone → Settings → Linked devices → Link a device'}</div>`
           + `</div>`
         : '');
+
+  // When it failed, say what the server can see: whether the browser is
+  // installed at all, and where it looked. Otherwise the only way to know is
+  // a build log nobody has access to.
+  if (st.error) {
+    fetch('/api/whatsapp/diagnose').then(r => r.ok ? r.json() : null).then(d => {
+      const box = document.getElementById('wa-diag');
+      if (!box) return;
+      if (!d) { box.textContent = 'diagnostics unavailable — the server may still be deploying'; return; }
+      box.textContent = [
+        'browser installed : ' + (d.executable_exists ? 'YES' : 'NO'),
+        'expected at       : ' + (d.executable || '?'),
+        'cache dir         : ' + (d.cache_dir_checked || d.cache_dir_env || '?'),
+        'cache contains    : ' + ((d.cache_contents || []).join(', ') || '(empty)'),
+        'server memory     : ' + d.node_memory_mb + ' MB',
+      ].join('\n');
+    }).catch(() => {});
+  }
 
   // Show the bulk panel only when a phone is actually paired.
   const bulk = document.getElementById('wa-bulk');
