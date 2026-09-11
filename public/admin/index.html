@@ -4609,6 +4609,8 @@ const LANG = {
     wa_placeholders:'are replaced with each child’s own details',
     wa_sent:'sent', wa_failed:'failed', wa_stopped:'Stopped', btn_stop:'Stop',
     wa_big_send:'That is a large number of messages from one WhatsApp number in one go. Sending to a single class at a time is safer.',
+    wa_failed_title:'Could not start WhatsApp',
+    wa_no_response:'The server did not produce a QR code. This usually means it cannot run WhatsApp — use the desktop app on the school computer.',
     msg_load_failed:'Could not load the graduate list.',
     btn_retry:'Click the refresh button at the top to try again.',
     msg_payment_deleted:'The payment has been removed and the balance updated.',
@@ -5077,6 +5079,8 @@ const LANG = {
     wa_placeholders:'د هر زده‌کوونکي په خپلو معلوماتو بدلېږي',
     wa_sent:'ولېږل شو', wa_failed:'ناکام', wa_stopped:'ودرېد', btn_stop:'ودروه',
     wa_big_send:'دا د یوې واټساپ شمېرې څخه ډېر پیغامونه دي. یو ټولګی په یو وار لېږل خوندي دي.',
+    wa_failed_title:'واټساپ پیل نه شو',
+    wa_no_response:'سرور QR کوډ رانه وړ. ښايي دلته واټساپ نه شي چلېدلی — د ښوونځي په کمپیوټر کې ډیسکټاپ اپ وکاروئ.',
     msg_load_failed:'د فارغانو لیست بار نه شو.',
     btn_retry:'بیا هڅه کولو لپاره پورته د تازه کولو تڼۍ کلیک کړئ.',
     msg_payment_deleted:'تادیه لرې شوه او بیلانس تازه شو.',
@@ -10671,6 +10675,11 @@ async function waRefreshStatus() {
           ? `<button onclick="waDisconnect()" style="padding:9px 18px;background:#fff;border:1px solid rgba(220,38,38,.30);border-radius:10px;color:#dc2626;font-family:var(--font-head);font-size:13px;font-weight:800;cursor:pointer;">${t('wa_disconnect') || 'Disconnect'}</button>`
           : `<button onclick="waConnect()" style="padding:9px 20px;background:linear-gradient(135deg,#25D366,#128C7E);border:none;border-radius:10px;color:#fff;font-family:var(--font-head);font-size:13px;font-weight:800;cursor:pointer;"><i class="fab fa-whatsapp"></i> ${t('wa_connect') || 'Connect the school phone'}</button>`)
     + `</div>`
+    + (st.error
+        ? `<div style="margin-top:12px;padding:11px 13px;background:#fff4f4;border:1px solid rgba(220,38,38,.25);border-radius:10px;font-size:12.5px;color:#b91c1c;line-height:1.55;">`
+          + `<b>${t('wa_failed_title') || 'Could not start WhatsApp'}:</b> ${waEsc(st.error)}`
+          + `</div>`
+        : '')
     + (st.qr
         ? `<div style="margin-top:14px;text-align:center;">`
           + `<img src="${st.qr}" alt="WhatsApp QR" style="width:220px;height:220px;border-radius:12px;border:1px solid rgba(20,40,80,.10);">`
@@ -10694,10 +10703,24 @@ async function waConnect() {
     const r = await fetch('/api/whatsapp/connect', { method: 'POST' });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || 'Failed');
-    showAlert({ title: t('wa_connect') || 'Connecting',
-                message: t('wa_connect_started') || 'Starting WhatsApp. The QR code appears here in a few seconds.',
-                type: 'info' });
-    setTimeout(waRefreshStatus, 1500);
+    // Starting the browser takes a few seconds, and on a host that cannot run
+    // it at all the attempt fails silently. Poll for a while, then say so.
+    let tries = 0;
+    const watch = setInterval(async () => {
+      tries++;
+      await waRefreshStatus();
+      const s = await fetch('/api/whatsapp/status').then(x => x.json()).catch(() => ({}));
+      if (s.connected || s.qr || s.error || tries > 12) {
+        clearInterval(watch);
+        if (s.error) {
+          showAlert({ title: t('wa_failed_title') || 'Could not start WhatsApp', message: s.error, type: 'error' });
+        } else if (!s.connected && !s.qr) {
+          showAlert({ title: t('wa_failed_title') || 'Could not start WhatsApp',
+                      message: t('wa_no_response') || 'The server did not produce a QR code. This usually means it cannot run WhatsApp — use the desktop app on the school computer.',
+                      type: 'warning' });
+        }
+      }
+    }, 2000);
   } catch (e) { showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' }); }
 }
 

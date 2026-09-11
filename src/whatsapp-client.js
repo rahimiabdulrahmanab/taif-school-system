@@ -5,15 +5,17 @@ const path   = require('path');
 let client  = null;
 let _status = 'disconnected'; // disconnected | initializing | qr | connected
 let _qr     = null;
+let _error  = null;           // why the last attempt failed, for the screen
 
 function getStatus() {
-  return { status: _status, connected: _status === 'connected', qr: _qr };
+  return { status: _status, connected: _status === 'connected', qr: _qr, error: _error };
 }
 
 async function initialize() {
   if (client) return;
   _status = 'initializing';
   _qr     = null;
+  _error  = null;
 
   client = new Client({
     authStrategy: new LocalAuth({
@@ -39,6 +41,7 @@ async function initialize() {
   client.on('ready', () => {
     _status = 'connected';
     _qr     = null;
+    _error  = null;
     console.log('[WhatsApp] Connected and ready');
   });
 
@@ -46,6 +49,7 @@ async function initialize() {
     _status = 'disconnected';
     client  = null;
     _qr     = null;
+    _error  = 'WhatsApp rejected the login: ' + msg;
     console.error('[WhatsApp] Auth failure:', msg);
   });
 
@@ -56,11 +60,17 @@ async function initialize() {
     console.log('[WhatsApp] Disconnected:', reason);
   });
 
-  // Initialize without awaiting — status updates come via events
+  // Initialize without awaiting — status updates come via events.
+  // The failure is REPORTED, not just logged: the usual cause is that this
+  // host cannot run Chromium at all, and somebody staring at a button that
+  // does nothing has no way to know that.
   client.initialize().catch((err) => {
     console.error('[WhatsApp] Init error:', err.message);
     _status = 'disconnected';
     client  = null;
+    _error  = /libnss|shared librar|Failed to launch|ENOENT|Could not find (Chrome|Chromium)/i.test(err.message || '')
+      ? 'This server cannot run WhatsApp: the browser it needs is missing or cannot start here. Run the desktop app on the school computer instead. (' + String(err.message || '').slice(0, 120) + ')'
+      : err.message;
   });
 }
 
