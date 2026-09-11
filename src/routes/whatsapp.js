@@ -10,6 +10,31 @@ router.get('/status', (req, res) => {
   res.json(wa.getStatus());
 });
 
+// ── GET diagnose — can this host run WhatsApp at all? ─────────
+// Answers the question "is the browser actually installed here", which is
+// otherwise only visible in build logs nobody reads.
+router.get('/diagnose', (req, res) => {
+  const fs = require('fs');
+  const out = {
+    cache_dir_env: process.env.PUPPETEER_CACHE_DIR || null,
+    executable: null,
+    executable_exists: false,
+    cache_contents: [],
+    node_memory_mb: Math.round(process.memoryUsage().rss / 1048576),
+  };
+  try {
+    out.executable = require('puppeteer').executablePath();
+    out.executable_exists = fs.existsSync(out.executable);
+  } catch (e) { out.executable = 'error: ' + e.message; }
+  try {
+    const dir = process.env.PUPPETEER_CACHE_DIR
+      || require('path').join(require('os').homedir(), '.cache', 'puppeteer');
+    out.cache_dir_checked = dir;
+    out.cache_contents = fs.existsSync(dir) ? fs.readdirSync(dir) : ['(directory does not exist)'];
+  } catch (e) { out.cache_contents = ['error: ' + e.message]; }
+  res.json(out);
+});
+
 // ── POST connect — start WhatsApp client ──────────────────────
 router.post('/connect', async (req, res) => {
   try {

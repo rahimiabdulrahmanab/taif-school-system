@@ -4,6 +4,7 @@
   "description": "Taif High School Management System",
   "main": "src/main.js",
   "scripts": {
+    "postinstall": "node scripts/install_chrome.js",
     "start": "electron .",
     "dev": "nodemon src/server.js",
     "build": "electron-builder",
@@ -16,6 +17,7 @@
     "directories": {
       "output": "dist"
     },
+    "extraMetadata": { "scripts": { "postinstall": "echo skip" } },
     "files": [
       "src/**/*",
       "public/**/*",
