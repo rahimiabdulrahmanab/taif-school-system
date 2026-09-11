@@ -154,8 +154,16 @@ function jobSnapshot() {
 }
 
 // Normalise a number the way POST /send does, so both paths agree.
+//
+// Real data is messier than the form suggests. Some records hold TWO numbers
+// in one field — "+93782766292 - 777246898" — which naively stripped of
+// punctuation becomes a 20-digit number that belongs to nobody. Take the
+// first number in the field; the second is what parent_phone2 is for.
 function normalisePhone(phone) {
-  const raw = String(phone || '').trim();
+  let raw = String(phone || '').trim();
+  const first = raw.split(/[,;/]|\s+-\s+|\s+و\s+|\n/)[0].trim();
+  if (first) raw = first;
+
   let clean = raw.replace(/\D/g, '');
   if (raw.startsWith('+'))         { /* already international */ }
   else if (clean.startsWith('00')) clean = clean.slice(2);
@@ -164,9 +172,16 @@ function normalisePhone(phone) {
   return clean;
 }
 
+// A number worth trying. E.164 allows at most 15 digits and no real number is
+// under 10, so this rejects the "+93" stubs and the two-numbers-in-one-field
+// wrecks rather than sending a message into nowhere.
+function usablePhone(clean) {
+  return /^\d{10,15}$/.test(clean);
+}
+
 // Who a category means. Only students with a usable parent number come back,
 // and the second parent number is the fallback when the first is blank.
-async function resolveRecipients(target) {
+async function resolveRecipients(target, opts = {}) {
   const t = (target && target.type) || 'all';
   const base = `
     SELECT s.id, s.first_name, s.last_name, s.student_code,
@@ -223,7 +238,7 @@ async function resolveRecipients(target) {
       due: dueBy[x.id] || 0,
       phone: normalisePhone(x.phone),
     }))
-    .filter(x => x.phone.length >= 10);
+    .filter(x => opts.keepUnusable || usablePhone(x.phone));
 }
 
 // {name} {class} {code} are filled in per parent, so one template greets
@@ -239,8 +254,18 @@ function personalise(message, r) {
 // ── GET who a category would reach, without sending ───────────
 router.post('/recipients', async (req, res) => {
   try {
-    const list = await resolveRecipients(req.body && req.body.target);
-    res.json({ count: list.length, recipients: list });
+    const target = req.body && req.body.target;
+    const list = await resolveRecipients(target);
+
+    // How many parents in this group have a number too broken to message.
+    // Worth surfacing: the office can only fix what it knows about.
+    let unusable = 0;
+    try {
+      const all = await resolveRecipients(target, { keepUnusable: true });
+      unusable = all.length - list.length;
+    } catch (_) {}
+
+    res.json({ count: list.length, unusable, recipients: list });
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
@@ -267,7 +292,7 @@ router.post('/send-bulk', async (req, res) => {
       ? req.body.recipients.map(r => ({
           name: r.name || '', class_name: r.class_name || '', code: r.code || '',
           phone: normalisePhone(r.phone),
-        })).filter(r => r.phone.length >= 10)
+        })).filter(r => usablePhone(r.phone))
       : await resolveRecipients(target);
 
     if (!list.length) return res.status(400).json({ error: 'Nobody in that group has a usable parent number.' });
