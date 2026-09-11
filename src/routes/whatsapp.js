@@ -196,7 +196,19 @@ async function resolveRecipients(target, opts = {}) {
   let sql = base;
 
   if (t === 'absent') {
-    // Nobody scanned in at the gate today.
+    // "Absent" is defined as "did not scan in at the gate today". If NOBODY
+    // scanned today, that definition makes every student absent — and the
+    // office would tell all 900-odd families their child missed school.
+    // Refuse rather than send something that is both wrong and, arriving
+    // from one number in one burst, a good way to get that number banned.
+    const scans = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM attendance
+        WHERE scan_date = $1::date AND person_type = 'student'`, [kabulTodayISO()]);
+    if (!scans.rows[0].n) {
+      throw new Error(
+        'No student has been scanned in at the gate today, so the system cannot tell who is absent — everyone would be counted absent. Use the Gate Screen first, or pick a different group.');
+    }
+
     params.push(kabulTodayISO());
     sql += ` AND s.id NOT IN (SELECT person_id FROM attendance
                                WHERE scan_date = $${params.length} AND person_type = 'student')`;

@@ -4608,6 +4608,7 @@ const LANG = {
     wa_parents_reached:'parents will receive this', wa_need_message:'Type the message first.',
     wa_placeholders:'are replaced with each child’s own details',
     wa_sent:'sent', wa_failed:'failed', wa_stopped:'Stopped', btn_stop:'Stop',
+    wa_big_send:'That is a large number of messages from one WhatsApp number in one go. Sending to a single class at a time is safer.',
     msg_load_failed:'Could not load the graduate list.',
     btn_retry:'Click the refresh button at the top to try again.',
     msg_payment_deleted:'The payment has been removed and the balance updated.',
@@ -5075,6 +5076,7 @@ const LANG = {
     wa_parents_reached:'والدین به يې ترلاسه کړي', wa_need_message:'لومړی پیغام ولیکئ.',
     wa_placeholders:'د هر زده‌کوونکي په خپلو معلوماتو بدلېږي',
     wa_sent:'ولېږل شو', wa_failed:'ناکام', wa_stopped:'ودرېد', btn_stop:'ودروه',
+    wa_big_send:'دا د یوې واټساپ شمېرې څخه ډېر پیغامونه دي. یو ټولګی په یو وار لېږل خوندي دي.',
     msg_load_failed:'د فارغانو لیست بار نه شو.',
     btn_retry:'بیا هڅه کولو لپاره پورته د تازه کولو تڼۍ کلیک کړئ.',
     msg_payment_deleted:'تادیه لرې شوه او بیلانس تازه شو.',
@@ -10756,7 +10758,10 @@ async function waBulkSend() {
   showConfirm({
     title: t('wa_bulk_confirm') || 'Send to every parent in this group?',
     message: (count ? count + '. ' : '')
-           + (t('wa_bulk_confirm_msg') || 'Messages go out about two seconds apart from the school number. You can stop it at any time.'),
+           + (t('wa_bulk_confirm_msg') || 'Messages go out about two seconds apart from the school number. You can stop it at any time.')
+           + (parseInt(count) > 150
+               ? ' — ' + (t('wa_big_send') || 'That is a large number of messages from one WhatsApp number in one go. Sending to a single class at a time is safer.')
+               : ''),
     confirmText: t('wa_bulk_send') || 'Send', type: 'warning',
     onConfirm: async () => {
       try {
