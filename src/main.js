@@ -6,6 +6,8 @@ const fs     = require('fs');
 
 let mainWindow;
 let serverProcess;
+let serverOutput  = '';   // what the server printed, for the error dialog
+let serverLogPath = null; // and a copy on disk
 
 // ── Load .env explicitly from project root ────────────────────
 // Where the settings file may live. Packaged, __dirname is inside
@@ -73,8 +75,14 @@ function startServer() {
   // writable once packaged, so the WhatsApp session must not live there.
   const dataDir = app.getPath('userData');
 
+  // Packaged, appRoot is ...\resources\app.asar — a FILE, not a folder. Using
+  // it as the working directory made the spawn fail with ENOENT before the
+  // server ran a single line, which is why the installed app never started
+  // while `node src/server.js` was fine. Run from a real, writable folder.
+  const workDir = app.isPackaged ? dataDir : appRoot;
+
   serverProcess = fork(serverPath, [], {
-    cwd: appRoot,
+    cwd: workDir,
     env: {
       ...process.env,
       ...envVars,
@@ -83,11 +91,31 @@ function startServer() {
       WA_SESSION_DIR: path.join(dataDir, 'wa-session'),
       UPLOADS_DIR:    path.join(dataDir, 'uploads'),
     },
-    silent: false,
+    silent: true,
   });
 
-  serverProcess.on('error', (err) => console.error('Server error:', err));
-  serverProcess.on('exit',  (code) => console.log('Server exit:', code));
+  // Keep whatever the server prints. Packaged, its console goes nowhere, so
+  // a crash on startup was invisible and the dialog could only guess.
+  try {
+    serverLogPath = path.join(app.getPath('userData'), 'server.log');
+    fs.writeFileSync(serverLogPath, '=== started ' + new Date().toISOString() + ' ===\n');
+  } catch (_) { serverLogPath = null; }
+
+  const record = (chunk) => {
+    const text = String(chunk);
+    serverOutput += text;
+    if (serverOutput.length > 20000) serverOutput = serverOutput.slice(-20000);
+    if (serverLogPath) { try { fs.appendFileSync(serverLogPath, text); } catch (_) {} }
+  };
+  if (serverProcess.stdout) serverProcess.stdout.on('data', record);
+  if (serverProcess.stderr) serverProcess.stderr.on('data', record);
+
+  // These two used to print to a console that does not exist once packaged,
+  // so a server that died on startup left no trace anywhere.
+  serverProcess.on('error', (err) =>
+    record('Could not start the server process: ' + err.message + '\n'));
+  serverProcess.on('exit', (code, signal) =>
+    record('Server stopped: code=' + code + ' signal=' + signal + '\n'));
 }
 
 // ── Poll until server responds ────────────────────────────────
@@ -183,6 +211,8 @@ app.whenReady().then(() => {
           '• the internet connection (the database is online)\n' +
           '• that the DATABASE_URL in that file is still correct\n' +
           '• that port 3000 is not already in use by another program\n\n' +
+          (serverOutput ? 'What the server said:\n\n' + serverOutput.slice(-1200) + '\n\n' : '') +
+          (serverLogPath ? 'Full log: ' + serverLogPath + '\n\n' : '') +
           'Then start the program again.');
       }
       app.quit();
