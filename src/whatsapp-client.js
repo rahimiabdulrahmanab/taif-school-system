@@ -23,7 +23,14 @@ async function initialize() {
     }),
     puppeteer: {
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--no-first-run'],
+      // Tuned for a small container: no /dev/shm to overflow, one process
+      // rather than a tree of them, and nothing drawn that nobody will see.
+      args: [
+        '--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--no-first-run',
+        '--disable-dev-shm-usage', '--no-zygote', '--single-process',
+        '--disable-extensions', '--disable-background-networking',
+        '--disable-accelerated-2d-canvas', '--mute-audio',
+      ],
     },
   });
 

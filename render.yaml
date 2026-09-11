@@ -15,11 +15,18 @@ services:
     runtime: node
     plan: free
     branch: main
-    buildCommand: npm install
+    # Puppeteer downloads Chromium into ~/.cache by default, and Render does
+    # not carry the home directory from the build into the running service —
+    # which is why WhatsApp failed with "Could not find Chrome". Pin the cache
+    # inside the project, which IS preserved, and install the browser during
+    # the build.
+    buildCommand: npm install && npx puppeteer browsers install chrome
     startCommand: node src/server.js
     envVars:
       - key: NODE_ENV
         value: production
+      - key: PUPPETEER_CACHE_DIR
+        value: /opt/render/project/src/.cache/puppeteer
       - key: DATABASE_URL
         sync: false   # secret — set in the Render dashboard
       - key: JWT_SECRET
