@@ -23,9 +23,20 @@ router.get('/diagnose', (req, res) => {
     node_memory_mb: Math.round(process.memoryUsage().rss / 1048576),
   };
   try {
-    out.executable = require('puppeteer').executablePath();
-    out.executable_exists = fs.existsSync(out.executable);
+    out.executable = wa.findChrome() || require('puppeteer').executablePath();
+    out.executable_exists = !!out.executable && fs.existsSync(out.executable);
+    out.found_by_search = !!wa.findChrome();
   } catch (e) { out.executable = 'error: ' + e.message; }
+
+  // What the postinstall script writes to, which is the most likely place
+  // for the browser to actually be on a host like Render.
+  try {
+    const local = require('path').join(__dirname, '..', '..', '.cache', 'puppeteer');
+    out.project_cache = local;
+    out.project_cache_contents = fs.existsSync(local) ? fs.readdirSync(local) : ['(does not exist)'];
+    const chromeDir = require('path').join(local, 'chrome');
+    out.project_chrome_versions = fs.existsSync(chromeDir) ? fs.readdirSync(chromeDir) : [];
+  } catch (e) { out.project_cache_contents = ['error: ' + e.message]; }
   try {
     const dir = process.env.PUPPETEER_CACHE_DIR
       || require('path').join(require('os').homedir(), '.cache', 'puppeteer');

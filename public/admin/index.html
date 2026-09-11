@@ -10701,6 +10701,8 @@ async function waRefreshStatus() {
         'expected at       : ' + (d.executable || '?'),
         'cache dir         : ' + (d.cache_dir_checked || d.cache_dir_env || '?'),
         'cache contains    : ' + ((d.cache_contents || []).join(', ') || '(empty)'),
+        'project cache     : ' + ((d.project_cache_contents || []).join(', ') || '(empty)'),
+        'chrome versions   : ' + ((d.project_chrome_versions || []).join(', ') || '(none)'),
         'server memory     : ' + d.node_memory_mb + ' MB',
       ].join('\n');
     }).catch(() => {});

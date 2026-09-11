@@ -2,6 +2,53 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const QRCode = require('qrcode');
 const path   = require('path');
 
+// Find the Chromium that WhatsApp Web needs, wherever it ended up.
+//
+// Puppeteer looks in the HOME directory by default. Render's home is
+// /opt/render, and the browser downloaded during the build is not there when
+// the service runs — the diagnose output showed "cache dir: does not exist".
+// Setting PUPPETEER_CACHE_DIR would line them up, but that needs a dashboard
+// change nobody can make from here, and a blueprint edit did not take.
+//
+// So instead of depending on an environment variable being right, look in
+// every place the browser could plausibly be and use whichever exists.
+function findChrome() {
+  const fs   = require('fs');
+  const path = require('path');
+  const candidates = [];
+
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) candidates.push(process.env.PUPPETEER_EXECUTABLE_PATH);
+  try { candidates.push(require('puppeteer').executablePath()); } catch (_) {}
+
+  // Every cache root worth checking, including the project-local one the
+  // postinstall script writes to.
+  const roots = [
+    path.join(__dirname, '..', '.cache', 'puppeteer'),
+    process.env.PUPPETEER_CACHE_DIR,
+    path.join(require('os').homedir(), '.cache', 'puppeteer'),
+    '/opt/render/project/src/.cache/puppeteer',
+  ].filter(Boolean);
+
+  for (const root of roots) {
+    const chromeDir = path.join(root, 'chrome');
+    let versions = [];
+    try { versions = fs.readdirSync(chromeDir); } catch (_) { continue; }
+    for (const v of versions) {
+      candidates.push(path.join(chromeDir, v, 'chrome-linux64', 'chrome'));
+      candidates.push(path.join(chromeDir, v, 'chrome-win64', 'chrome.exe'));
+      candidates.push(path.join(chromeDir, v, 'chrome-headless-shell-linux64', 'chrome-headless-shell'));
+    }
+  }
+
+  // A system Chromium, if the host happens to provide one.
+  candidates.push('/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser');
+
+  for (const p of candidates) {
+    try { if (p && fs.existsSync(p)) return p; } catch (_) {}
+  }
+  return null;
+}
+
 let client  = null;
 let _status = 'disconnected'; // disconnected | initializing | qr | connected
 let _qr     = null;
@@ -23,6 +70,8 @@ async function initialize() {
     }),
     puppeteer: {
       headless: true,
+      // Whatever we found, rather than whatever the default path guesses.
+      executablePath: findChrome() || undefined,
       // Tuned for a small container: no /dev/shm to overflow, one process
       // rather than a tree of them, and nothing drawn that nobody will see.
       args: [
@@ -95,4 +144,4 @@ async function destroy() {
   }
 }
 
-module.exports = { initialize, sendMessage, destroy, getStatus };
+module.exports = { initialize, sendMessage, destroy, getStatus, findChrome };
