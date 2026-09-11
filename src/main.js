@@ -8,21 +8,58 @@ let mainWindow;
 let serverProcess;
 
 // ── Load .env explicitly from project root ────────────────────
+// Where the settings file may live. Packaged, __dirname is inside
+// app.asar — a read-only archive that cannot contain a .env and that the
+// school could never edit anyway. So look beside the installed program and
+// in the per-user data folder as well, and remember which one was used so
+// the error message can name it.
+let _envPathUsed = null;
+
+function envSearchPaths() {
+  const paths = [];
+  if (process.env.TAIF_ENV_FILE) paths.push(process.env.TAIF_ENV_FILE);
+  try { paths.push(path.join(app.getPath('userData'), '.env')); } catch (_) {}
+  try { paths.push(path.join(path.dirname(app.getPath('exe')), '.env')); } catch (_) {}
+  paths.push(path.join(__dirname, '..', '.env'));   // running from source
+  return paths;
+}
+
 function loadEnv() {
-  const envPath = path.join(__dirname, '..', '.env');
-  if (!fs.existsSync(envPath)) return {};
-  const lines = fs.readFileSync(envPath, 'utf8').split('\n');
-  const vars  = {};
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const idx = trimmed.indexOf('=');
-    if (idx < 0) continue;
-    const key = trimmed.slice(0, idx).trim();
-    const val = trimmed.slice(idx + 1).trim().replace(/^["']|["']$/g, '');
-    vars[key] = val;
+  for (const envPath of envSearchPaths()) {
+    if (!fs.existsSync(envPath)) continue;
+    const lines = fs.readFileSync(envPath, 'utf8').split('\n');
+    const vars  = {};
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const idx = trimmed.indexOf('=');
+      if (idx < 0) continue;
+      const key = trimmed.slice(0, idx).trim();
+      const val = trimmed.slice(idx + 1).trim().replace(/^["']|["']$/g, '');
+      vars[key] = val;
+    }
+    _envPathUsed = envPath;
+    return vars;
   }
-  return vars;
+  return {};
+}
+
+// On first run there is nowhere obvious to put the settings, so leave a
+// template in the per-user folder with the right shape and a comment.
+function ensureEnvTemplate() {
+  try {
+    const target = path.join(app.getPath('userData'), '.env');
+    if (fs.existsSync(target)) return target;
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target,
+      '# Taif School System — settings\n' +
+      '# Paste the DATABASE_URL from the Neon console between the quotes,\n' +
+      '# save this file, then start the program again.\n' +
+      'DATABASE_URL=\n' +
+      'JWT_SECRET=change-me-to-a-long-random-string\n' +
+      'PORT=3000\n');
+    return target;
+  } catch (_) { return null; }
 }
 
 // ── Start the Express server ──────────────────────────────────
@@ -124,8 +161,30 @@ app.whenReady().then(() => {
       setTimeout(() => { if (!splash.isDestroyed()) splash.close(); }, 600);
     } else {
       if (!splash.isDestroyed()) splash.close();
-      dialog.showErrorBox('Startup Error',
-        'Could not start the server.\n\nPlease check:\n• PostgreSQL service is running\n• Port 3000 is not already in use\n• Your .env file has the correct database credentials\n\nThen restart the application.');
+      // Say which problem it actually is. The commonest by far is that the
+      // program has no database settings: the .env cannot be packaged inside
+      // the app, so on a fresh install there is nothing to connect with.
+      const envVars = loadEnv();
+      if (!envVars.DATABASE_URL) {
+        const created = ensureEnvTemplate();
+        dialog.showErrorBox('Database settings missing',
+          'The program does not know which database to use, so the server could not start.\n\n' +
+          'A settings file has been prepared here:\n\n' +
+          (created || '(could not create it)') + '\n\n' +
+          'Open that file in Notepad, paste the DATABASE_URL from the Neon console after "DATABASE_URL=", ' +
+          'save it, and start the program again.\n\n' +
+          'It is the same database the website uses, so all the students, fees and classes will be there.');
+        try { shell.showItemInFolder(created); } catch (_) {}
+      } else {
+        dialog.showErrorBox('Startup Error',
+          'Could not start the server, but the database settings were found in:\n\n' +
+          (_envPathUsed || 'unknown') + '\n\n' +
+          'Please check:\n' +
+          '• the internet connection (the database is online)\n' +
+          '• that the DATABASE_URL in that file is still correct\n' +
+          '• that port 3000 is not already in use by another program\n\n' +
+          'Then start the program again.');
+      }
       app.quit();
     }
   });
