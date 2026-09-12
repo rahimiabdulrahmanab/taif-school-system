@@ -933,13 +933,29 @@ async function computeBalances({ periodYear, periodMonth, withLeavers } = {}) {
 
     // Per-month due overrides
     const dueMap = new Map();
+
+    // The earliest month that has money attached to it, per student. An old
+    // unpaid month the office recorded with "Set Due" — or a payment tagged
+    // to a month before the student's joining date — sits outside the normal
+    // walk, and would otherwise be shown on the statement but left out of
+    // what the family actually owes.
+    const earliestTouched = new Map();
+    const noteMonth = (sid, y, m) => {
+      if (!Number.isFinite(y) || !Number.isFinite(m)) return;
+      const at = earliestTouched.get(sid);
+      if (!at || y < at.y || (y === at.y && m < at.m)) earliestTouched.set(sid, { y, m });
+    };
+    paid.rows.forEach(p => noteMonth(p.student_id, +p.payment_year, +p.payment_month));
+
     try {
       const dm = await pool.query(
         `SELECT student_id, payment_year, payment_month, amount_due
            FROM student_month_due`);
-      dm.rows.forEach(r =>
+      dm.rows.forEach(r => {
         dueMap.set(`${r.student_id}-${r.payment_year}-${r.payment_month}`,
-                   parseFloat(r.amount_due) || 0));
+                   parseFloat(r.amount_due) || 0);
+        noteMonth(r.student_id, +r.payment_year, +r.payment_month);
+      });
     } catch (_) {}
 
     // Billing-start cutoff (same rule the statement uses)
@@ -961,7 +977,11 @@ async function computeBalances({ periodYear, periodMonth, withLeavers } = {}) {
     const out = students.rows.map(s => {
       const fee = effectiveFeeOf(s);
       const feeLine = feeLines.get(s.id);
-      const { startY, startM } = walkStart(s.enrolled_at);
+      let { startY, startM } = walkStart(s.enrolled_at);
+      const touched = earliestTouched.get(s.id);
+      if (touched && (touched.y < startY || (touched.y === startY && touched.m < startM))) {
+        startY = touched.y; startM = touched.m;
+      }
 
       // Running bank-account ledger: sum everything billed and everything
       // paid across all expected months, then net them. This way ANY
