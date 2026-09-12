@@ -608,6 +608,26 @@ router.get('/statement/:student_id', async (req, res) => {
         sy = es.year; sm = es.month;
       }
     }
+
+    // The account begins at the joining date, but that date is often the day
+    // the record was typed in rather than the day the child started school.
+    // ?from_year= opens the account further back so the office can put an old
+    // unpaid month where it belongs. Those months bill nothing on their own —
+    // they are before the billing cut-off — so reaching back changes no money
+    // until somebody sets a due on one.
+    const FLOOR = cur.year - 10;
+    const askedYear = parseInt(req.query.from_year, 10);
+    // Billing still starts at the joining month, whatever is being shown.
+    // Reaching back is a way of LOOKING at earlier months, never a way of
+    // charging for them — otherwise one click would have billed this student
+    // for the months before they joined, and the statement would then
+    // disagree with the outstanding figure on the fee list.
+    const joinY = sy, joinM = sm;
+    if (Number.isFinite(askedYear) && askedYear >= FLOOR && (askedYear < sy)) {
+      sy = askedYear; sm = 1;
+    }
+    const earliestAllowed = FLOOR;
+
     // Safety cap: 240 months (20 years)
     const span = (cur.year - sy) * 12 + (cur.month - sm);
     if (span > 240) { sy = cur.year; sm = cur.month - 239; while (sm <= 0) { sm += 12; sy -= 1; } }
@@ -673,14 +693,18 @@ router.get('/statement/:student_id', async (req, res) => {
       const ov  = dueByKey[k];
       const isHoliday = !ov && holidayMonths.has(m);
       const isFuture  = (y > cur.year) || (y === cur.year && m > cur.month);
+      const preJoin   = (y < joinY) || (y === joinY && m < joinM);
       const monthFee  = effectiveFeeAt(s, feeLine, y, m);
       const pays = payByKey[k] || [];
       const paid = +pays.reduce((t, p) => t + parseFloat(p.amount || 0), 0).toFixed(2);
       // A month ahead of today is billed only once somebody pays into it —
       // then it shows its own fee, so the receipt reads as a month settled in
-      // advance instead of the school owing the family money.
+      // advance instead of the school owing the family money. A month before
+      // the student joined is listed for history and bills nothing, unless
+      // the office deliberately sets a due on it.
       const due = ov ? parseFloat(ov.amount_due)
                 : isHoliday ? 0
+                : preJoin   ? 0
                 : isFuture  ? (paid > 0 ? monthFee : 0)
                 : (atOrAfterCutoff(y, m) ? monthFee : 0);
       const balance = +(due - paid).toFixed(2);
@@ -741,6 +765,9 @@ router.get('/statement/:student_id', async (req, res) => {
       effective_fee: fee,
       opening,
       years,
+      first_year:      sy,               // earliest year in this statement
+      earliest_year:   earliestAllowed,  // how far back it can be opened
+      can_go_earlier:  sy > earliestAllowed,
       grand_total_due:  +gd.toFixed(2),
       grand_total_paid: +gp.toFixed(2),
       grand_balance:    +(gd - gp).toFixed(2),

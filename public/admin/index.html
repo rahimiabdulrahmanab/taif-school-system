@@ -4731,6 +4731,7 @@ const LANG = {
     hint_staff_attendance:'"Scanned Days" is auto-counted from gate scans. Adjust "Present Days" if needed, then Save — payroll uses the saved value.',
     status_paid:'Paid', status_pending:'Pending', status_advance_taken:'Advance Taken',
     status_holiday:'Holiday', status_upcoming:'Not yet due',
+    btn_show_earlier_year:'Show an earlier year',
     hint_advance_month:'This month has not started. Taking the money now records it as paid in advance —',
     lbl_afn:'AFN',
     pr_holiday_title:'School Holiday — no salary for this month',
@@ -5213,6 +5214,7 @@ const LANG = {
     lbl_tax_hint:'دولتي مالیه', lbl_advances_detail:'د پیش معاش تفصیل',
     status_paid:'ورکړل شو', status_pending:'پاتې', status_advance_taken:'پیش معاش اخیستل شوی',
     status_holiday:'رخصتي', status_upcoming:'لا نه ده رارسېدلې',
+    btn_show_earlier_year:'پخوانی کال وښیه',
     hint_advance_month:'دا میاشت لا نه ده پیل شوې. اوس پیسې اخیستل يې مخکې تادیه شوې ثبتوي —',
     lbl_afn:'افغانۍ',
     pr_holiday_title:'د ښوونځي رخصتي — د دې میاشتې معاش نشته',
@@ -9774,10 +9776,27 @@ function _liftFeePanel() {
   _liftToBody('fee-overlay', 'fee-panel', 'confirm-modal', 'alert-modal');
 }
 
-async function openFeePanel(studentId) {
+// How far back this account has been opened. The statement normally begins at
+// the joining date, but for most students that is the day the record was
+// typed in — so the office can pull earlier years into view when a family
+// owes for a month from before then.
+let _feeFromYear = null;
+
+function feeShowEarlierYear() {
+  const d = feeStatementData;
+  if (!d) return;
+  _feeFromYear = (d.first_year || 0) - 1;
+  const sid = document.getElementById('fee-student-id').value;
+  openFeePanel(parseInt(sid));
+}
+
+async function openFeePanel(studentId, keepRange) {
   _liftFeePanel();
+  if (!keepRange && _feeStudentShown !== studentId) _feeFromYear = null;
+  _feeStudentShown = studentId;
   try {
-    const res = await fetch(`/api/fees/statement/${studentId}`);
+    const res = await fetch(`/api/fees/statement/${studentId}`
+      + (_feeFromYear ? `?from_year=${_feeFromYear}` : ''));
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to load statement');
     feeStatementData = data;
@@ -9873,7 +9892,15 @@ function renderFeeStatement() {
         </div>`:''}
       </div>`;
   }
-  if (!d.years.length) { host.innerHTML = openingHtml || `<div style="font-size:13px;color:var(--text-dim);padding:8px;">—</div>`; return; }
+  // Most students were entered into the system this year, so their account
+  // starts this year. This pulls an earlier year into view — those months are
+  // before the billing cut-off and charge nothing until a due is set on one.
+  const earlierBtn = d.can_go_earlier ? `
+    <button onclick="feeShowEarlierYear()" style="align-self:center;margin-top:2px;padding:8px 16px;background:var(--glass);border:1px dashed var(--glass-border);border-radius:20px;color:var(--text-mid);font-family:var(--font-head);font-size:12px;font-weight:700;cursor:pointer;">
+      <i class="fas fa-clock-rotate-left"></i> ${t('btn_show_earlier_year')||'Show an earlier year'} (${toPersianDigits((d.first_year||0)-1)})
+    </button>` : '';
+
+  if (!d.years.length) { host.innerHTML = (openingHtml || `<div style="font-size:13px;color:var(--text-dim);padding:8px;">—</div>`) + earlierBtn; return; }
 
   host.innerHTML = openingHtml + d.years.map(yr => {
     const open = !!_feeOpenYears[yr.year];
@@ -9940,10 +9967,11 @@ function renderFeeStatement() {
         </div>
         ${open?`<div style="padding:10px;display:flex;flex-direction:column;gap:8px;">${monthsHtml}</div>`:''}
       </div>`;
-  }).join('');
+  }).join('') + earlierBtn;
 }
 
 let _feeOpenMonth = null;
+let _feeStudentShown = null;
 function feeToggleYear(y) { _feeOpenYears[y] = !_feeOpenYears[y]; renderFeeStatement(); }
 function feeToggleMonth(key) { _feeOpenMonth = (_feeOpenMonth === key) ? null : key; renderFeeStatement(); }
 
