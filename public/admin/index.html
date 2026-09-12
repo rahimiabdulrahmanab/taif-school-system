@@ -3670,13 +3670,28 @@ button[style*="background:linear-gradient"]{
   <div style="font-size:11px;font-weight:800;color:#6a7c93;font-family:var(--font-head);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px;" data-i18n="wa_pick_who">2 · Who receives it</div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
     <select id="wa-bulk-target" onchange="waBulkTargetChanged()" style="padding:10px 13px;background:#f5f9fc;border:1px solid rgba(20,40,80,.10);border-radius:10px;font-size:13px;font-weight:700;color:#0f2845;outline:none;cursor:pointer;">
-      <option value="all">All parents</option>
-      <option value="absent">Parents of students absent today</option>
-      <option value="unpaid">Parents who still owe fees</option>
-      <option value="class">One class</option>
+      <option value="all" data-i18n="wa_target_all">All parents</option>
+      <option value="absent" data-i18n="wa_target_absent">Parents of students absent today</option>
+      <option value="unpaid" data-i18n="wa_target_unpaid">Parents who still owe fees</option>
+      <option value="class" data-i18n="wa_target_class">One class</option>
+      <option value="students" data-i18n="wa_target_students">Only the students I choose</option>
     </select>
     <select id="wa-bulk-class" onchange="waBulkPreview()" style="display:none;padding:10px 13px;background:#f5f9fc;border:1px solid rgba(20,40,80,.10);border-radius:10px;font-size:13px;font-weight:700;color:#0f2845;outline:none;cursor:pointer;min-width:150px;"></select>
     <span id="wa-bulk-count" style="font-size:12.5px;color:#6a7c93;font-weight:700;"></span>
+  </div>
+
+  <!-- A complaint is about one child. It is locked to this picker, so it can
+       never be sent to a whole class or to every family in the school. -->
+  <div id="wa-complaint-note" style="display:none;margin:-4px 0 10px;padding:9px 12px;background:#fff7ed;border:1px solid rgba(234,88,12,.25);border-radius:10px;font-size:12.5px;color:#9a3412;font-weight:700;">
+    <i class="fas fa-user-shield"></i> <span data-i18n="wa_complaint_locked">A complaint is about one child, so it goes only to the students you choose below.</span>
+  </div>
+
+  <div id="wa-bulk-students" style="display:none;margin:0 0 12px;padding:12px 14px;background:#f8fbff;border:1px solid rgba(20,40,80,.10);border-radius:12px;">
+    <input id="wa-stu-search" oninput="waStudentSearch()" data-ph="wa_stu_search_ph"
+           placeholder="Type a student's name or code…"
+           style="width:100%;box-sizing:border-box;padding:9px 12px;background:#fff;border:1px solid rgba(20,40,80,.12);border-radius:9px;font-family:var(--font-body);font-size:13px;outline:none;">
+    <div id="wa-stu-results" style="max-height:190px;overflow-y:auto;margin-top:8px;"></div>
+    <div id="wa-stu-picked" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div>
   </div>
 
   <div style="font-size:11px;font-weight:800;color:#6a7c93;font-family:var(--font-head);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px;" data-i18n="wa_check_message">3 · Check it, then send</div>
@@ -4612,6 +4627,13 @@ const LANG = {
     wa_bulk_confirm_msg:'Messages go out about two seconds apart from the school number. You can stop it at any time.',
     wa_parents_reached:'parents will receive this', wa_need_message:'Type the message first.',
     wa_no_classes:'No classes found', wa_pick_class:'Choose a class',
+    wa_target_all:'All parents', wa_target_absent:'Parents of students absent today',
+    wa_target_unpaid:'Parents who still owe fees', wa_target_class:'One class',
+    wa_target_students:'Only the students I choose',
+    wa_stu_search_ph:'Type a student’s name or code…',
+    wa_stu_none:'No student found', wa_stu_no_phone:'no phone number',
+    wa_stu_pick_first:'Choose at least one student first.',
+    wa_complaint_locked:'A complaint is about one child, so it goes only to the students you choose below.',
     wa_placeholders:'are replaced with each child’s own details',
     wa_sent:'sent', wa_failed:'failed', wa_stopped:'Stopped', btn_stop:'Stop',
     wa_big_send:'That is a large number of messages from one WhatsApp number in one go. Sending to a single class at a time is safer.',
@@ -5085,6 +5107,13 @@ const LANG = {
     wa_bulk_confirm_msg:'پیغامونه شاوخوا هرې دوه ثانیې وروسته لېږل کېږي. هر وخت يې ودرولی شئ.',
     wa_parents_reached:'والدین به يې ترلاسه کړي', wa_need_message:'لومړی پیغام ولیکئ.',
     wa_no_classes:'هیڅ ټولګی و نه موندل شو', wa_pick_class:'ټولګی وټاکئ',
+    wa_target_all:'ټول والدین', wa_target_absent:'د نن غیرحاضرو زده‌کوونکو والدین',
+    wa_target_unpaid:'هغه والدین چې فیس يې پاتې دی', wa_target_class:'یو ټولګی',
+    wa_target_students:'یوازې هغه زده‌کوونکي چې زه يې ټاکم',
+    wa_stu_search_ph:'د زده‌کوونکي نوم یا کوډ ولیکئ…',
+    wa_stu_none:'زده‌کوونکی و نه موندل شو', wa_stu_no_phone:'شمېره نلري',
+    wa_stu_pick_first:'لومړی لږ تر لږه یو زده‌کوونکی وټاکئ.',
+    wa_complaint_locked:'شکایت د یو زده‌کوونکي په اړه وي، نو یوازې هغو زده‌کوونکو ته ځي چې لاندې يې ټاکئ.',
     wa_placeholders:'د هر زده‌کوونکي په خپلو معلوماتو بدلېږي',
     wa_sent:'ولېږل شو', wa_failed:'ناکام', wa_stopped:'ودرېد', btn_stop:'ودروه',
     wa_big_send:'دا د یوې واټساپ شمېرې څخه ډېر پیغامونه دي. یو ټولګی په یو وار لېږل خوندي دي.',
@@ -10688,11 +10717,14 @@ function waUseTemplate(i) {
   if (box) box.value = tpl.template || '';
 
   // The message and the audience belong together: an absence alert goes to
-  // the absentees, a fee receipt to the families who owe.
+  // the absentees, a fee receipt to the families who owe, and a complaint or
+  // a notice to named students only — never to a class or to everyone.
   const target = document.getElementById('wa-bulk-target');
   if (target) {
     if (tpl.id === 'absence_alert') target.value = 'absent';
     else if (tpl.id === 'fee_receipt') target.value = 'unpaid';
+    else if (tpl.id === 'complaint') target.value = 'students';
+    waLockToStudents(tpl.id === 'complaint');
     waBulkTargetChanged();
   }
 }
@@ -10819,11 +10851,84 @@ async function waDisconnect() {
 function waBulkTarget() {
   const type = (document.getElementById('wa-bulk-target') || {}).value || 'all';
   const cls  = parseInt((document.getElementById('wa-bulk-class') || {}).value, 10);
-  return type === 'class' ? { type, class_id: Number.isFinite(cls) ? cls : null } : { type };
+  if (type === 'class')    return { type, class_id: Number.isFinite(cls) ? cls : null };
+  if (type === 'students') return { type, student_ids: Array.from(_waPicked.keys()) };
+  return { type };
+}
+
+// ── Naming the students by hand ───────────────────────────────
+// A complaint or a notice is about one child. There is no version of it that
+// should reach a whole class, so it is sent only to students picked here, by
+// name, one at a time.
+let _waPicked   = new Map();   // student id → the row we showed
+let _waStuFound = [];          // last search results, so onclick needs only an id
+let _waStuTimer = null;
+
+function waStudentSearch() {
+  clearTimeout(_waStuTimer);
+  _waStuTimer = setTimeout(waStudentSearchNow, 250);
+}
+
+async function waStudentSearchNow() {
+  const box = document.getElementById('wa-stu-results');
+  if (!box) return;
+  const q = ((document.getElementById('wa-stu-search') || {}).value || '').trim();
+  if (q.length < 2) { box.innerHTML = ''; return; }
+  try {
+    const r = await fetch('/api/students?search=' + encodeURIComponent(q));
+    const d = r.ok ? await r.json() : [];
+    _waStuFound = (Array.isArray(d) ? d : []).slice(0, 40);
+  } catch (_) { _waStuFound = []; }
+
+  box.innerHTML = _waStuFound.length ? _waStuFound.map(s => {
+    const name  = `${s.first_name || ''} ${s.last_name || ''}`.trim();
+    const phone = s.parent_phone || s.parent_phone2 || '';
+    const on    = _waPicked.has(s.id);
+    return `<div onclick="waPickStudent(${s.id})" style="display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;cursor:pointer;background:${on ? '#eaf7ef' : 'transparent'};">
+      <i class="fas ${on ? 'fa-check-square' : 'fa-square'}" style="color:${on ? '#16a34a' : '#c3ccd8'};font-size:13px;"></i>
+      <span style="font-size:13px;font-weight:700;color:#0f2845;">${waEsc(name)}</span>
+      <span style="font-size:11.5px;color:#6a7c93;">${waEsc(s.class_name || '')} · ${waEsc(s.student_code || '')}</span>
+      ${phone ? '' : `<span style="font-size:11px;color:#dc2626;font-weight:700;margin-${_lang === 'en' ? 'left' : 'right'}:auto;"><i class="fas fa-phone-slash"></i> ${waEsc(t('wa_stu_no_phone'))}</span>`}
+    </div>`;
+  }).join('') : `<div style="padding:8px 4px;font-size:12.5px;color:#94a3b8;">${waEsc(t('wa_stu_none'))}</div>`;
+}
+
+function waPickStudent(id) {
+  const s = _waStuFound.find(x => x.id === id);
+  if (!s) return;
+  if (_waPicked.has(id)) _waPicked.delete(id);
+  else _waPicked.set(id, s);
+  waStudentSearchNow();      // repaint the ticks
+  waRenderPicked();
+}
+
+function waRenderPicked() {
+  const host = document.getElementById('wa-stu-picked');
+  if (!host) return;
+  host.innerHTML = Array.from(_waPicked.values()).map(s => {
+    const name  = `${s.first_name || ''} ${s.last_name || ''}`.trim();
+    const phone = s.parent_phone || s.parent_phone2 || '';
+    return `<span style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;background:${phone ? '#eaf7ef' : '#fef2f2'};border:1px solid ${phone ? 'rgba(22,163,74,.25)' : 'rgba(220,38,38,.25)'};border-radius:20px;font-size:12px;font-weight:700;color:${phone ? '#166534' : '#991b1b'};">
+      ${waEsc(name)}
+      <i class="fas fa-times" onclick="waPickStudent(${s.id})" style="cursor:pointer;opacity:.6;"></i>
+    </span>`;
+  }).join('');
+  waBulkPreview();
+}
+
+// While a complaint is the chosen message, the other audiences are refused.
+function waLockToStudents(lock) {
+  const sel  = document.getElementById('wa-bulk-target');
+  const note = document.getElementById('wa-complaint-note');
+  if (sel) Array.from(sel.options).forEach(o => { o.disabled = lock && o.value !== 'students'; });
+  if (note) note.style.display = lock ? '' : 'none';
 }
 
 async function waBulkTargetChanged() {
-  const isClass = (document.getElementById('wa-bulk-target') || {}).value === 'class';
+  const value   = (document.getElementById('wa-bulk-target') || {}).value;
+  const isClass = value === 'class';
+  const stuBox  = document.getElementById('wa-bulk-students');
+  if (stuBox) stuBox.style.display = value === 'students' ? '' : 'none';
   const sel = document.getElementById('wa-bulk-class');
   if (sel) {
     sel.style.display = isClass ? '' : 'none';
@@ -10858,8 +10963,14 @@ async function waBulkPreview() {
       body: JSON.stringify({ target: waBulkTarget() }),
     });
     const d = await r.json();
+    // With named students, say plainly when one of them has no number — the
+    // office picked that child on purpose and should know the message to that
+    // family is not going out.
+    const picked  = waBulkTarget().type === 'students' ? _waPicked.size : 0;
+    const missing = picked && r.ok && d.count < picked ? picked - d.count : 0;
     out.textContent = r.ok
       ? `${d.count} ${t('wa_parents_reached') || 'parents will receive this'}`
+        + (missing ? ` · ${missing} ${t('wa_stu_no_phone')}` : '')
       : (d.error || '');
   } catch (_) { out.textContent = ''; }
 }
@@ -10869,6 +10980,10 @@ async function waBulkSend() {
   if (!message.trim()) {
     return showAlert({ title: t('alert_title_invalid') || 'Message needed',
                        message: t('wa_need_message') || 'Type the message first.', type: 'warning' });
+  }
+  if (waBulkTarget().type === 'students' && !_waPicked.size) {
+    return showAlert({ title: t('alert_title_invalid') || 'Nobody chosen',
+                       message: t('wa_stu_pick_first'), type: 'warning' });
   }
   const count = (document.getElementById('wa-bulk-count') || {}).textContent || '';
   showConfirm({

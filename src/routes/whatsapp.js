@@ -257,6 +257,14 @@ async function resolveRecipients(target, opts = {}) {
     if (!target.class_id) throw new Error('class_id is required for a class message');
     params.push(target.class_id);
     sql += ` AND s.class_id = $${params.length}`;
+  } else if (t === 'students') {
+    // Named students, chosen one by one. A complaint or a notice is about one
+    // child and must never go out to a whole class, let alone every family.
+    const ids = (Array.isArray(target.student_ids) ? target.student_ids : [])
+      .map(n => parseInt(n, 10)).filter(Number.isFinite);
+    if (!ids.length) throw new Error('Choose at least one student first.');
+    params.push(ids);
+    sql += ` AND s.id = ANY($${params.length}::int[])`;
   } else if (t === 'unpaid') {
     // Parents of students who still owe money. Who owes what is decided by
     // the fee ledger itself, not recalculated here, so a reminder can never
