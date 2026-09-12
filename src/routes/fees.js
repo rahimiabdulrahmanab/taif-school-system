@@ -41,12 +41,56 @@ const getNonBillableMonths = getHolidayMonths;
 // Gregorian YYYY-MM-DD, the only date shape this module accepts from a client.
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-// Compute the student's effective monthly fee (after discount).
+// A student's own discount. It follows the student, not the grade: when a
+// promotion raises the fee the discount simply comes off the larger figure.
+function applyDiscount(fee, s) {
+  let f = parseFloat(fee) || 0;
+  if (s.discount_type === 'fixed')   f = Math.max(0, f - parseFloat(s.discount_value || 0));
+  if (s.discount_type === 'percent') f = f * (1 - parseFloat(s.discount_value || 0) / 100);
+  return f;
+}
+
+// Compute the student's effective monthly fee (after discount), today.
 function effectiveFeeOf(s) {
-  let fee = parseFloat(s.monthly_fee) || 0;
-  if (s.discount_type === 'fixed')   fee = Math.max(0, fee - parseFloat(s.discount_value || 0));
-  if (s.discount_type === 'percent') fee = fee * (1 - parseFloat(s.discount_value || 0) / 100);
-  return fee;
+  return applyDiscount(s.monthly_fee, s);
+}
+
+// ── What the fee WAS in a given month ─────────────────────────
+// Moving up a grade changes the fee from that month onward. The months the
+// student has already been billed must keep the price they were billed at,
+// or last year's دریم months would silently re-price themselves at the
+// څلورم fee. student_fee_history stamps each change with its starting month;
+// this reads it back.
+async function loadFeeTimelines(studentIds) {
+  const map = new Map();
+  try {
+    const r = await pool.query(
+      `SELECT student_id, from_year, from_month, monthly_fee
+         FROM student_fee_history
+        WHERE ($1::int[] IS NULL OR student_id = ANY($1::int[]))
+        ORDER BY student_id, from_year, from_month`,
+      [studentIds && studentIds.length ? studentIds : null]);
+    r.rows.forEach(x => {
+      const arr = map.get(x.student_id) || [];
+      arr.push({ y: x.from_year, m: x.from_month, fee: parseFloat(x.monthly_fee) || 0 });
+      map.set(x.student_id, arr);
+    });
+  } catch (_) { /* not migrated yet → today's fee applies to every month */ }
+  return map;
+}
+
+function rawFeeAt(timeline, y, m, currentFee) {
+  if (!timeline || !timeline.length) return currentFee;
+  let fee = null;
+  for (const row of timeline) {              // oldest first
+    if (row.y < y || (row.y === y && row.m <= m)) fee = row.fee;
+    else break;
+  }
+  return fee == null ? currentFee : fee;
+}
+
+function effectiveFeeAt(s, timeline, y, m) {
+  return applyDiscount(rawFeeAt(timeline, y, m, parseFloat(s.monthly_fee) || 0), s);
 }
 
 // Convert enrolled_at (or today) → Shamsi (year, month) walk-start.
@@ -195,6 +239,7 @@ router.get('/student/:student_id', async (req, res) => {
     if (!student.rows.length) return res.status(404).json({ error: 'Student not found' });
     const s   = student.rows[0];
     const fee = effectiveFeeOf(s);
+    const feeLine = (await loadFeeTimelines([s.id])).get(s.id);
 
     const payments = await pool.query(
       `SELECT * FROM fee_payments WHERE student_id = $1 ORDER BY payment_date DESC`,
@@ -230,12 +275,13 @@ router.get('/student/:student_id', async (req, res) => {
       while (y < endY || (y === endY && m <= endM)) {
         const key = `${y}-${m}`;
         if (!carriedMonths.has(key) && !holidayMonths.has(m)) {
+          const monthFee = effectiveFeeAt(s, feeLine, y, m);
           const paid    = +(paidByMonth[key] || 0).toFixed(2);
-          const balance = Math.max(0, +(fee - paid).toFixed(2));
+          const balance = Math.max(0, +(monthFee - paid).toFixed(2));
           if (balance > 0) {
             outstanding.push({
               year: y, month: m,
-              amount:  fee,
+              amount:  monthFee,
               paid,
               balance,
               partial: paid > 0,
@@ -327,10 +373,14 @@ router.post('/', async (req, res) => {
       [student_id]
     );
     if (!stuRes.rows.length) return res.status(404).json({ error: 'Student not found' });
-    const fee = effectiveFeeOf(stuRes.rows[0]);
+    const stu     = stuRes.rows[0];
+    const feeLine = (await loadFeeTimelines([parseInt(student_id, 10)])).get(parseInt(student_id, 10));
+    // Each month is charged at the fee that applied in THAT month, so paying
+    // off a month from before a promotion costs what it cost back then.
+    const feeOfMonth = (mm) => effectiveFeeAt(stu, feeLine, mm.year, mm.month);
 
     const total       = parseFloat(amount);
-    const expected    = +(fee * monthsList.length).toFixed(2);
+    const expected    = +monthsList.reduce((t, mm) => t + feeOfMonth(mm), 0).toFixed(2);
     const excess      = +(total - expected).toFixed(2);
 
     const results = await withTx(async (c) => {
@@ -344,7 +394,7 @@ router.post('/', async (req, res) => {
                payment_month, payment_year, payment_method, notes, payment_date)
             VALUES ($1,$2,$2,$2,$3,$4,$5,$6,COALESCE($7::date, (NOW() AT TIME ZONE 'Asia/Kabul')::date))
             RETURNING *
-          `, [student_id, fee, m.month, m.year, payment_method || 'cash', notes || null, payDate]);
+          `, [student_id, feeOfMonth(m), m.month, m.year, payment_method || 'cash', notes || null, payDate]);
           out.push(r.rows[0]);
         }
         const d = await c.query(`
@@ -404,7 +454,10 @@ router.post('/carry-forward', async (req, res) => {
       [student_id]
     );
     if (!stuRes.rows.length) return res.status(404).json({ error: 'Student not found' });
-    const fee = effectiveFeeOf(stuRes.rows[0]);
+    // The month is carried forward at the price it carried at the time, not
+    // at whatever the student pays now after moving up a grade.
+    const cfLine = (await loadFeeTimelines([parseInt(student_id, 10)])).get(parseInt(student_id, 10));
+    const fee = effectiveFeeAt(stuRes.rows[0], cfLine, year, month);
 
     // What's still owed for that month — only that portion rolls into debt.
     const paidRow = await pool.query(`
@@ -470,9 +523,12 @@ router.post('/close-month', async (req, res) => {
 
     let closed = 0;
     let totalCarried = 0;
+    // Each student is closed at the fee that applied in the month being
+    // closed, which is not today's fee for anyone promoted since.
+    const closeLines = await loadFeeTimelines(students.rows.map(s => s.id));
 
     for (const s of students.rows) {
-      const fee = effectiveFeeOf(s);
+      const fee = effectiveFeeAt(s, closeLines.get(s.id), year, month);
       if (fee <= 0) continue;
 
       // Skip students who weren't expected to pay yet (enrolled after this month)
@@ -541,6 +597,7 @@ router.get('/statement/:student_id', async (req, res) => {
     if (!sres.rows.length) return res.status(404).json({ error: 'Student not found' });
     const s   = sres.rows[0];
     const fee = effectiveFeeOf(s);
+    const feeLine = (await loadFeeTimelines([s.id])).get(s.id);
 
     const cur = todayShamsi();
     let sy = cur.year, sm = cur.month;
@@ -599,21 +656,48 @@ router.get('/statement/:student_id', async (req, res) => {
     // statement keeps adding a month's fee for ever, and would disagree with
     // the Outstanding figure on the Graduates screen, which already stops.
     const { endY: stEndY, endM: stEndM } = walkEnd(s, cur.year, cur.month);
-    let y = stEndY, m = stEndM;
+
+    // The rest of this school year is shown as well, so the office can take a
+    // payment for a month that has not arrived yet — families often pay two or
+    // three months ahead. Those months are listed but not billed: their Due
+    // stays 0 until the month comes round, so an advance payment never makes
+    // the school's outstanding figure look wrong. A student who has left keeps
+    // their old cut-off; nothing is opened up beyond the month they left.
+    const stillHere = (stEndY === cur.year && stEndM === cur.month);
+    let lastY = stEndY, lastM = stEndM;
+    if (stillHere) { lastY = cur.year; lastM = 12; }
+
+    let y = lastY, m = lastM;
     while (y > sy || (y === sy && m >= sm)) {
       const k = `${y}-${m}`;
       const ov  = dueByKey[k];
       const isHoliday = !ov && holidayMonths.has(m);
-      const due = ov ? parseFloat(ov.amount_due)
-                     : (isHoliday ? 0 : (atOrAfterCutoff(y, m) ? fee : 0));
+      const isFuture  = (y > cur.year) || (y === cur.year && m > cur.month);
+      const monthFee  = effectiveFeeAt(s, feeLine, y, m);
       const pays = payByKey[k] || [];
       const paid = +pays.reduce((t, p) => t + parseFloat(p.amount || 0), 0).toFixed(2);
+      // A month ahead of today is billed only once somebody pays into it —
+      // then it shows its own fee, so the receipt reads as a month settled in
+      // advance instead of the school owing the family money.
+      const due = ov ? parseFloat(ov.amount_due)
+                : isHoliday ? 0
+                : isFuture  ? (paid > 0 ? monthFee : 0)
+                : (atOrAfterCutoff(y, m) ? monthFee : 0);
       const balance = +(due - paid).toFixed(2);
+
+      // A holiday month with no money in it is not a month of schooling, so it
+      // is left off the list entirely — the school year is the ten months that
+      // remain. One that was paid or given a due of its own still shows.
+      if (isHoliday && !paid && !ov) { m--; if (m < 1) { m = 12; y--; } continue; }
+
       (byYear[y] = byYear[y] || []).push({
         year: y, month: m, due, paid, balance,
         status: isHoliday ? 'holiday'
+              : (isFuture && paid <= 0) ? 'upcoming'
               : (paid <= 0 ? 'unpaid' : (balance > 0 ? 'partial' : 'paid')),
         holiday: isHoliday,
+        upcoming: isFuture,
+        month_fee: monthFee,          // what this month costs if it is billed
         due_overridden: !!ov,
         due_note: ov ? ov.notes : null,
         payments: pays,
@@ -843,9 +927,13 @@ async function computeBalances({ periodYear, periodMonth, withLeavers } = {}) {
     } catch (_) {}
     const atOrAfterCutoff = (yy, mm) => (yy > cutY) || (yy === cutY && mm >= cutM);
     const holidayMonths = await getNonBillableMonths();
+    // One query for the whole school: what each student's fee was in each
+    // month, so a promotion never re-prices months already billed.
+    const feeLines = await loadFeeTimelines(students.rows.map(s => s.id));
 
     const out = students.rows.map(s => {
       const fee = effectiveFeeOf(s);
+      const feeLine = feeLines.get(s.id);
       const { startY, startM } = walkStart(s.enrolled_at);
 
       // Running bank-account ledger: sum everything billed and everything
@@ -865,7 +953,8 @@ async function computeBalances({ periodYear, periodMonth, withLeavers } = {}) {
           // months bill nothing, and normal months bill the fee.
           const due = (ov !== undefined)
             ? ov
-            : (holidayMonths.has(m) ? 0 : (atOrAfterCutoff(y, m) ? fee : 0));
+            : (holidayMonths.has(m) ? 0
+               : (atOrAfterCutoff(y, m) ? effectiveFeeAt(s, feeLine, y, m) : 0));
           const pd  = paidMap.get(key) || 0;
           monthsDue  += due;
           monthsPaid += pd;

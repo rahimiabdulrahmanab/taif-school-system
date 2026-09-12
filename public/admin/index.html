@@ -4730,7 +4730,9 @@ const LANG = {
     th_scanned_days:'Scanned Days', th_present_days:'Present Days', th_absent_days:'Absent Days',
     hint_staff_attendance:'"Scanned Days" is auto-counted from gate scans. Adjust "Present Days" if needed, then Save — payroll uses the saved value.',
     status_paid:'Paid', status_pending:'Pending', status_advance_taken:'Advance Taken',
-    status_holiday:'Holiday',
+    status_holiday:'Holiday', status_upcoming:'Not yet due',
+    hint_advance_month:'This month has not started. Taking the money now records it as paid in advance —',
+    lbl_afn:'AFN',
     pr_holiday_title:'School Holiday — no salary for this month',
     pr_holiday_sub:'The school is closed, so no salary is earned. Only overtime actually worked during the break can be paid.',
     lbl_holiday_months:'Holiday Months — No Fee Charged',
@@ -5210,7 +5212,9 @@ const LANG = {
     hint_staff_attendance:'«سکن شوې ورځې» د دروازې له سکن څخه په اتومات ډول شمیرل کیږي. که اړتیا وي «د حاضرۍ ورځې» سم کړئ، بیا یې خوندي کړئ — معاش به همدا ارزښت وکاروي.',
     lbl_tax_hint:'دولتي مالیه', lbl_advances_detail:'د پیش معاش تفصیل',
     status_paid:'ورکړل شو', status_pending:'پاتې', status_advance_taken:'پیش معاش اخیستل شوی',
-    status_holiday:'رخصتي',
+    status_holiday:'رخصتي', status_upcoming:'لا نه ده رارسېدلې',
+    hint_advance_month:'دا میاشت لا نه ده پیل شوې. اوس پیسې اخیستل يې مخکې تادیه شوې ثبتوي —',
+    lbl_afn:'افغانۍ',
     pr_holiday_title:'د ښوونځي رخصتي — د دې میاشتې معاش نشته',
     pr_holiday_sub:'ښوونځی تړل شوی دی، نو معاش نه ترلاسه کیږي. یوازې هغه اضافه کاري چې په رخصتۍ کې شوې وي تادیه کیدی شي.',
     lbl_holiday_months:'د رخصتۍ میاشتې — فیس نه اخیستل کیږي',
@@ -9812,6 +9816,9 @@ async function openFeePanel(studentId) {
 
 function _statusPill(st) {
   if (st === 'holiday') return `<span style="font-size:9.5px;font-weight:800;padding:2px 9px;background:rgba(155,110,255,.15);color:#6e3fdb;border-radius:12px;">${t('status_holiday')||'Holiday'}</span>`;
+  // A month that has not arrived yet. Nothing is owed for it, but the office
+  // can still take the money now — families often pay a few months ahead.
+  if (st === 'upcoming') return `<span style="font-size:9.5px;font-weight:800;padding:2px 9px;background:rgba(90,140,220,.13);color:#2b5fa8;border-radius:12px;">${t('status_upcoming')||'Not yet due'}</span>`;
   if (st === 'paid')    return `<span style="font-size:9.5px;font-weight:800;padding:2px 9px;background:rgba(34,197,113,.15);color:#178f4f;border-radius:12px;">${t('status_paid')||'Paid'}</span>`;
   if (st === 'partial') return `<span style="font-size:9.5px;font-weight:800;padding:2px 9px;background:rgba(255,170,61,.15);color:#8b5a0e;border-radius:12px;">${t('status_partial')||'Partial'}</span>`;
   return `<span style="font-size:9.5px;font-weight:800;padding:2px 9px;background:rgba(220,79,76,.15);color:#dc4f4c;border-radius:12px;">${t('status_unpaid')||'Unpaid'}</span>`;
@@ -9898,6 +9905,9 @@ function renderFeeStatement() {
           </div>
           ${expanded?`
           <div style="padding:10px 12px;border-top:1px dashed var(--glass-border);">
+            ${mn.upcoming?`<div style="margin-bottom:8px;padding:7px 10px;background:rgba(90,140,220,.10);border-radius:8px;font-size:11.5px;color:#2b5fa8;font-weight:700;">
+              <i class="fas fa-hourglass-half"></i> ${t('hint_advance_month')||'This month has not started. Taking the money now records it as paid in advance.'} ${Math.round(mn.month_fee||0).toLocaleString()} ${t('lbl_afn')||'AFN'}
+            </div>`:''}
             <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
               <span style="font-size:10.5px;color:var(--text-dim);font-weight:700;text-transform:uppercase;">${t('lbl_due')||'Due'}</span>
               <input id="due-in-${key}" type="text" inputmode="numeric" value="${Math.round(mn.due)}" style="width:90px;padding:6px 8px;background:#fff;border:1px solid var(--glass-border);border-radius:6px;font-family:var(--font-mono);font-size:12px;font-weight:700;color:#0C1526;" oninput="this.value=toWesternDigits(this.value).replace(/[^0-9.]/g,'')">
@@ -9905,7 +9915,7 @@ function renderFeeStatement() {
             </div>
             ${payRows}
             <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed var(--glass-border);">
-              <input id="pay-amt-${key}" type="text" inputmode="numeric" placeholder="${t('lbl_amount_afn')||'Amount'}" value="${mn.balance>0?Math.round(mn.balance):''}" style="width:90px;padding:6px 8px;background:#fff;border:1px solid var(--glass-border);border-radius:6px;font-family:var(--font-mono);font-size:12px;font-weight:700;color:#0C1526;" oninput="this.value=toWesternDigits(this.value).replace(/[^0-9.]/g,'')">
+              <input id="pay-amt-${key}" type="text" inputmode="numeric" placeholder="${t('lbl_amount_afn')||'Amount'}" value="${mn.balance>0?Math.round(mn.balance):(mn.upcoming&&mn.paid<=0?Math.round(mn.month_fee||0):'')}" style="width:90px;padding:6px 8px;background:#fff;border:1px solid var(--glass-border);border-radius:6px;font-family:var(--font-mono);font-size:12px;font-weight:700;color:#0C1526;" oninput="this.value=toWesternDigits(this.value).replace(/[^0-9.]/g,'')">
               <select id="pay-mtd-${key}" style="padding:6px 8px;background:#fff;border:1px solid var(--glass-border);border-radius:6px;font-size:12px;color:#0C1526;">
                 <option value="cash">${t('opt_cash')||'Cash'}</option>
                 <option value="bank">${t('opt_bank')||'Bank'}</option>

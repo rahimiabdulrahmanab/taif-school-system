@@ -383,6 +383,8 @@ router.post('/graduate', async (req, res) => {
 // The grade ladder lives in src/grades.js so the Classes screen and the
 // promotion logic can never disagree about what "one grade up" means.
 const { GRADE_ORDER, gradeIndex, sameSection, normalize } = require('../grades.js');
+const { getBands, feeForGrade } = require('../fee-bands.js');
+const { todayShamsi } = require('../shamsi.js');
 
 router.post('/promote', async (req, res) => {
   try {
@@ -421,11 +423,17 @@ router.post('/promote', async (req, res) => {
     // undo restores.
     const studentsRes = await pool.query(
       `SELECT id, first_name, last_name, student_code, parent_name, class_id,
-              is_active, COALESCE(graduated, FALSE) AS graduated, graduated_at
+              is_active, COALESCE(graduated, FALSE) AS graduated, graduated_at,
+              monthly_fee
          FROM students
         WHERE is_active = TRUE
           AND ($1::int IS NULL OR class_id = $1::int)`,
       [scopeClassId ? parseInt(scopeClassId, 10) : null]);
+
+    // The fee a grade costs. Moving up a grade moves the fee with it — the
+    // whole point of the bands — while the student's own discount stays
+    // exactly as it is, coming off the new figure instead of the old one.
+    const feeBands = await getBands();
 
     const moves = {};          // "fromName→toName" → count
     const promoteUpdates = []; // { studentId, destId }
@@ -468,7 +476,8 @@ router.post('/promote', async (req, res) => {
       }
       promoteUpdates.push({ studentId: s.id, destId: dest.id, fromId: s.class_id,
                             wasActive: s.is_active, wasGraduated: s.graduated,
-                            wasGraduatedAt: s.graduated_at });
+                            wasGraduatedAt: s.graduated_at,
+                            destGrade: dest.grade_level, oldFee: s.monthly_fee });
       const k = `${cls.name}${cls.section ? ' ' + cls.section : ''} → ${dest.name}${dest.section ? ' ' + dest.section : ''}`;
       moves[k] = (moves[k] || 0) + 1;
     }
@@ -540,7 +549,8 @@ router.post('/promote', async (req, res) => {
         projected[t.id] = (projected[t.id] || 0) + 1;
         promoteUpdates.push({ studentId: s.id, destId: t.id, fromId: s.class_id,
                               wasActive: s.is_active, wasGraduated: s.graduated,
-                              wasGraduatedAt: s.graduated_at });
+                              wasGraduatedAt: s.graduated_at,
+                              destGrade: t.grade_level, oldFee: s.monthly_fee });
         const mk = o.cls.name + ' → ' + t.name;
         moves[mk] = (moves[mk] || 0) + 1;
       }
@@ -551,6 +561,26 @@ router.post('/promote', async (req, res) => {
     // transaction below.
     const createCount   = createPlans.reduce((n, p) => n + p.students.length, 0);
     const promotedCount = promoteUpdates.length + createCount;
+
+    // What this run does to fees, grouped, so the preview can say "45 students
+    // 600 → 700" before a single row is written.
+    const feeMoves = {};
+    const countFee = (destGrade, rawOldFee) => {
+      const newFee = feeForGrade(destGrade, feeBands);
+      const oldFee = parseFloat(rawOldFee);
+      if (newFee == null || !Number.isFinite(oldFee)) return;
+      if (oldFee === 0 || newFee === oldFee) return;
+      const k = oldFee + '>' + newFee;
+      feeMoves[k] = (feeMoves[k] || 0) + 1;
+    };
+    promoteUpdates.forEach(u => countFee(u.destGrade, u.oldFee));
+    createPlans.forEach(p => p.students.forEach(s => countFee(p.grade_level, s.monthly_fee)));
+    const feeChanges = Object.entries(feeMoves)
+      .map(([k, count]) => {
+        const [from, to] = k.split('>').map(Number);
+        return { from, to, count };
+      })
+      .sort((a, b) => (a.from - b.from) || (a.to - b.to));
 
     const missing = Object.entries(missingDest)
       .map(([label, count]) => ({ label, count }));
@@ -578,6 +608,7 @@ router.post('/promote', async (req, res) => {
         skipped_untracked: skippedUntracked,
         missing_destinations: missing,
         moves:         Object.entries(moves).map(([label, count]) => ({ label, count })),
+        fee_changes:   feeChanges,
         graduate_list: graduateRows,
       });
     }
@@ -601,7 +632,8 @@ router.post('/promote', async (req, res) => {
         for (const s of p.students) {
           promoteUpdates.push({ studentId: s.id, destId: newId, fromId: s.class_id,
                                 wasActive: s.is_active, wasGraduated: s.graduated,
-                                wasGraduatedAt: s.graduated_at });
+                                wasGraduatedAt: s.graduated_at,
+                                destGrade: p.grade_level, oldFee: s.monthly_fee });
         }
       }
 
@@ -613,21 +645,24 @@ router.post('/promote', async (req, res) => {
           ...graduateBefore.map(g => ({ ...g, action: 'graduate', toId: null })),
         ];
         if (rows.length) {
+          // was_monthly_fee is what the student was paying before this run.
+          // Undo puts the fee back with the class; without it, a class put
+          // back into دریم would keep being billed the څلورم price.
           await client.query(`
             INSERT INTO student_class_history
               (batch_id, student_id, action, from_class_id, to_class_id,
-               was_active, was_graduated, was_graduated_at, changed_by)
+               was_active, was_graduated, was_graduated_at, was_monthly_fee, changed_by)
             SELECT $1, x.student_id, x.action, x.from_class_id, x.to_class_id,
-                   x.was_active, x.was_graduated, x.was_graduated_at, $2
+                   x.was_active, x.was_graduated, x.was_graduated_at, x.was_monthly_fee, $2
               FROM UNNEST($3::int[], $4::text[], $5::int[], $6::int[],
-                          $7::bool[], $8::bool[], $9::date[])
+                          $7::bool[], $8::bool[], $9::date[], $10::numeric[])
                    AS x(student_id, action, from_class_id, to_class_id,
-                        was_active, was_graduated, was_graduated_at)`,
+                        was_active, was_graduated, was_graduated_at, was_monthly_fee)`,
             [batchId, (req.user && req.user.id) || null,
              rows.map(r => r.studentId), rows.map(r => r.action),
              rows.map(r => r.fromId ?? null), rows.map(r => r.toId ?? null),
              rows.map(r => r.wasActive ?? null), rows.map(r => r.wasGraduated ?? null),
-             rows.map(r => r.wasGraduatedAt ?? null)]);
+             rows.map(r => r.wasGraduatedAt ?? null), rows.map(r => r.oldFee ?? null)]);
         }
       }
 
@@ -635,6 +670,40 @@ router.post('/promote', async (req, res) => {
         await client.query('UPDATE students SET class_id = $1 WHERE id = $2',
           [u.destId, u.studentId]);
       }
+
+      // ── The fee moves up with the grade ──────────────────────
+      // Each change is stamped with the month it starts from, so the months
+      // the student has already been billed keep the price they were billed
+      // at. Students on 0 are left alone: a fee of nothing is a decision the
+      // school made about that child, not a figure waiting to be corrected.
+      const nowS = todayShamsi();
+      for (const u of promoteUpdates) {
+        const newFee = feeForGrade(u.destGrade, feeBands);
+        const oldFee = parseFloat(u.oldFee);
+        if (newFee == null || !Number.isFinite(oldFee)) continue;
+        if (oldFee === 0 || newFee === oldFee) continue;
+
+        // First change for this student: record what they were paying until
+        // now, otherwise every earlier month would silently re-price.
+        const has = await client.query(
+          'SELECT 1 FROM student_fee_history WHERE student_id = $1 LIMIT 1', [u.studentId]);
+        if (!has.rows.length) {
+          await client.query(
+            `INSERT INTO student_fee_history
+               (student_id, from_year, from_month, monthly_fee, reason)
+             VALUES ($1, 0, 1, $2, 'fee before the first promotion')`,
+            [u.studentId, oldFee]);
+        }
+        await client.query(
+          `INSERT INTO student_fee_history
+             (student_id, from_year, from_month, monthly_fee, reason, batch_id)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [u.studentId, nowS.year, nowS.month, newFee,
+           'promoted to ' + (u.destGrade || ''), batchId]);
+        await client.query('UPDATE students SET monthly_fee = $1 WHERE id = $2',
+          [newFee, u.studentId]);
+      }
+
       // Graduate the final grade (archive — kept in DB, off active lists)
       if (graduateIds.length) {
         await client.query(`
@@ -667,6 +736,7 @@ router.post('/promote', async (req, res) => {
       skipped_untracked: skippedUntracked,
       missing_destinations: missing,
       moves:          Object.entries(moves).map(([label, count]) => ({ label, count })),
+      fee_changes:    feeChanges,
       graduate_list:  graduateRows,
     });
   } catch (err) {
@@ -768,6 +838,29 @@ router.post('/promote/undo', async (req, res) => {
          AND ($2::int IS NULL OR h.from_class_id = $2::int)
          AND h.action = 'graduate' AND s.id = h.student_id`, [batchId, classId]);
 
+    // The fee went up with the grade, so it comes back down with it. The
+    // stamped history row for this run is removed as well, otherwise the
+    // ledger would keep pricing this month at the higher grade's fee.
+    let feeBack = { rowCount: 0 };
+    try {
+      feeBack = await client.query(`
+        UPDATE students s
+           SET monthly_fee = h.was_monthly_fee
+          FROM student_class_history h
+         WHERE h.batch_id = $1 AND h.undone_at IS NULL
+           AND ($2::int IS NULL OR h.from_class_id = $2::int)
+           AND h.was_monthly_fee IS NOT NULL
+           AND s.id = h.student_id
+           AND s.monthly_fee IS DISTINCT FROM h.was_monthly_fee`, [batchId, classId]);
+
+      await client.query(`
+        DELETE FROM student_fee_history f
+         USING student_class_history h
+         WHERE f.batch_id = $1 AND h.batch_id = $1 AND h.undone_at IS NULL
+           AND ($2::int IS NULL OR h.from_class_id = $2::int)
+           AND f.student_id = h.student_id`, [batchId, classId]);
+    } catch (_) { /* fee history not migrated yet — classes still go back */ }
+
     await client.query(
       `UPDATE student_class_history SET undone_at = NOW()
         WHERE batch_id = $1 AND undone_at IS NULL
@@ -781,6 +874,7 @@ router.post('/promote/undo', async (req, res) => {
       class_id:     classId,
       restored:     back.rowCount,
       ungraduated:  ungrad.rowCount,
+      fees_restored: feeBack.rowCount,
     });
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch (_) {}
