@@ -53,6 +53,10 @@
       {
         "from": "vendor/chrome-win64",
         "to": "chrome"
+      },
+      {
+        "from": ".env",
+        "to": "settings.env"
       }
     ]
   },

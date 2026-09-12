@@ -300,7 +300,11 @@ app.get('/', (req, res) => res.redirect('/login'));
 // exported `app` directly, so we must NOT call listen(). Locally / on Render
 // we start a normal HTTP server.
 if (!process.env.VERCEL) {
-  app.listen(PORT, () => {
+  // In the desktop program the server is for that one PC only. Binding it to
+  // localhost keeps Windows Firewall from asking the office for permission it
+  // may not have, and keeps the school's data off the local network.
+  const HOST = process.env.ELECTRON ? '127.0.0.1' : '0.0.0.0';
+  app.listen(PORT, HOST, () => {
     console.log('');
     console.log('╔══════════════════════════════════════════╗');
     console.log(`║  ${CONFIG.name.padEnd(40)} ║`);

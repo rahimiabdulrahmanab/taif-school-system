@@ -4611,6 +4611,7 @@ const LANG = {
     wa_bulk_send:'Send to all of them', wa_bulk_confirm:'Send to every parent in this group?',
     wa_bulk_confirm_msg:'Messages go out about two seconds apart from the school number. You can stop it at any time.',
     wa_parents_reached:'parents will receive this', wa_need_message:'Type the message first.',
+    wa_no_classes:'No classes found', wa_pick_class:'Choose a class',
     wa_placeholders:'are replaced with each child’s own details',
     wa_sent:'sent', wa_failed:'failed', wa_stopped:'Stopped', btn_stop:'Stop',
     wa_big_send:'That is a large number of messages from one WhatsApp number in one go. Sending to a single class at a time is safer.',
@@ -5083,6 +5084,7 @@ const LANG = {
     wa_bulk_send:'ټولو ته ولېږه', wa_bulk_confirm:'په دې ډله کې ټولو والدینو ته ولېږل شي؟',
     wa_bulk_confirm_msg:'پیغامونه شاوخوا هرې دوه ثانیې وروسته لېږل کېږي. هر وخت يې ودرولی شئ.',
     wa_parents_reached:'والدین به يې ترلاسه کړي', wa_need_message:'لومړی پیغام ولیکئ.',
+    wa_no_classes:'هیڅ ټولګی و نه موندل شو', wa_pick_class:'ټولګی وټاکئ',
     wa_placeholders:'د هر زده‌کوونکي په خپلو معلوماتو بدلېږي',
     wa_sent:'ولېږل شو', wa_failed:'ناکام', wa_stopped:'ودرېد', btn_stop:'ودروه',
     wa_big_send:'دا د یوې واټساپ شمېرې څخه ډېر پیغامونه دي. یو ټولګی په یو وار لېږل خوندي دي.',
@@ -10816,17 +10818,30 @@ async function waDisconnect() {
 
 function waBulkTarget() {
   const type = (document.getElementById('wa-bulk-target') || {}).value || 'all';
-  const cls  = (document.getElementById('wa-bulk-class') || {}).value;
-  return type === 'class' ? { type, class_id: parseInt(cls) } : { type };
+  const cls  = parseInt((document.getElementById('wa-bulk-class') || {}).value, 10);
+  return type === 'class' ? { type, class_id: Number.isFinite(cls) ? cls : null } : { type };
 }
 
-function waBulkTargetChanged() {
+async function waBulkTargetChanged() {
   const isClass = (document.getElementById('wa-bulk-target') || {}).value === 'class';
   const sel = document.getElementById('wa-bulk-class');
   if (sel) {
     sel.style.display = isClass ? '' : 'none';
+    // The class list is filled in by the Classes page, so anyone who opened
+    // WhatsApp without going there first found this box empty and the send
+    // refused with "class_id is required". Fetch the list here as well.
     if (isClass && !sel.options.length) {
-      sel.innerHTML = (allClasses || []).map(c => `<option value="${c.id}">${waEsc(c.name)}</option>`).join('');
+      let list = Array.isArray(allClasses) ? allClasses : [];
+      if (!list.length) {
+        try {
+          const r = await fetch('/api/classes');
+          const d = r.ok ? await r.json() : [];
+          if (Array.isArray(d)) { list = d; allClasses = d; }
+        } catch (_) {}
+      }
+      sel.innerHTML = list.length
+        ? list.map(c => `<option value="${c.id}">${waEsc(c.name)}</option>`).join('')
+        : `<option value="">${waEsc(t('wa_no_classes'))}</option>`;
     }
   }
   waBulkPreview();

@@ -2,12 +2,14 @@ const { app, BrowserWindow, shell, Menu, dialog } = require('electron');
 const path   = require('path');
 const { fork } = require('child_process');
 const http   = require('http');
+const net    = require('net');
 const fs     = require('fs');
 
 let mainWindow;
 let serverProcess;
 let serverOutput  = '';   // what the server printed, for the error dialog
 let serverLogPath = null; // and a copy on disk
+let PORT = 3000;          // 3000 unless something on the PC already has it
 
 // ── Load .env explicitly from project root ────────────────────
 // Where the settings file may live. Packaged, __dirname is inside
@@ -23,27 +25,42 @@ function envSearchPaths() {
   try { paths.push(path.join(app.getPath('userData'), '.env')); } catch (_) {}
   try { paths.push(path.join(path.dirname(app.getPath('exe')), '.env')); } catch (_) {}
   paths.push(path.join(__dirname, '..', '.env'));   // running from source
+  // Shipped with the installer, so a school PC works the moment it is
+  // installed — nobody in the office has to paste a connection string.
+  // It is last, so a .env we place by hand still wins over it.
+  try { paths.push(path.join(process.resourcesPath, 'settings.env')); } catch (_) {}
   return paths;
 }
 
+function parseEnvFile(envPath) {
+  const vars = {};
+  for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const idx = trimmed.indexOf('=');
+    if (idx < 0) continue;
+    vars[trimmed.slice(0, idx).trim()] =
+      trimmed.slice(idx + 1).trim().replace(/^["']|["']$/g, '');
+  }
+  return vars;
+}
+
+// Read every settings file, not just the first one that exists. An earlier
+// version of this program left behind a template with an empty DATABASE_URL,
+// and stopping at that file would have hidden the real settings shipped with
+// the installer. A key that is actually filled in wins; a blank one does not.
 function loadEnv() {
+  const vars = {};
   for (const envPath of envSearchPaths()) {
     if (!fs.existsSync(envPath)) continue;
-    const lines = fs.readFileSync(envPath, 'utf8').split('\n');
-    const vars  = {};
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
-      const idx = trimmed.indexOf('=');
-      if (idx < 0) continue;
-      const key = trimmed.slice(0, idx).trim();
-      const val = trimmed.slice(idx + 1).trim().replace(/^["']|["']$/g, '');
-      vars[key] = val;
+    let fileVars;
+    try { fileVars = parseEnvFile(envPath); } catch (_) { continue; }
+    for (const key of Object.keys(fileVars)) {
+      if (!vars[key] && fileVars[key]) vars[key] = fileVars[key];
     }
-    _envPathUsed = envPath;
-    return vars;
+    if (!_envPathUsed && fileVars.DATABASE_URL) _envPathUsed = envPath;
   }
-  return {};
+  return vars;
 }
 
 // On first run there is nowhere obvious to put the settings, so leave a
@@ -88,6 +105,7 @@ function startServer() {
       ...envVars,
       ELECTRON: 'true',
       NODE_ENV:  'production',
+      PORT: String(PORT),   // after envVars: the free port wins over the file
       WA_SESSION_DIR: path.join(dataDir, 'wa-session'),
       UPLOADS_DIR:    path.join(dataDir, 'uploads'),
     },
@@ -118,10 +136,33 @@ function startServer() {
     record('Server stopped: code=' + code + ' signal=' + signal + '\n'));
 }
 
+// ── Pick a port ───────────────────────────────────────────────
+// An office PC may already have something sitting on 3000 — another copy of
+// this program, a printer utility, a developer tool. "Port 3000 is in use" is
+// not something the school can act on, so take the next free port instead.
+function tryPort(port) {
+  return new Promise((resolve) => {
+    const probe = net.createServer();
+    probe.once('error', () => resolve(0));
+    probe.listen(port, '127.0.0.1', () => {
+      const got = probe.address().port;
+      probe.close(() => resolve(got));
+    });
+  });
+}
+
+async function choosePort() {
+  for (const p of [3000, 3001, 3002, 3003, 0]) {
+    const got = await tryPort(p);
+    if (got) return got;
+  }
+  return 3000;
+}
+
 // ── Poll until server responds ────────────────────────────────
 function waitForServer(callback, attempts = 0) {
   if (attempts > 60) { callback(false); return; }
-  http.get('http://localhost:3000/api/health', (res) => {
+  http.get('http://localhost:' + PORT + '/api/health', (res) => {
     if (res.statusCode === 200) { callback(true); }
     else { setTimeout(() => waitForServer(callback, attempts + 1), 800); }
   }).on('error', () => {
@@ -152,7 +193,7 @@ function createWindow() {
   });
 
   Menu.setApplicationMenu(null);
-  mainWindow.loadURL('http://localhost:3000/admin');
+  mainWindow.loadURL('http://localhost:' + PORT + '/admin');
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
     mainWindow.maximize();
@@ -176,12 +217,14 @@ function checkAlreadyRunning(callback) {
 }
 
 // ── Lifecycle ─────────────────────────────────────────────────
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   const splash = createSplash();
 
-  checkAlreadyRunning((alreadyUp) => {
-    if (!alreadyUp) startServer();
-  });
+  // If this program is already running, join it rather than starting a second
+  // server; otherwise take a port that is actually free.
+  const alreadyUp = await new Promise((res) => checkAlreadyRunning(res));
+  if (alreadyUp) PORT = 3000;
+  else { PORT = await choosePort(); startServer(); }
 
   waitForServer((ready) => {
     if (ready) {
@@ -210,7 +253,7 @@ app.whenReady().then(() => {
           'Please check:\n' +
           '• the internet connection (the database is online)\n' +
           '• that the DATABASE_URL in that file is still correct\n' +
-          '• that port 3000 is not already in use by another program\n\n' +
+          '• that no antivirus is blocking it\n\n' +
           (serverOutput ? 'What the server said:\n\n' + serverOutput.slice(-1200) + '\n\n' : '') +
           (serverLogPath ? 'Full log: ' + serverLogPath + '\n\n' : '') +
           'Then start the program again.');
