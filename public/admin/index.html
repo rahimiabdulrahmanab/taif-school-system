@@ -4732,6 +4732,7 @@ const LANG = {
     status_paid:'Paid', status_pending:'Pending', status_advance_taken:'Advance Taken',
     status_holiday:'Holiday', status_upcoming:'Not yet due',
     btn_show_earlier_year:'Show an earlier year',
+    btn_try_again:'Try again', msg_students_load_failed:'Could not load the students.',
     btn_promote_student:'Move up a grade', btn_undo_promote_student:'Put back to the previous class',
     btn_promote:'Promote', msg_promoted_ok:'moved up', msg_graduated_ok:'graduated',
     msg_put_back_ok:'put back to', lbl_monthly_fee:'Monthly fee',
@@ -5225,6 +5226,7 @@ const LANG = {
     status_paid:'ورکړل شو', status_pending:'پاتې', status_advance_taken:'پیش معاش اخیستل شوی',
     status_holiday:'رخصتي', status_upcoming:'لا نه ده رارسېدلې',
     btn_show_earlier_year:'پخوانی کال وښیه',
+    btn_try_again:'بیا هڅه وکړئ', msg_students_load_failed:'زده‌کوونکي و نه بارېدل.',
     btn_promote_student:'یو ټولګی پورته بوځه', btn_undo_promote_student:'پخواني ټولګي ته يې بیرته بوځه',
     btn_promote:'پورته بوتله', msg_promoted_ok:'پورته وتله', msg_graduated_ok:'فارغ شو',
     msg_put_back_ok:'بیرته ولېږدول شو', lbl_monthly_fee:'میاشتنی فیس',
@@ -6228,37 +6230,73 @@ window.go = function(id, el) {
   if (id === 'students') loadStudents();
 };
 
+// Never leave a false "No students yet" on screen while the request is in
+// flight. On a cold free-tier instance the first call can take the better
+// part of a minute, and an empty table with an "Add Student" button is the
+// worst possible thing to show a school that has a thousand of them.
+let _stuLoaded     = false;
+let _stuDuesLoaded = false;
+
+function stuNotice(icon, text, retry) {
+  const tb = document.getElementById('stu-tbody');
+  if (!tb) return;
+  tb.innerHTML = `<tr><td colspan="8"><div class="empty" style="padding:60px 20px;">
+    <i class="fas ${icon}"></i>
+    <p>${text}</p>
+    ${retry ? `<button onclick="loadStudents()" style="margin-top:14px;padding:9px 20px;background:var(--glass);border:1px solid var(--glass-border);border-radius:24px;color:var(--text-mid);font-family:var(--font-head);font-size:12px;font-weight:800;cursor:pointer;">
+      <i class="fas fa-rotate-right"></i> ${t('btn_try_again') || 'Try again'}</button>` : ''}
+  </div></td></tr>`;
+}
+
 async function loadStudents() {
+  _stuLoaded = false;
+  stuNotice('fa-spinner fa-spin', t('lbl_loading') || 'Loading…');
+  ['stu-stat-total', 'stu-stat-male', 'stu-stat-female', 'stu-stat-discounted']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '…'; });
+
   try {
-    // Balances come from the same running ledger the Fee Collection page
-    // uses, so the Due column here can never disagree with it.
-    const [stuRes, clsRes, balRes] = await Promise.all([
+    // The names come first and are rendered as soon as they arrive. The
+    // balances call is far heavier — it prices every student in the school —
+    // so it is deliberately NOT awaited here: waiting on the money query is
+    // what kept this page looking empty.
+    const [stuRes, clsRes] = await Promise.all([
       fetch('/api/students'),
       fetch('/api/classes'),
-      fetch('/api/fees/balances'),
     ]);
-    allStudents = await stuRes.json();
-    const classes = await clsRes.json();
-
-    studentDueMap = {};
-    if (balRes.ok) {
-      const balances = await balRes.json();
-      (Array.isArray(balances) ? balances : []).forEach(b => { studentDueMap[b.student_id] = b; });
-    }
+    if (!stuRes.ok) throw new Error('HTTP ' + stuRes.status);
+    const data = await stuRes.json();
+    allStudents = Array.isArray(data) ? data : [];
+    const classes = clsRes.ok ? await clsRes.json() : [];
 
     // Populate class filter + form select
     const cf  = document.getElementById('stu-class-filter');
     const sf  = document.getElementById('sf-class');
     cf.innerHTML  = `<option value="">${t('opt_all_classes')}</option>`;
     sf.innerHTML  = `<option value="">${t('lbl_no_class')}</option>`;
-    classes.forEach(c => {
+    (Array.isArray(classes) ? classes : []).forEach(c => {
       cf.innerHTML += `<option value="${c.id}">${c.name}</option>`;
       sf.innerHTML += `<option value="${c.id}">${c.name}</option>`;
     });
 
-    renderStudents(allStudents);
-  } catch(e) {
+    _stuLoaded = true;
+    filterStudents();
+
+    // The Due column fills itself in when the ledger answers. Until then it
+    // shows a dash rather than a confident 0 — nobody should read "owes
+    // nothing" off a column that has not loaded.
+    fetch('/api/fees/balances')
+      .then(r => (r && r.ok) ? r.json() : [])
+      .then(balances => {
+        studentDueMap = {};
+        (Array.isArray(balances) ? balances : []).forEach(b => { studentDueMap[b.student_id] = b; });
+        _stuDuesLoaded = true;
+        if (_stuLoaded) filterStudents();
+      })
+      .catch(() => { /* names are on screen; the Due column simply stays blank */ });
+  } catch (e) {
     console.error('Failed to load students:', e);
+    stuNotice('fa-triangle-exclamation',
+      (t('msg_students_load_failed') || 'Could not load the students.') + ' ' + e.message, true);
   }
 }
 
@@ -6287,6 +6325,12 @@ function renderStudents(list) {
   set('stu-stat-discounted', discCnt);
 
   const tb = document.getElementById('stu-tbody');
+  // "No students yet" is a statement about the school, not about the network.
+  // Only say it once the list has actually arrived.
+  if (!list.length && !_stuLoaded) {
+    stuNotice('fa-spinner fa-spin', t('lbl_loading') || 'Loading…');
+    return;
+  }
   if (!list.length) {
     tb.innerHTML = `<tr><td colspan="8"><div class="empty" style="padding:60px 20px;">
       <i class="fas fa-user-graduate"></i>
@@ -6326,7 +6370,9 @@ function renderStudents(list) {
     // Click opens the student's full account statement.
     const bal  = studentDueMap[s.id] || { total_balance: 0, unpaid_months: 0 };
     const owed = +bal.total_balance || 0;
-    const dueHtml = owed > 0
+    const dueHtml = !_stuDuesLoaded
+      ? `<span style="color:#94a3b8;font-size:12px;" title="${t('lbl_loading')||'Loading…'}">…</span>`
+      : owed > 0
       ? `<div onclick="openFeePanel(${s.id})" title="${t('lbl_account_statement')||'Account Statement'}" style="cursor:pointer;line-height:1.35;">
            <span style="font-family:var(--font-mono);font-size:12.5px;font-weight:800;color:#dc4f4c;">${Math.round(owed).toLocaleString()}</span>
            <span style="font-size:10px;color:#94a3b8;font-weight:600;">AFN</span>
