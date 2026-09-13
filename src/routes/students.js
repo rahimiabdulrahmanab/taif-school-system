@@ -151,6 +151,80 @@ router.get('/:id/promotion', async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════
+//  GET /api/students/:id/promote-options — where can this one go?
+//  The classes that make up the grade above, with the fee each of
+//  them carries, so the office chooses the destination rather than
+//  having the system assume the matching section exists.
+// ══════════════════════════════════════════════════════════════
+router.get('/:id/promote-options', async (req, res) => {
+  try {
+    const sres = await pool.query(`
+      SELECT s.id, s.first_name, s.last_name, s.monthly_fee, s.discount_type,
+             s.discount_value, s.class_id,
+             c.name AS class_name, c.grade_level, c.section
+        FROM students s LEFT JOIN classes c ON c.id = s.class_id
+       WHERE s.id = $1`, [req.params.id]);
+    if (!sres.rows.length) return res.status(404).json({ error: 'Student not found' });
+    const s = sres.rows[0];
+
+    const base = {
+      student: { id: s.id, name: `${s.first_name} ${s.last_name || ''}`.trim() },
+      current: { class_id: s.class_id, class_name: s.class_name || null,
+                 grade_level: s.grade_level || null,
+                 monthly_fee: parseFloat(s.monthly_fee) || 0,
+                 discount_type: s.discount_type, discount_value: parseFloat(s.discount_value) || 0 },
+      options: [], graduating: false, reason: null,
+    };
+
+    // Whether the fee will actually move depends on the migration being in.
+    let feeTracking = false;
+    try {
+      const chk = await pool.query(`
+        SELECT to_regclass('public.student_fee_history') IS NOT NULL AS have_table,
+               EXISTS (SELECT 1 FROM information_schema.columns
+                        WHERE table_schema = 'public' AND table_name = 'student_class_history'
+                          AND column_name = 'was_monthly_fee') AS have_column`);
+      feeTracking = chk.rows[0].have_table && chk.rows[0].have_column;
+    } catch (_) {}
+
+    const gi = gradeIndex(s.grade_level);
+    if (gi < 0) {
+      return res.json({ ...base, fee_tracking: feeTracking,
+                        reason: s.class_id ? 'no_grade' : 'no_class' });
+    }
+
+    if (gi === GRADE_ORDER.length - 1) {
+      return res.json({ ...base, graduating: true, fee_tracking: feeTracking });
+    }
+
+    const nextGrade = GRADE_ORDER[gi + 1];
+    const bands = await getBands();
+    const cls = await pool.query(`
+      SELECT c.id, c.name, c.section, c.grade_level,
+             COUNT(st.id) FILTER (WHERE st.is_active)::int AS students
+        FROM classes c LEFT JOIN students st ON st.class_id = c.id
+       GROUP BY c.id, c.name, c.section, c.grade_level`);
+
+    const options = cls.rows
+      .filter(c => gradeIndex(c.grade_level) === gi + 1)
+      .map(withGradeMeta)
+      .sort(compareClasses)
+      .map(c => ({
+        id: c.id, name: c.name, section: c.section, students: c.students,
+        fee: feeForGrade(c.grade_level, bands),
+        // The section they are already in is the obvious default; it is only
+        // a suggestion, and the office can pick any of the others.
+        same_section: sameSection(c.section, s.section),
+      }));
+
+    res.json({ ...base, next_grade: nextGrade, options, fee_tracking: feeTracking,
+               reason: options.length ? null : 'no_class_in_next_grade' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
 //  POST /api/students  — create student
 // ══════════════════════════════════════════════════════════════
 router.post('/', upload.single('photo'), async (req, res) => {
@@ -430,7 +504,8 @@ router.post('/graduate', async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 // The grade ladder lives in src/grades.js so the Classes screen and the
 // promotion logic can never disagree about what "one grade up" means.
-const { GRADE_ORDER, gradeIndex, sameSection, normalize } = require('../grades.js');
+const { GRADE_ORDER, gradeIndex, sameSection, normalize,
+        withGradeMeta, compareClasses } = require('../grades.js');
 const { getBands, feeForGrade } = require('../fee-bands.js');
 const { todayShamsi } = require('../shamsi.js');
 
@@ -456,6 +531,20 @@ router.post('/promote', async (req, res) => {
       ? parseInt(rawStudentId, 10) : null;
     if (rawStudentId != null && rawStudentId !== '' && !Number.isFinite(scopeStudentId)) {
       return res.status(400).json({ error: 'student_id must be a number' });
+    }
+
+    // Which class in the grade above. The office picks it, because the system
+    // cannot know which section a child should join when more than one exists
+    // — and for a section with no counterpart above, there is nothing to
+    // assume at all. Only meaningful for one student at a time.
+    const rawToClass = req.body?.to_class_id ?? null;
+    const toClassId = rawToClass != null && rawToClass !== ''
+      ? parseInt(rawToClass, 10) : null;
+    if (rawToClass != null && rawToClass !== '' && !Number.isFinite(toClassId)) {
+      return res.status(400).json({ error: 'to_class_id must be a number' });
+    }
+    if (toClassId != null && scopeStudentId == null) {
+      return res.status(400).json({ error: 'to_class_id can only be used for one student at a time' });
     }
 
     const classesRes = await pool.query(
@@ -525,6 +614,29 @@ router.post('/promote', async (req, res) => {
         continue;
       }
       const nextGrade = GRADE_ORDER[gi + 1];
+
+      // A destination chosen by hand wins over the matching-section rule, but
+      // only one rung up: "promote" has to keep meaning the grade above, not
+      // become a way of dropping a child anywhere in the school.
+      if (toClassId != null) {
+        const chosen = byId[toClassId];
+        if (!chosen) {
+          return res.status(400).json({ error: 'That class no longer exists. Refresh and choose again.' });
+        }
+        if (gradeIndex(chosen.grade_level) !== gi + 1) {
+          return res.status(400).json({
+            error: `${chosen.name} is not in ${nextGrade}, the grade above this student. Choose a class in ${nextGrade}.`,
+          });
+        }
+        promoteUpdates.push({ studentId: s.id, destId: chosen.id, fromId: s.class_id,
+                              wasActive: s.is_active, wasGraduated: s.graduated,
+                              wasGraduatedAt: s.graduated_at,
+                              destGrade: chosen.grade_level, oldFee: s.monthly_fee });
+        const kc = `${cls.name}${cls.section ? ' ' + cls.section : ''} → ${chosen.name}${chosen.section ? ' ' + chosen.section : ''}`;
+        moves[kc] = (moves[kc] || 0) + 1;
+        continue;
+      }
+
       const dest = findDest(nextGrade, cls.section);
       if (!dest) {
         // Orphaned class: this section has no counterpart in the grade above
