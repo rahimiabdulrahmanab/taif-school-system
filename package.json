@@ -1,6 +1,6 @@
 {
   "name": "taif-school-system",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Taif High School Management System",
   "main": "src/main.js",
   "scripts": {
