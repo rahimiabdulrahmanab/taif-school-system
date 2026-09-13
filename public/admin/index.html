@@ -4732,6 +4732,16 @@ const LANG = {
     status_paid:'Paid', status_pending:'Pending', status_advance_taken:'Advance Taken',
     status_holiday:'Holiday', status_upcoming:'Not yet due',
     btn_show_earlier_year:'Show an earlier year',
+    btn_promote_student:'Move up a grade', btn_undo_promote_student:'Put back to the previous class',
+    btn_promote:'Promote', msg_promoted_ok:'moved up', msg_graduated_ok:'graduated',
+    msg_put_back_ok:'put back to', lbl_monthly_fee:'Monthly fee',
+    msg_cannot_promote:'Cannot move this student up',
+    msg_no_destination_section:'The next grade has no matching section for this student. Create it first, or promote the whole class from the Classes screen, where a destination can be chosen.',
+    msg_class_has_no_grade:'This student’s class has no grade set, so the system does not know which grade comes next.',
+    confirm_graduate_student:'Graduate this student?',
+    msg_graduate_student:'This student is in the final grade, so moving up means graduating: they leave the active lists and are kept in Graduates.',
+    msg_nothing_to_undo_student:'This student has no promotion left to undo — they were never moved by the system, or it has already been put back.',
+    msg_undo_graduate:'They were graduated by that run and will be active again.',
     hint_advance_month:'This month has not started. Taking the money now records it as paid in advance —',
     lbl_afn:'AFN',
     pr_holiday_title:'School Holiday — no salary for this month',
@@ -5215,6 +5225,16 @@ const LANG = {
     status_paid:'ورکړل شو', status_pending:'پاتې', status_advance_taken:'پیش معاش اخیستل شوی',
     status_holiday:'رخصتي', status_upcoming:'لا نه ده رارسېدلې',
     btn_show_earlier_year:'پخوانی کال وښیه',
+    btn_promote_student:'یو ټولګی پورته بوځه', btn_undo_promote_student:'پخواني ټولګي ته يې بیرته بوځه',
+    btn_promote:'پورته بوتله', msg_promoted_ok:'پورته وتله', msg_graduated_ok:'فارغ شو',
+    msg_put_back_ok:'بیرته ولېږدول شو', lbl_monthly_fee:'میاشتنی فیس',
+    msg_cannot_promote:'دا زده‌کوونکی پورته نشي تلای',
+    msg_no_destination_section:'په راتلونکي ټولګي کې د دې زده‌کوونکي لپاره ورته څانګه نشته. لومړی يې جوړ کړئ، یا ټول ټولګی د ټولګیو له پاڼې څخه پورته بوځئ چیرې چې منزل ټاکل کیږي.',
+    msg_class_has_no_grade:'د دې زده‌کوونکي ټولګي ته درجه نه ده ټاکل شوې، نو سیسټم نه پوهیږي چې راتلونکی ټولګی کوم دی.',
+    confirm_graduate_student:'دا زده‌کوونکی فارغ کړئ؟',
+    msg_graduate_student:'دا زده‌کوونکی په وروستي ټولګي کې دی، نو پورته تلل يې فراغت دی: له فعالو لیستونو وځي او په فارغانو کې ساتل کیږي.',
+    msg_nothing_to_undo_student:'د دې زده‌کوونکي لپاره د بیرته ګرځولو وړ لېږد نشته — یا هېڅکله نه دی لېږدول شوی، یا دمخه بیرته ګرځول شوی.',
+    msg_undo_graduate:'هغه په دې لېږد کې فارغ شوی و او بیا به فعال شي.',
     hint_advance_month:'دا میاشت لا نه ده پیل شوې. اوس پیسې اخیستل يې مخکې تادیه شوې ثبتوي —',
     lbl_afn:'افغانۍ',
     pr_holiday_title:'د ښوونځي رخصتي — د دې میاشتې معاش نشته',
@@ -6330,6 +6350,8 @@ function renderStudents(list) {
       <td style="text-align:center;">
         <div style="display:inline-flex;gap:5px;justify-content:center;">
           <button onclick="openStudentForm(${s.id})" title="Edit" style="width:30px;height:30px;border-radius:8px;background:rgba(91,158,247,.10);border:1px solid rgba(91,158,247,.22);color:#3a7abf;cursor:pointer;font-size:12px;transition:transform .15s ease;" onmouseover="this.style.transform='scale(1.08)';this.style.background='rgba(91,158,247,.18)'" onmouseout="this.style.transform='scale(1)';this.style.background='rgba(91,158,247,.10)'"><i class="fas fa-edit"></i></button>
+          <button onclick="stuPromoteOne(${s.id})" title="${t('btn_promote_student')||'Move up a grade'}" style="width:30px;height:30px;border-radius:8px;background:rgba(20,140,110,.10);border:1px solid rgba(20,140,110,.22);color:#0d7055;cursor:pointer;font-size:12px;transition:transform .15s ease;" onmouseover="this.style.transform='scale(1.08)'" onmouseout="this.style.transform='scale(1)'"><i class="fas fa-arrow-up"></i></button>
+          ${s.can_undo_promotion ? `<button onclick="stuUndoPromoteOne(${s.id})" title="${t('btn_undo_promote_student')||'Put back to the previous class'}" style="width:30px;height:30px;border-radius:8px;background:rgba(255,170,61,.12);border:1px solid rgba(255,170,61,.30);color:#8b5a0e;cursor:pointer;font-size:12px;transition:transform .15s ease;" onmouseover="this.style.transform='scale(1.08)'" onmouseout="this.style.transform='scale(1)'"><i class="fas fa-rotate-left"></i></button>` : ''}
           <button type="button" class="qr-btn" data-qr-type="students" data-qr-id="${s.id}" title="QR Code" style="width:30px;height:30px;border-radius:8px;background:rgba(93,202,165,.10);border:1px solid rgba(93,202,165,.22);color:#178f4f;cursor:pointer;font-size:12px;position:relative;z-index:5;transition:transform .15s ease;" onmouseover="this.style.transform='scale(1.08)';this.style.background='rgba(93,202,165,.18)'" onmouseout="this.style.transform='scale(1)';this.style.background='rgba(93,202,165,.10)'"><i class="fas fa-qrcode"></i></button>
           <button onclick="deleteStudent(${s.id},this)" data-name="${s.first_name} ${s.last_name}" title="Delete" style="width:30px;height:30px;border-radius:8px;background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.20);color:#dc2626;cursor:pointer;font-size:12px;transition:transform .15s ease;" onmouseover="this.style.transform='scale(1.08)';this.style.background='rgba(220,38,38,.16)'" onmouseout="this.style.transform='scale(1)';this.style.background='rgba(220,38,38,.08)'"><i class="fas fa-trash"></i></button>
         </div>
@@ -6534,6 +6556,130 @@ async function deleteStudent(id, btnOrName) {
         showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' });
       }
     }
+  });
+}
+
+// ── One student up a grade, or back ───────────────────────────
+// Promotion normally moves whole classes, but a child who repeated a year, or
+// one carried up by mistake, has to be dealt with on their own. These use the
+// same endpoint, the same audit trail and the same undo as a class run — only
+// the scope is one student, so nobody else in their class is touched.
+function _stuName(id) {
+  const s = (allStudents || []).find(x => x.id === id);
+  return s ? `${s.first_name} ${s.last_name || ''}`.trim() : '';
+}
+
+async function stuPromoteOne(id) {
+  const name = _stuName(id);
+  let plan;
+  try {
+    const r = await fetch('/api/students/promote?dry_run=1', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dry_run: true, student_id: id }),
+    });
+    plan = await r.json();
+    if (!r.ok) throw new Error(plan.error || 'Could not work out the promotion');
+  } catch (e) {
+    return showAlert({ title: t('alert_title_error') || 'Error', message: e.message, type: 'error' });
+  }
+
+  // Nothing to do — say which of the two reasons it is, because they need
+  // different fixes.
+  if (!plan.promoted && !plan.graduated) {
+    const missing = (plan.missing_destinations || []).map(x => x.label || x).join(', ');
+    return showAlert({
+      title:   t('msg_cannot_promote') || 'Cannot move this student up',
+      message: missing
+        ? (t('msg_no_destination_section') || 'The next grade has no matching section for this student. Create it first, or promote the whole class from the Classes screen, where a destination can be chosen.') + '\n\n' + missing
+        : (t('msg_class_has_no_grade') || 'This student’s class has no grade set, so the system does not know which grade comes next.'),
+      type: 'warning',
+    });
+  }
+
+  const move = (plan.moves && plan.moves[0]) ? plan.moves[0].label : '';
+  const feeLine = (plan.fee_changes || [])
+    .map(f => `${Math.round(f.from).toLocaleString()} → ${Math.round(f.to).toLocaleString()} ${t('lbl_afn') || 'AFN'}`)
+    .join(', ');
+
+  const graduating = !!plan.graduated;
+  showConfirm({
+    title: graduating
+      ? (t('confirm_graduate_student') || 'Graduate this student?')
+      : (t('btn_promote_student') || 'Move up a grade'),
+    message: (name ? name + ' — ' : '')
+      + (graduating
+          ? (t('msg_graduate_student') || 'This student is in the final grade, so moving up means graduating: they leave the active lists and are kept in Graduates.')
+          : move)
+      + (feeLine ? '\n\n' + (t('lbl_monthly_fee') || 'Monthly fee') + ': ' + feeLine : ''),
+    confirmText: graduating ? (t('btn_graduate') || 'Graduate') : (t('btn_promote') || 'Promote'),
+    type: graduating ? 'warning' : 'success',
+    onConfirm: async () => {
+      try {
+        const r = await fetch('/api/students/promote', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ student_id: id }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Promotion failed');
+        await loadStudents();
+        showAlert({
+          title: t('alert_title_saved') || 'Done',
+          message: (name ? name + ' — ' : '') + (d.graduated ? (t('msg_graduated_ok') || 'graduated') : (move || (t('msg_promoted_ok') || 'moved up'))),
+          type: 'success',
+        });
+      } catch (e) {
+        showAlert({ title: t('alert_title_error') || 'Error', message: e.message, type: 'error' });
+      }
+    },
+  });
+}
+
+async function stuUndoPromoteOne(id) {
+  const name = _stuName(id);
+  let info;
+  try {
+    info = await fetch('/api/students/' + id + '/promotion').then(r => r.json());
+  } catch (_) { info = { can_undo: false }; }
+
+  if (!info.can_undo) {
+    return showAlert({
+      title:   t('btn_undo_promote_student') || 'Put back',
+      message: t('msg_nothing_to_undo_student') || 'This student has no promotion left to undo — they were never moved by the system, or it has already been put back.',
+      type:    'warning',
+    });
+  }
+
+  const last = info.last || {};
+  const feeBack = last.was_monthly_fee != null
+    ? '\n\n' + (t('lbl_monthly_fee') || 'Monthly fee') + ': ' + Math.round(last.was_monthly_fee).toLocaleString() + ' ' + (t('lbl_afn') || 'AFN')
+    : '';
+
+  showConfirm({
+    title:   t('btn_undo_promote_student') || 'Put back to the previous class',
+    message: (name ? name + ' — ' : '')
+      + (last.to_class || '?') + ' → ' + (last.from_class || '?')
+      + (last.action === 'graduate' ? '\n' + (t('msg_undo_graduate') || 'They were graduated by that run and will be active again.') : '')
+      + feeBack,
+    confirmText: t('btn_undo') || 'Put back',
+    type: 'warning',
+    onConfirm: async () => {
+      try {
+        const r = await fetch('/api/students/promote/undo', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ student_id: id }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Undo failed');
+        await loadStudents();
+        showAlert({
+          title:   t('alert_title_saved') || 'Done',
+          message: (name ? name + ' — ' : '') + (t('msg_put_back_ok') || 'put back') + ' ' + (last.from_class || ''),
+          type:    'success',
+        });
+      } catch (e) {
+        showAlert({ title: t('alert_title_error') || 'Error', message: e.message, type: 'error' });
+      }
+    },
   });
 }
 

@@ -50,8 +50,13 @@ async function nextStudentCode() {
 router.get('/', async (req, res) => {
   try {
     const { search, class_id, active } = req.query;
+    // can_undo_promotion tells the list whether THIS student was moved up by a
+    // promotion that has not been put back — that is what decides whether the
+    // Undo button on their row means anything.
     let query = `
-      SELECT s.*, c.name as class_name
+      SELECT s.*, c.name as class_name,
+             EXISTS (SELECT 1 FROM student_class_history h
+                      WHERE h.student_id = s.id AND h.undone_at IS NULL) AS can_undo_promotion
       FROM students s
       LEFT JOIN classes c ON c.id = s.class_id
       WHERE 1=1
@@ -74,7 +79,18 @@ router.get('/', async (req, res) => {
     }
     query += ` ORDER BY s.first_name, s.last_name`;
 
-    const result = await pool.query(query, params);
+    let result;
+    try {
+      result = await pool.query(query, params);
+    } catch (e) {
+      // A database without the promotion-history table is still a working
+      // school database; the student list must not fail because of it.
+      if (!/student_class_history/.test(e.message)) throw e;
+      result = await pool.query(
+        query.replace(/EXISTS \(SELECT 1 FROM student_class_history[\s\S]*?\) AS can_undo_promotion/,
+                      'FALSE AS can_undo_promotion'),
+        params);
+    }
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -98,6 +114,38 @@ router.get('/:id', async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  GET /api/students/:id/promotion — this student's last move
+//  What the Undo button on their row would actually put back:
+//  which class they came from, when, and what they paid then.
+// ══════════════════════════════════════════════════════════════
+router.get('/:id/promotion', async (req, res) => {
+  const sql = (feeCol) => `
+      SELECT h.batch_id, h.action, h.changed_at, ${feeCol} AS was_monthly_fee,
+             f.name AS from_class, t.name AS to_class
+        FROM student_class_history h
+        LEFT JOIN classes f ON f.id = h.from_class_id
+        LEFT JOIN classes t ON t.id = h.to_class_id
+       WHERE h.student_id = $1 AND h.undone_at IS NULL
+       ORDER BY h.changed_at DESC
+       LIMIT 1`;
+  try {
+    let r;
+    try {
+      r = await pool.query(sql('h.was_monthly_fee'), [req.params.id]);
+    } catch (e) {
+      // The fee column arrives with migration_fee_by_grade.sql. Until then the
+      // move itself can still be shown and undone; only the old fee is unknown.
+      if (!/was_monthly_fee/.test(e.message)) throw e;
+      r = await pool.query(sql('NULL::numeric'), [req.params.id]);
+    }
+    res.json({ can_undo: r.rows.length > 0, last: r.rows[0] || null });
+  } catch (err) {
+    if (/student_class_history/.test(err.message)) return res.json({ can_undo: false, last: null });
     res.status(500).json({ error: err.message });
   }
 });
@@ -399,6 +447,17 @@ router.post('/promote', async (req, res) => {
     // it goes. Everything else (preview, audit trail, undo) is identical.
     const scopeClassId = req.body?.class_id ?? req.query.class_id ?? null;
 
+    // One student at a time. A child who repeated a year, or one the office
+    // held back by mistake, is moved on their own — the rest of the class is
+    // not touched. Everything else about the run is identical: same preview,
+    // same audit trail, same undo.
+    const rawStudentId = req.body?.student_id ?? req.query.student_id ?? null;
+    const scopeStudentId = rawStudentId != null && rawStudentId !== ''
+      ? parseInt(rawStudentId, 10) : null;
+    if (rawStudentId != null && rawStudentId !== '' && !Number.isFinite(scopeStudentId)) {
+      return res.status(400).json({ error: 'student_id must be a number' });
+    }
+
     const classesRes = await pool.query(
       'SELECT id, name, grade_level, section FROM classes');
     const classes = classesRes.rows;
@@ -427,8 +486,9 @@ router.post('/promote', async (req, res) => {
               monthly_fee
          FROM students
         WHERE is_active = TRUE
-          AND ($1::int IS NULL OR class_id = $1::int)`,
-      [scopeClassId ? parseInt(scopeClassId, 10) : null]);
+          AND ($1::int IS NULL OR class_id = $1::int)
+          AND ($2::int IS NULL OR id = $2::int)`,
+      [scopeClassId ? parseInt(scopeClassId, 10) : null, scopeStudentId]);
 
     // The fee a grade costs. Moving up a grade moves the fee with it — the
     // whole point of the bands — while the student's own discount stays
@@ -591,6 +651,22 @@ router.post('/promote', async (req, res) => {
     const undoable = (await pool.query(
       `SELECT to_regclass('public.student_class_history') AS t`)).rows[0].t !== null;
 
+    // Is fee-by-grade available in THIS database? Asked here, outside the
+    // transaction, on purpose: a missing table or column discovered inside it
+    // aborts the whole transaction in PostgreSQL, so a school that has not run
+    // migration_fee_by_grade.sql yet would find that promotion itself stopped
+    // working. Without it the students still move; only the fee stays put.
+    let feeTracking = false;
+    try {
+      const chk = await pool.query(`
+        SELECT to_regclass('public.student_fee_history') IS NOT NULL AS have_table,
+               EXISTS (SELECT 1 FROM information_schema.columns
+                        WHERE table_schema = 'public'
+                          AND table_name   = 'student_class_history'
+                          AND column_name  = 'was_monthly_fee') AS have_column`);
+      feeTracking = chk.rows[0].have_table && chk.rows[0].have_column;
+    } catch (_) { feeTracking = false; }
+
     // ── DRY RUN ───────────────────────────────────────────────────
     // Preview only: report exactly what WOULD happen and change nothing.
     // The admin screen calls this first so the plan can be confirmed.
@@ -600,6 +676,7 @@ router.post('/promote', async (req, res) => {
         dry_run:   true,
         applied:   false,
         scope_class_id: scopeClassId ? parseInt(scopeClassId, 10) : null,
+        scope_student_id: scopeStudentId,
         undoable,
         needs_decision: needsDecision,
         promoted:  promotedCount,
@@ -608,7 +685,8 @@ router.post('/promote', async (req, res) => {
         skipped_untracked: skippedUntracked,
         missing_destinations: missing,
         moves:         Object.entries(moves).map(([label, count]) => ({ label, count })),
-        fee_changes:   feeChanges,
+        fee_changes:   feeTracking ? feeChanges : [],
+        fee_tracking:  feeTracking,
         graduate_list: graduateRows,
       });
     }
@@ -647,13 +725,17 @@ router.post('/promote', async (req, res) => {
         if (rows.length) {
           // was_monthly_fee is what the student was paying before this run.
           // Undo puts the fee back with the class; without it, a class put
-          // back into دریم would keep being billed the څلورم price.
+          // back into دریم would keep being billed the څلورم price. The
+          // column arrives with the fee migration, so the older shape is kept
+          // for a database that has not had it yet.
           await client.query(`
             INSERT INTO student_class_history
               (batch_id, student_id, action, from_class_id, to_class_id,
-               was_active, was_graduated, was_graduated_at, was_monthly_fee, changed_by)
+               was_active, was_graduated, was_graduated_at, changed_by
+               ${feeTracking ? ', was_monthly_fee' : ''})
             SELECT $1, x.student_id, x.action, x.from_class_id, x.to_class_id,
-                   x.was_active, x.was_graduated, x.was_graduated_at, x.was_monthly_fee, $2
+                   x.was_active, x.was_graduated, x.was_graduated_at, $2
+                   ${feeTracking ? ', x.was_monthly_fee' : ''}
               FROM UNNEST($3::int[], $4::text[], $5::int[], $6::int[],
                           $7::bool[], $8::bool[], $9::date[], $10::numeric[])
                    AS x(student_id, action, from_class_id, to_class_id,
@@ -677,7 +759,7 @@ router.post('/promote', async (req, res) => {
       // at. Students on 0 are left alone: a fee of nothing is a decision the
       // school made about that child, not a figure waiting to be corrected.
       const nowS = todayShamsi();
-      for (const u of promoteUpdates) {
+      for (const u of feeTracking ? promoteUpdates : []) {
         const newFee = feeForGrade(u.destGrade, feeBands);
         const oldFee = parseFloat(u.oldFee);
         if (newFee == null || !Number.isFinite(oldFee)) continue;
@@ -728,6 +810,7 @@ router.post('/promote', async (req, res) => {
       success:         true,
       applied:         true,
       scope_class_id:  scopeClassId ? parseInt(scopeClassId, 10) : null,
+      scope_student_id: scopeStudentId,
       batch_id:        undoable ? batchId : null,
       undoable,
       promoted:        promoteUpdates.length,
@@ -736,7 +819,8 @@ router.post('/promote', async (req, res) => {
       skipped_untracked: skippedUntracked,
       missing_destinations: missing,
       moves:          Object.entries(moves).map(([label, count]) => ({ label, count })),
-      fee_changes:    feeChanges,
+      fee_changes:    feeTracking ? feeChanges : [],
+      fee_tracking:   feeTracking,
       graduate_list:  graduateRows,
     });
   } catch (err) {
@@ -794,6 +878,10 @@ router.post('/promote/undo', async (req, res) => {
     const wanted  = req.body && req.body.batch_id ? String(req.body.batch_id) : null;
     const classId = req.body && req.body.class_id != null && req.body.class_id !== ''
       ? parseInt(req.body.class_id, 10) : null;
+    // One student put back on their own, leaving the rest of their class where
+    // the promotion left them.
+    const studentId = req.body && req.body.student_id != null && req.body.student_id !== ''
+      ? parseInt(req.body.student_id, 10) : null;
 
     // Newest run that still has un-undone rows matching the scope.
     const pick = await client.query(
@@ -801,12 +889,15 @@ router.post('/promote/undo', async (req, res) => {
         WHERE undone_at IS NULL
           AND ($1::text IS NULL OR batch_id      = $1::text)
           AND ($2::int  IS NULL OR from_class_id = $2::int)
+          AND ($3::int  IS NULL OR student_id    = $3::int)
         ORDER BY changed_at DESC LIMIT 1`,
-      [wanted, classId]);
+      [wanted, classId, studentId]);
 
     if (!pick.rows.length) {
       return res.status(404).json({
-        error: classId
+        error: studentId
+          ? 'This student has no promotion left to undo — they were never promoted by the system, or it has already been put back.'
+          : classId
           ? 'This class has no promotion left to undo — it was never promoted, or it has already been put back.'
           : wanted
             ? 'That promotion run was not found, or it has already been undone.'
@@ -824,7 +915,8 @@ router.post('/promote/undo', async (req, res) => {
         FROM student_class_history h
        WHERE h.batch_id = $1 AND h.undone_at IS NULL
          AND ($2::int IS NULL OR h.from_class_id = $2::int)
-         AND h.action = 'promote' AND s.id = h.student_id`, [batchId, classId]);
+         AND ($3::int IS NULL OR h.student_id = $3::int)
+         AND h.action = 'promote' AND s.id = h.student_id`, [batchId, classId, studentId]);
 
     // Students the run archived as graduates → fully restored
     const ungrad = await client.query(`
@@ -836,35 +928,56 @@ router.post('/promote/undo', async (req, res) => {
         FROM student_class_history h
        WHERE h.batch_id = $1 AND h.undone_at IS NULL
          AND ($2::int IS NULL OR h.from_class_id = $2::int)
-         AND h.action = 'graduate' AND s.id = h.student_id`, [batchId, classId]);
+         AND ($3::int IS NULL OR h.student_id = $3::int)
+         AND h.action = 'graduate' AND s.id = h.student_id`, [batchId, classId, studentId]);
 
     // The fee went up with the grade, so it comes back down with it. The
     // stamped history row for this run is removed as well, otherwise the
     // ledger would keep pricing this month at the higher grade's fee.
+    //
+    // Whether that is possible is decided BEFORE the statements run: in
+    // PostgreSQL a missing column found inside a transaction aborts the whole
+    // transaction, so on a database without the fee migration this once took
+    // the undo down with it — and putting a class back is exactly what the
+    // school cannot afford to have fail.
     let feeBack = { rowCount: 0 };
+    let feeTracking = false;
     try {
+      const chk = await client.query(`
+        SELECT to_regclass('public.student_fee_history') IS NOT NULL AS have_table,
+               EXISTS (SELECT 1 FROM information_schema.columns
+                        WHERE table_schema = 'public'
+                          AND table_name   = 'student_class_history'
+                          AND column_name  = 'was_monthly_fee') AS have_column`);
+      feeTracking = chk.rows[0].have_table && chk.rows[0].have_column;
+    } catch (_) { feeTracking = false; }
+
+    if (feeTracking) try {
       feeBack = await client.query(`
         UPDATE students s
            SET monthly_fee = h.was_monthly_fee
           FROM student_class_history h
          WHERE h.batch_id = $1 AND h.undone_at IS NULL
            AND ($2::int IS NULL OR h.from_class_id = $2::int)
+           AND ($3::int IS NULL OR h.student_id = $3::int)
            AND h.was_monthly_fee IS NOT NULL
            AND s.id = h.student_id
-           AND s.monthly_fee IS DISTINCT FROM h.was_monthly_fee`, [batchId, classId]);
+           AND s.monthly_fee IS DISTINCT FROM h.was_monthly_fee`, [batchId, classId, studentId]);
 
       await client.query(`
         DELETE FROM student_fee_history f
          USING student_class_history h
          WHERE f.batch_id = $1 AND h.batch_id = $1 AND h.undone_at IS NULL
            AND ($2::int IS NULL OR h.from_class_id = $2::int)
-           AND f.student_id = h.student_id`, [batchId, classId]);
+           AND ($3::int IS NULL OR h.student_id = $3::int)
+           AND f.student_id = h.student_id`, [batchId, classId, studentId]);
     } catch (_) { /* fee history not migrated yet — classes still go back */ }
 
     await client.query(
       `UPDATE student_class_history SET undone_at = NOW()
         WHERE batch_id = $1 AND undone_at IS NULL
-          AND ($2::int IS NULL OR from_class_id = $2::int)`, [batchId, classId]);
+          AND ($2::int IS NULL OR from_class_id = $2::int)
+          AND ($3::int IS NULL OR student_id = $3::int)`, [batchId, classId, studentId]);
 
     await client.query('COMMIT');
 
@@ -872,6 +985,7 @@ router.post('/promote/undo', async (req, res) => {
       success:      true,
       batch_id:     batchId,
       class_id:     classId,
+      student_id:   studentId,
       restored:     back.rowCount,
       ungraduated:  ungrad.rowCount,
       fees_restored: feeBack.rowCount,
