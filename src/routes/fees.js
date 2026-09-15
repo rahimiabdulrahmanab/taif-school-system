@@ -623,6 +623,13 @@ router.get('/statement/:student_id', async (req, res) => {
     // for the months before they joined, and the statement would then
     // disagree with the outstanding figure on the fee list.
     const joinY = sy, joinM = sm;
+
+    // A school year is its ten months, and the office reads the account as a
+    // year — so حمل، ثور، جوزا belong on the list even for a child who joined
+    // in سرطان. They are listed, not billed: the preJoin rule below keeps
+    // their Due at 0 unless someone deliberately sets one.
+    sm = 1;
+
     if (Number.isFinite(askedYear) && askedYear >= FLOOR && (askedYear < sy)) {
       sy = askedYear; sm = 1;
     }
@@ -716,8 +723,12 @@ router.get('/statement/:student_id', async (req, res) => {
 
       (byYear[y] = byYear[y] || []).push({
         year: y, month: m, due, paid, balance,
+        // A month that charges nothing and was paid nothing is not "Unpaid" —
+        // nobody owes anything for it. That is every month before the student
+        // joined, and every month before the school started billing here.
         status: isHoliday ? 'holiday'
               : (isFuture && paid <= 0) ? 'upcoming'
+              : (due <= 0 && paid <= 0) ? 'none'
               : (paid <= 0 ? 'unpaid' : (balance > 0 ? 'partial' : 'paid')),
         holiday: isHoliday,
         upcoming: isFuture,

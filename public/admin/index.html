@@ -4730,7 +4730,7 @@ const LANG = {
     th_scanned_days:'Scanned Days', th_present_days:'Present Days', th_absent_days:'Absent Days',
     hint_staff_attendance:'"Scanned Days" is auto-counted from gate scans. Adjust "Present Days" if needed, then Save — payroll uses the saved value.',
     status_paid:'Paid', status_pending:'Pending', status_advance_taken:'Advance Taken',
-    status_holiday:'Holiday', status_upcoming:'Not yet due',
+    status_holiday:'Holiday', status_upcoming:'Not yet due', status_no_fee:'No fee',
     btn_show_earlier_year:'Show an earlier year',
     btn_try_again:'Try again', msg_students_load_failed:'Could not load the students.',
     lbl_promote_to:'Move to',
@@ -5228,7 +5228,7 @@ const LANG = {
     hint_staff_attendance:'«سکن شوې ورځې» د دروازې له سکن څخه په اتومات ډول شمیرل کیږي. که اړتیا وي «د حاضرۍ ورځې» سم کړئ، بیا یې خوندي کړئ — معاش به همدا ارزښت وکاروي.',
     lbl_tax_hint:'دولتي مالیه', lbl_advances_detail:'د پیش معاش تفصیل',
     status_paid:'ورکړل شو', status_pending:'پاتې', status_advance_taken:'پیش معاش اخیستل شوی',
-    status_holiday:'رخصتي', status_upcoming:'لا نه ده رارسېدلې',
+    status_holiday:'رخصتي', status_upcoming:'لا نه ده رارسېدلې', status_no_fee:'فیس نشته',
     btn_show_earlier_year:'پخوانی کال وښیه',
     btn_try_again:'بیا هڅه وکړئ', msg_students_load_failed:'زده‌کوونکي و نه بارېدل.',
     lbl_promote_to:'دې ته يې بوځه',
@@ -10085,6 +10085,9 @@ function _statusPill(st) {
   // A month that has not arrived yet. Nothing is owed for it, but the office
   // can still take the money now — families often pay a few months ahead.
   if (st === 'upcoming') return `<span style="font-size:9.5px;font-weight:800;padding:2px 9px;background:rgba(90,140,220,.13);color:#2b5fa8;border-radius:12px;">${t('status_upcoming')||'Not yet due'}</span>`;
+  // Nothing was charged and nothing was paid — before the student joined, or
+  // before the school began billing through the system.
+  if (st === 'none')     return `<span style="font-size:9.5px;font-weight:800;padding:2px 9px;background:rgba(120,140,160,.13);color:#64748b;border-radius:12px;">${t('status_no_fee')||'No fee'}</span>`;
   if (st === 'paid')    return `<span style="font-size:9.5px;font-weight:800;padding:2px 9px;background:rgba(34,197,113,.15);color:#178f4f;border-radius:12px;">${t('status_paid')||'Paid'}</span>`;
   if (st === 'partial') return `<span style="font-size:9.5px;font-weight:800;padding:2px 9px;background:rgba(255,170,61,.15);color:#8b5a0e;border-radius:12px;">${t('status_partial')||'Partial'}</span>`;
   return `<span style="font-size:9.5px;font-weight:800;padding:2px 9px;background:rgba(220,79,76,.15);color:#dc4f4c;border-radius:12px;">${t('status_unpaid')||'Unpaid'}</span>`;
