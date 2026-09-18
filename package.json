@@ -51,7 +51,7 @@
     },
     "extraResources": [
       {
-        "from": "vendor/chrome-win64",
+        "from": "vendor/chrome-headless-win64",
         "to": "chrome"
       },
       {

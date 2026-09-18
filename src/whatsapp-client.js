@@ -19,8 +19,14 @@ function findChrome() {
 
   if (process.env.PUPPETEER_EXECUTABLE_PATH) candidates.push(process.env.PUPPETEER_EXECUTABLE_PATH);
 
-  // The desktop app ships Chromium beside itself, under resources/chrome.
+  // The desktop app ships a browser beside itself, under resources/chrome.
+  // It is chrome-headless-shell: the same engine with no window, half the
+  // size of full Chromium, which matters when the installer has to reach a
+  // school over a slow connection. Full Chrome is still accepted, so a build
+  // made with either one works.
   if (process.resourcesPath) {
+    candidates.push(path.join(process.resourcesPath, 'chrome', 'chrome-headless-shell.exe'));
+    candidates.push(path.join(process.resourcesPath, 'chrome', 'chrome-headless-shell'));
     candidates.push(path.join(process.resourcesPath, 'chrome', 'chrome.exe'));
     candidates.push(path.join(process.resourcesPath, 'chrome', 'chrome'));
   }
