@@ -65,14 +65,36 @@ let client  = null;
 let _status = 'disconnected'; // disconnected | initializing | qr | connected
 let _qr     = null;
 let _error  = null;           // why the last attempt failed, for the screen
+let _startedAt = 0;           // when this attempt began, so slow is not read as broken
+
+// The browser path never changes while the process lives, and the status is
+// polled every few seconds — look once.
+let _chromeCached;
+function chromeOnce() {
+  if (_chromeCached === undefined) _chromeCached = findChrome() || null;
+  return _chromeCached;
+}
 
 function getStatus() {
-  return { status: _status, connected: _status === 'connected', qr: _qr, error: _error };
+  return {
+    status: _status,
+    connected: _status === 'connected',
+    qr: _qr,
+    error: _error,
+    // What the screen needs in order to be honest about a slow start: is this
+    // the desktop app, was a browser found at all, and how long has it been
+    // trying? A first run on a school PC downloads WhatsApp Web over their
+    // connection, which is not quick.
+    desktop: !!process.env.ELECTRON,
+    chrome: chromeOnce(),
+    starting_for: _startedAt ? Math.round((Date.now() - _startedAt) / 1000) : 0,
+  };
 }
 
 async function initialize() {
   if (client) return;
   _status = 'initializing';
+  _startedAt = Date.now();
   _qr     = null;
   _error  = null;
 
@@ -86,14 +108,22 @@ async function initialize() {
       headless: true,
       // Whatever we found, rather than whatever the default path guesses.
       executablePath: findChrome() || undefined,
-      // Tuned for a small container: no /dev/shm to overflow, one process
-      // rather than a tree of them, and nothing drawn that nobody will see.
-      args: [
-        '--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--no-first-run',
-        '--disable-dev-shm-usage', '--no-zygote', '--single-process',
-        '--disable-extensions', '--disable-background-networking',
-        '--disable-accelerated-2d-canvas', '--mute-audio',
-      ],
+      // Nothing drawn that nobody will see, on either host.
+      args: (() => {
+        const common = [
+          '--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--no-first-run',
+          '--disable-extensions', '--disable-background-networking',
+          '--disable-accelerated-2d-canvas', '--mute-audio',
+        ];
+        // --single-process and --no-zygote exist to survive a 512 MB container
+        // with no /dev/shm. On a Windows PC they buy nothing and single-process
+        // Chromium is known to hang at startup there — which looks exactly
+        // like the school's report: no QR, no error, forever. The desktop has
+        // memory to spare, so it gets the ordinary multi-process browser.
+        return process.env.ELECTRON
+          ? common
+          : common.concat(['--disable-dev-shm-usage', '--no-zygote', '--single-process']);
+      })(),
     },
   });
 

@@ -3654,6 +3654,17 @@ button[style*="background:linear-gradient"]{
 <!-- ── School phone: pair once, then send to everyone at once ── -->
 <div id="wa-conn" style="margin-bottom:16px;padding:16px 20px;background:#fff;border:1px solid rgba(20,40,80,.08);border-radius:14px;box-shadow:0 4px 14px rgba(20,40,80,.05);"></div>
 
+<!-- Shown only while the browser is starting. A first run on a school PC can
+     take a minute or two, and silence for that long reads as a failure. -->
+<div id="wa-starting" style="display:none;margin-bottom:16px;padding:14px 18px;background:#fff;border:1px solid rgba(90,140,220,.30);border-radius:14px;display:flex;align-items:center;gap:12px;">
+  <i class="fas fa-spinner fa-spin" style="color:#2b5fa8;font-size:16px;"></i>
+  <div style="flex:1;min-width:0;">
+    <div style="font-family:var(--font-head);font-size:14px;font-weight:800;color:#0f2845;" data-i18n="wa_starting_title">Starting WhatsApp…</div>
+    <div style="font-size:12px;color:#6a7c93;" data-i18n="wa_starting_sub">The first time takes a minute or two while it loads WhatsApp Web. Leave this screen open.</div>
+  </div>
+  <span id="wa-starting-secs" style="font-family:var(--font-mono);font-size:12px;color:#6a7c93;"></span>
+</div>
+
 <!-- Bulk sending — only usable once the phone is paired -->
 <div id="wa-bulk" style="display:none;margin-bottom:20px;padding:18px 22px;background:#fff;border:1px solid rgba(37,211,102,.30);border-radius:14px;box-shadow:0 4px 14px rgba(20,40,80,.05);">
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
@@ -4627,6 +4638,12 @@ const LANG = {
     wa_bulk_confirm_msg:'Messages go out about two seconds apart from the school number. You can stop it at any time.',
     wa_parents_reached:'parents will receive this', wa_need_message:'Type the message first.',
     wa_no_classes:'No classes found', wa_pick_class:'Choose a class',
+    wa_starting_title:'Starting WhatsApp…',
+    wa_starting_sub:'The first time takes a minute or two while it loads WhatsApp Web. Leave this screen open.',
+    wa_no_response_long:'WhatsApp did not finish starting after three minutes.',
+    lbl_browser:'Browser', wa_no_browser:'none found',
+    wa_log_at:'Details are written to',
+    wa_use_desktop:'This is the website, which cannot run WhatsApp. Use the desktop app on the school computer.',
     wa_target_all:'All parents', wa_target_absent:'Parents of students absent today',
     wa_target_unpaid:'Parents who still owe fees', wa_target_class:'One class',
     wa_target_students:'Only the students I choose',
@@ -5125,6 +5142,12 @@ const LANG = {
     wa_bulk_confirm_msg:'پیغامونه شاوخوا هرې دوه ثانیې وروسته لېږل کېږي. هر وخت يې ودرولی شئ.',
     wa_parents_reached:'والدین به يې ترلاسه کړي', wa_need_message:'لومړی پیغام ولیکئ.',
     wa_no_classes:'هیڅ ټولګی و نه موندل شو', wa_pick_class:'ټولګی وټاکئ',
+    wa_starting_title:'واټساپ پیلېږي…',
+    wa_starting_sub:'لومړی ځل یوه دوه دقیقې نیسي ترڅو واټساپ وېب پورته شي. دا پاڼه خلاصه پرېږدئ.',
+    wa_no_response_long:'واټساپ په درې دقیقو کې پیل نه شو.',
+    lbl_browser:'براوزر', wa_no_browser:'و نه موندل شو',
+    wa_log_at:'تفصیلات دلته لیکل کیږي',
+    wa_use_desktop:'دا ویب‌پاڼه ده چې واټساپ نشي چلولی. د ښوونځي په کمپیوټر کې ډیسکټاپ اپ وکاروئ.',
     wa_target_all:'ټول والدین', wa_target_absent:'د نن غیرحاضرو زده‌کوونکو والدین',
     wa_target_unpaid:'هغه والدین چې فیس يې پاتې دی', wa_target_class:'یو ټولګی',
     wa_target_students:'یوازې هغه زده‌کوونکي چې زه يې ټاکم',
@@ -11103,27 +11126,52 @@ async function waConnect() {
     const r = await fetch('/api/whatsapp/connect', { method: 'POST' });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || 'Failed');
-    // Starting the browser takes a few seconds, and on a host that cannot run
-    // it at all the attempt fails silently. Poll for a while, then say so.
+
+    // Starting the browser and loading WhatsApp Web takes a while — on a
+    // school PC doing it for the first time, over their connection, well over
+    // a minute. The old code gave up after 24 seconds and told the office the
+    // thing had failed while it was still working. Wait three minutes, and
+    // say what is happening in the meantime instead of raising an alarm.
+    const LIMIT = 90;                 // × 2s = 3 minutes
     let tries = 0;
     const watch = setInterval(async () => {
       tries++;
       await waRefreshStatus();
       const s = await fetch('/api/whatsapp/status').then(x => x.json()).catch(() => ({}));
-      if (s.connected || s.qr || s.error || tries > 12) {
+
+      const waiting = document.getElementById('wa-starting');
+      if (waiting) {
+        waiting.style.display = (s.connected || s.qr || s.error) ? 'none' : '';
+        const secs = document.getElementById('wa-starting-secs');
+        if (secs) secs.textContent = (s.starting_for || tries * 2) + 's';
+      }
+
+      if (s.connected || s.qr || s.error || tries > LIMIT) {
         clearInterval(watch);
+        if (waiting) waiting.style.display = 'none';
         if (s.error) {
           showAlert({ title: t('wa_failed_title') || 'Could not start WhatsApp', message: s.error, type: 'error' });
         } else if (!s.connected && !s.qr) {
+          // Three minutes with no QR and no error. Say what was actually
+          // found, so the report that comes back is worth something.
+          const lines = [
+            t('wa_no_response_long') || 'WhatsApp did not finish starting after three minutes.',
+            '',
+            (t('lbl_browser') || 'Browser') + ': ' + (s.chrome || (t('wa_no_browser') || 'none found')),
+          ];
+          if (s.desktop) {
+            lines.push((t('wa_log_at') || 'Details are written to') + ':',
+                       '%APPDATA%\\taif-school-system\\server.log');
+          } else {
+            lines.push(t('wa_use_desktop') || 'This is the website, which cannot run WhatsApp. Use the desktop app on the school computer.');
+          }
           showAlert({ title: t('wa_failed_title') || 'Could not start WhatsApp',
-                      message: t('wa_no_response') || 'The server did not produce a QR code. This usually means it cannot run WhatsApp — use the desktop app on the school computer.',
-                      type: 'warning' });
+                      message: lines.join('\n'), type: 'warning' });
         }
       }
     }, 2000);
   } catch (e) { showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' }); }
 }
-
 async function waDisconnect() {
   showConfirm({
     title: t('wa_disconnect') || 'Disconnect the school phone?',
