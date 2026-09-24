@@ -4748,6 +4748,12 @@ const LANG = {
     hint_staff_attendance:'"Scanned Days" is auto-counted from gate scans. Adjust "Present Days" if needed, then Save — payroll uses the saved value.',
     status_paid:'Paid', status_pending:'Pending', status_advance_taken:'Advance Taken',
     status_holiday:'Holiday', status_upcoming:'Not yet due', status_no_fee:'No fee',
+    btn_waive_month:'Waive this month', btn_waive:'Waive', btn_remove_waiver:'Remove waiver',
+    status_waived:'Waived', btn_continue:'Continue',
+    msg_waive_reason:'Why is this month being waived? It is kept with the record.',
+    msg_waive_already_paid:'This month already has a payment of',
+    msg_waive_credit:'Waiving it leaves that money as a credit on the account.',
+    msg_remove_waiver:'the normal monthly fee applies to this month again.',
     btn_show_earlier_year:'Show an earlier year',
     btn_try_again:'Try again', msg_students_load_failed:'Could not load the students.',
     lbl_promote_to:'Move to',
@@ -5252,6 +5258,12 @@ const LANG = {
     lbl_tax_hint:'دولتي مالیه', lbl_advances_detail:'د پیش معاش تفصیل',
     status_paid:'ورکړل شو', status_pending:'پاتې', status_advance_taken:'پیش معاش اخیستل شوی',
     status_holiday:'رخصتي', status_upcoming:'لا نه ده رارسېدلې', status_no_fee:'فیس نشته',
+    btn_waive_month:'د دې میاشتې فیس وبښئ', btn_waive:'وبښئ', btn_remove_waiver:'بښنه لرې کړئ',
+    status_waived:'بښل شوی', btn_continue:'دوام ورکړئ',
+    msg_waive_reason:'د دې میاشتې فیس ولې بښل کیږي؟ دا به له ریکارډ سره وساتل شي.',
+    msg_waive_already_paid:'د دې میاشتې لپاره دمخه تادیه شوې ده:',
+    msg_waive_credit:'بښل يې هغه پیسې د حساب په ګټه پاتې کوي.',
+    msg_remove_waiver:'د دې میاشتې لپاره بیا عادي میاشتنی فیس تطبیقیږي.',
     btn_show_earlier_year:'پخوانی کال وښیه',
     btn_try_again:'بیا هڅه وکړئ', msg_students_load_failed:'زده‌کوونکي و نه بارېدل.',
     lbl_promote_to:'دې ته يې بوځه',
@@ -10111,6 +10123,8 @@ function _statusPill(st) {
   // Nothing was charged and nothing was paid — before the student joined, or
   // before the school began billing through the system.
   if (st === 'none')     return `<span style="font-size:9.5px;font-weight:800;padding:2px 9px;background:rgba(120,140,160,.13);color:#64748b;border-radius:12px;">${t('status_no_fee')||'No fee'}</span>`;
+  // Forgiven on purpose, by a decision somebody made and wrote down.
+  if (st === 'waived')   return `<span style="font-size:9.5px;font-weight:800;padding:2px 9px;background:rgba(109,76,214,.14);color:#5b3fc4;border-radius:12px;"><i class="fas fa-hand-holding-heart" style="font-size:9px;"></i> ${t('status_waived')||'Waived'}</span>`;
   if (st === 'paid')    return `<span style="font-size:9.5px;font-weight:800;padding:2px 9px;background:rgba(34,197,113,.15);color:#178f4f;border-radius:12px;">${t('status_paid')||'Paid'}</span>`;
   if (st === 'partial') return `<span style="font-size:9.5px;font-weight:800;padding:2px 9px;background:rgba(255,170,61,.15);color:#8b5a0e;border-radius:12px;">${t('status_partial')||'Partial'}</span>`;
   return `<span style="font-size:9.5px;font-weight:800;padding:2px 9px;background:rgba(220,79,76,.15);color:#dc4f4c;border-radius:12px;">${t('status_unpaid')||'Unpaid'}</span>`;
@@ -10212,7 +10226,11 @@ function renderFeeStatement() {
               <span style="font-size:10.5px;color:var(--text-dim);font-weight:700;text-transform:uppercase;">${t('lbl_due')||'Due'}</span>
               <input id="due-in-${key}" type="text" inputmode="numeric" value="${Math.round(mn.due)}" style="width:90px;padding:6px 8px;background:#fff;border:1px solid var(--glass-border);border-radius:6px;font-family:var(--font-mono);font-size:12px;font-weight:700;color:#0C1526;" oninput="this.value=toWesternDigits(this.value).replace(/[^0-9.]/g,'')">
               <button onclick="feeSetDue(${mn.year},${mn.month})" style="padding:6px 10px;background:rgba(255,170,61,.15);border:1px solid rgba(255,170,61,.4);border-radius:6px;color:#8b5a0e;font-family:var(--font-head);font-size:11px;font-weight:700;cursor:pointer;">${t('btn_set_due')||'Set Due'}</button>
+              ${mn.waived
+                ? `<button onclick="feeClearWaiver(${mn.year},${mn.month})" style="padding:6px 10px;background:var(--glass);border:1px solid var(--glass-border);border-radius:6px;color:var(--text-mid);font-family:var(--font-head);font-size:11px;font-weight:700;cursor:pointer;"><i class="fas fa-rotate-left"></i> ${t('btn_remove_waiver')||'Remove waiver'}</button>`
+                : `<button onclick="feeWaiveMonth(${mn.year},${mn.month})" style="padding:6px 10px;background:rgba(109,76,214,.12);border:1px solid rgba(109,76,214,.32);border-radius:6px;color:#5b3fc4;font-family:var(--font-head);font-size:11px;font-weight:700;cursor:pointer;"><i class="fas fa-hand-holding-heart"></i> ${t('btn_waive_month')||'Waive this month'}</button>`}
             </div>
+            ${mn.due_note ? `<div style="margin:-2px 0 8px;font-size:11.5px;color:#5b3fc4;"><i class="fas fa-quote-left" style="font-size:9px;opacity:.6;"></i> ${String(mn.due_note).replace(/</g,'&lt;')}</div>` : ''}
             ${payRows}
             <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed var(--glass-border);">
               <input id="pay-amt-${key}" type="text" inputmode="numeric" placeholder="${t('lbl_amount_afn')||'Amount'}" value="${mn.balance>0?Math.round(mn.balance):(mn.upcoming&&mn.paid<=0?Math.round(mn.month_fee||0):'')}" style="width:90px;padding:6px 8px;background:#fff;border:1px solid var(--glass-border);border-radius:6px;font-family:var(--font-mono);font-size:12px;font-weight:700;color:#0C1526;" oninput="this.value=toWesternDigits(this.value).replace(/[^0-9.]/g,'')">
@@ -10257,6 +10275,82 @@ function _feeRefresh() {
   // Outstanding column keeps showing the amount from before the payment.
   const gp = document.getElementById('pg-graduates');
   if (gp && gp.classList.contains('active')) loadGraduates();
+}
+
+// ── Forgiving one month ───────────────────────────────────────
+// The school waives a month for a family now and then — an orphan, a teacher's
+// child, a hard year. It was possible already by typing 0 into Set Due, but
+// nobody would guess that, and a bare 0 records no reason. This asks for the
+// reason, stores it with the month, and marks the month as waived rather than
+// as a month that simply cost nothing.
+async function feeWaiveMonth(year, month) {
+  const sid = document.getElementById('fee-student-id').value;
+  const mn  = _feeMonth(year, month);
+  const label = (MONTHS[month] || '') + ' ' + year;
+
+  const ask = () => showConfirmInput({
+    title:   (t('btn_waive_month') || 'Waive this month') + ' — ' + label,
+    message: t('msg_waive_reason') || 'Why is this month being waived? It is kept with the record.',
+    value:   '',
+    numeric: false,
+    confirmText: t('btn_waive') || 'Waive',
+    onConfirm: async (reason) => {
+      try {
+        const r = await fetch('/api/fees/due', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ student_id: parseInt(sid), year, month, waive: true, notes: reason }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Failed');
+        _feeRefresh();
+      } catch (e) { showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' }); }
+    },
+  });
+
+  // Money already taken for a month that is then forgiven becomes a credit,
+  // which is a real decision and not one to make by accident.
+  if (mn && mn.paid > 0) {
+    return showConfirm({
+      title:   t('btn_waive_month') || 'Waive this month',
+      message: (t('msg_waive_already_paid') || 'This month already has a payment of')
+             + ' ' + Math.round(mn.paid).toLocaleString() + ' ' + (t('lbl_afn') || 'AFN') + '. '
+             + (t('msg_waive_credit') || 'Waiving it leaves that money as a credit on the account.'),
+      confirmText: t('btn_continue') || 'Continue',
+      type: 'warning',
+      onConfirm: ask,
+    });
+  }
+  ask();
+}
+
+async function feeClearWaiver(year, month) {
+  const sid = document.getElementById('fee-student-id').value;
+  const label = (MONTHS[month] || '') + ' ' + year;
+  showConfirm({
+    title:   t('btn_remove_waiver') || 'Remove waiver',
+    message: label + ' — ' + (t('msg_remove_waiver') || 'the normal monthly fee applies to this month again.'),
+    confirmText: t('btn_remove_waiver') || 'Remove waiver',
+    type: 'warning',
+    onConfirm: async () => {
+      try {
+        const r = await fetch('/api/fees/due', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ student_id: parseInt(sid), year, month, clear: true }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Failed');
+        _feeRefresh();
+      } catch (e) { showAlert({ title: t('alert_title_error'), message: e.message, type: 'error' }); }
+    },
+  });
+}
+
+// The month row as the statement last reported it.
+function _feeMonth(year, month) {
+  const d = feeStatementData;
+  if (!d || !d.years) return null;
+  const yr = d.years.find(y => y.year === year);
+  return yr ? yr.months.find(m => m.month === month) : null;
 }
 
 async function feeSetDue(year, month) {

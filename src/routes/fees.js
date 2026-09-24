@@ -727,9 +727,14 @@ router.get('/statement/:student_id', async (req, res) => {
         // nobody owes anything for it. That is every month before the student
         // joined, and every month before the school started billing here.
         status: isHoliday ? 'holiday'
+              // A month the school deliberately forgave. It reads differently
+              // from a month that was never charged, and the office needs to
+              // see which of the two it is looking at.
+              : (ov && due <= 0) ? 'waived'
               : (isFuture && paid <= 0) ? 'upcoming'
               : (due <= 0 && paid <= 0) ? 'none'
               : (paid <= 0 ? 'unpaid' : (balance > 0 ? 'partial' : 'paid')),
+        waived: !!(ov && due <= 0),
         holiday: isHoliday,
         upcoming: isFuture,
         month_fee: monthFee,          // what this month costs if it is billed
@@ -789,9 +794,29 @@ router.get('/statement/:student_id', async (req, res) => {
 // POST /api/fees/due — set/override a single month's due amount
 router.post('/due', async (req, res) => {
   try {
-    const { student_id, year, month, amount_due, notes } = req.body;
+    const { student_id, year, month, amount_due, notes, waive, clear } = req.body;
     if (!student_id || !year || !month)
       return res.status(400).json({ error: 'student_id, year and month are required' });
+
+    // Putting the month back to the normal fee: the override row is removed
+    // rather than set to the fee, so a later change of fee still reaches it.
+    if (clear) {
+      await pool.query(
+        `DELETE FROM student_month_due
+          WHERE student_id = $1 AND payment_year = $2 AND payment_month = $3`,
+        [student_id, parseInt(year), parseInt(month)]);
+      return res.json({ success: true, cleared: true });
+    }
+
+    // A waiver is a due of nothing, written down with its reason. The school
+    // forgives a month for a family now and then, and "why" is the part that
+    // has to survive — otherwise next year nobody can tell a kindness from a
+    // mistake in the ledger.
+    const amount = waive ? 0 : Math.max(0, parseFloat(amount_due) || 0);
+    const note = waive
+      ? (String(notes || '').trim() || 'Fee waived for this month')
+      : (notes || null);
+
     const r = await pool.query(`
       INSERT INTO student_month_due
         (student_id, payment_year, payment_month, amount_due, notes, updated_at)
@@ -801,9 +826,8 @@ router.post('/due', async (req, res) => {
                     notes      = EXCLUDED.notes,
                     updated_at = NOW()
       RETURNING *`,
-      [student_id, parseInt(year), parseInt(month),
-       Math.max(0, parseFloat(amount_due) || 0), notes || null]);
-    res.json({ success: true, due: r.rows[0] });
+      [student_id, parseInt(year), parseInt(month), amount, note]);
+    res.json({ success: true, due: r.rows[0], waived: !!waive });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
