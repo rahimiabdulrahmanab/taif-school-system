@@ -3651,77 +3651,11 @@ button[style*="background:linear-gradient"]{
   </div>
 </div>
 
-<!-- ── School phone: pair once, then send to everyone at once ── -->
-<div id="wa-conn" style="margin-bottom:16px;padding:16px 20px;background:#fff;border:1px solid rgba(20,40,80,.08);border-radius:14px;box-shadow:0 4px 14px rgba(20,40,80,.05);"></div>
 
-<!-- Shown only while the browser is starting. A first run on a school PC can
-     take a minute or two, and silence for that long reads as a failure. -->
-<div id="wa-starting" style="display:none;margin-bottom:16px;padding:14px 18px;background:#fff;border:1px solid rgba(90,140,220,.30);border-radius:14px;display:flex;align-items:center;gap:12px;">
-  <i class="fas fa-spinner fa-spin" style="color:#2b5fa8;font-size:16px;"></i>
-  <div style="flex:1;min-width:0;">
-    <div style="font-family:var(--font-head);font-size:14px;font-weight:800;color:#0f2845;" data-i18n="wa_starting_title">Starting WhatsApp…</div>
-    <div style="font-size:12px;color:#6a7c93;" data-i18n="wa_starting_sub">The first time takes a minute or two while it loads WhatsApp Web. Leave this screen open.</div>
-  </div>
-  <span id="wa-starting-secs" style="font-family:var(--font-mono);font-size:12px;color:#6a7c93;"></span>
-</div>
 
-<!-- Bulk sending — only usable once the phone is paired -->
-<div id="wa-bulk" style="display:none;margin-bottom:20px;padding:18px 22px;background:#fff;border:1px solid rgba(37,211,102,.30);border-radius:14px;box-shadow:0 4px 14px rgba(20,40,80,.05);">
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-    <div style="width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#25D366,#128C7E);display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;"><i class="fas fa-paper-plane"></i></div>
-    <div>
-      <div style="font-family:var(--font-head);font-size:15px;font-weight:800;color:#0f2845;" data-i18n="wa_bulk_title">Send to many parents at once</div>
-      <div style="font-size:12px;color:#6a7c93;" data-i18n="wa_bulk_sub">Sent by the school's own paired phone — no window opens for each parent</div>
-    </div>
-  </div>
 
-  <div style="font-size:11px;font-weight:800;color:#6a7c93;font-family:var(--font-head);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px;" data-i18n="wa_pick_message">1 · Pick the message</div>
-  <div id="wa-bulk-templates" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;"></div>
 
-  <div style="font-size:11px;font-weight:800;color:#6a7c93;font-family:var(--font-head);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px;" data-i18n="wa_pick_who">2 · Who receives it</div>
-  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
-    <select id="wa-bulk-target" onchange="waBulkTargetChanged()" style="padding:10px 13px;background:#f5f9fc;border:1px solid rgba(20,40,80,.10);border-radius:10px;font-size:13px;font-weight:700;color:#0f2845;outline:none;cursor:pointer;">
-      <option value="all" data-i18n="wa_target_all">All parents</option>
-      <option value="absent" data-i18n="wa_target_absent">Parents of students absent today</option>
-      <option value="unpaid" data-i18n="wa_target_unpaid">Parents who still owe fees</option>
-      <option value="class" data-i18n="wa_target_class">One class</option>
-      <option value="students" data-i18n="wa_target_students">Only the students I choose</option>
-    </select>
-    <select id="wa-bulk-class" onchange="waBulkPreview()" style="display:none;padding:10px 13px;background:#f5f9fc;border:1px solid rgba(20,40,80,.10);border-radius:10px;font-size:13px;font-weight:700;color:#0f2845;outline:none;cursor:pointer;min-width:150px;"></select>
-    <span id="wa-bulk-count" style="font-size:12.5px;color:#6a7c93;font-weight:700;"></span>
-  </div>
 
-  <!-- A complaint is about one child. It is locked to this picker, so it can
-       never be sent to a whole class or to every family in the school. -->
-  <div id="wa-complaint-note" style="display:none;margin:-4px 0 10px;padding:9px 12px;background:#fff7ed;border:1px solid rgba(234,88,12,.25);border-radius:10px;font-size:12.5px;color:#9a3412;font-weight:700;">
-    <i class="fas fa-user-shield"></i> <span data-i18n="wa_complaint_locked">A complaint is about one child, so it goes only to the students you choose below.</span>
-  </div>
-
-  <div id="wa-bulk-students" style="display:none;margin:0 0 12px;padding:12px 14px;background:#f8fbff;border:1px solid rgba(20,40,80,.10);border-radius:12px;">
-    <input id="wa-stu-search" oninput="waStudentSearch()" data-ph="wa_stu_search_ph"
-           placeholder="Type a student's name or code…"
-           style="width:100%;box-sizing:border-box;padding:9px 12px;background:#fff;border:1px solid rgba(20,40,80,.12);border-radius:9px;font-family:var(--font-body);font-size:13px;outline:none;">
-    <div id="wa-stu-results" style="max-height:190px;overflow-y:auto;margin-top:8px;"></div>
-    <div id="wa-stu-picked" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div>
-  </div>
-
-  <div style="font-size:11px;font-weight:800;color:#6a7c93;font-family:var(--font-head);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px;" data-i18n="wa_check_message">3 · Check it, then send</div>
-  <textarea id="wa-bulk-message" rows="4" placeholder="Type the message every parent will receive…" style="width:100%;box-sizing:border-box;padding:12px 13px;background:#f5f9fc;border:1px solid rgba(20,40,80,.10);border-radius:10px;font-family:var(--font-body);font-size:13px;line-height:1.6;outline:none;resize:vertical;"></textarea>
-  <div style="font-size:11.5px;color:#94a3b8;margin:6px 0 12px;">
-    <b>{name}</b> · <b>{class}</b> · <b>{code}</b> · <b>{due}</b> <span data-i18n="wa_placeholders">are replaced with each child's own details</span>
-  </div>
-
-  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-    <button onclick="waBulkSend()" id="wa-bulk-send" style="padding:11px 22px;background:linear-gradient(135deg,#25D366,#128C7E);border:none;border-radius:10px;color:#fff;font-family:var(--font-head);font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 6px 16px rgba(37,211,102,.30);">
-      <i class="fab fa-whatsapp"></i> <span data-i18n="wa_bulk_send">Send to all of them</span>
-    </button>
-    <button onclick="waBulkCancel()" id="wa-bulk-cancel" style="display:none;padding:11px 18px;background:#fff;border:1px solid rgba(220,38,38,.30);border-radius:10px;color:#dc2626;font-family:var(--font-head);font-size:13px;font-weight:800;cursor:pointer;">
-      <i class="fas fa-stop"></i> <span data-i18n="btn_stop">Stop</span>
-    </button>
-  </div>
-
-  <div id="wa-bulk-progress" style="display:none;margin-top:14px;"></div>
-</div>
 
 <!-- Info banner — the wa.me route, which needs no pairing -->
 <div style="margin-bottom:20px;padding:18px 22px;background:linear-gradient(135deg,rgba(37,211,102,.10),rgba(37,211,102,.04));border:1px solid rgba(37,211,102,.25);border-radius:14px;display:flex;align-items:flex-start;gap:14px;">
@@ -6367,14 +6301,34 @@ async function loadStudents() {
 // box has to take all three rather than making anyone pick which field they
 // are searching. Typing four digits matches the END of a phone number, which
 // is how a number is read out loud here.
+// Two keyboards, one letter. The names in this database are written with the
+// Farsi yeh ی and keheh ک; an Arabic layout types ي and ك, which look the same
+// on screen and match nothing at all. Anyone searching would simply be told
+// the student does not exist. Both sides are folded to one spelling first,
+// along with Pashto and Arabic digits, stray diacritics and joiners.
+function waFold(v) {
+  return String(v == null ? '' : v)
+    .normalize('NFC')
+    .replace(/[يىېےئ]/g, 'ی')   // ي ى ې ے ئ → ی
+    .replace(/[ك]/g, 'ک')                            // ك → ک
+    .replace(/[ۀہۂەة]/g, 'ه')    // ۀ ہ ۂ ە ة → ه
+    .replace(/[أإآٱ]/g, 'ا')          // أ إ آ ٱ → ا
+    .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06F0))
+    .replace(/[ً-ْـ​-‏‪-‮﻿]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
 function studentMatches(s, q) {
   if (!q) return true;
-  const needle = String(q).toLowerCase().trim();
+  const needle = waFold(q);
   if (!needle) return true;
 
-  const text = [
+  const text = waFold([
     s.first_name, s.last_name, s.parent_name, s.student_code, s.class_name,
-  ].filter(Boolean).join(' ').toLowerCase();
+  ].filter(Boolean).join(' '));
   if (text.includes(needle)) return true;
 
   // Digits typed are a phone search: the last four, or any longer run.
@@ -10939,8 +10893,8 @@ window.go = function(id, el) {
 };
 
 async function initWhatsApp() {
-  // Show whether the school phone is paired, and the bulk panel if it is.
-  waRefreshStatus();
+  // No phone is paired any more: messages go out from the office's own
+  // WhatsApp, so there is nothing to connect and nothing to ask about.
   try {
     const [tplRes, stuRes, clsRes] = await Promise.all([
       fetch('/api/whatsapp/templates'),
@@ -11568,6 +11522,12 @@ function waFilterStudentList() {
 
   // Keep the chosen student selected if they survived the filter.
   if (keep && list.some(s => String(s.id) === String(keep))) sel.value = keep;
+
+  // A dropdown hides its contents until it is opened, so filtering it looked
+  // like nothing had happened. While a search or a class is narrowing things
+  // down, show the matches as a list that is simply there to be clicked.
+  const narrowing = !!(q || cls);
+  sel.size = (narrowing && list.length > 1) ? Math.min(8, list.length + 1) : 1;
 
   const count = document.getElementById('wa-stu-count');
   if (count) {
