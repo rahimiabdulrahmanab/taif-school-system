@@ -72,10 +72,14 @@ router.get('/', async (req, res) => {
     }
     if (search) {
       params.push(`%${search}%`);
+      // The father's name counts as a way of finding a child — it is how the
+      // office asks for them — and so does the tail of either phone number.
       query += ` AND (s.first_name ILIKE $${params.length}
                    OR s.last_name  ILIKE $${params.length}
+                   OR s.parent_name ILIKE $${params.length}
                    OR s.student_code ILIKE $${params.length}
-                   OR s.parent_phone ILIKE $${params.length})`;
+                   OR s.parent_phone ILIKE $${params.length}
+                   OR s.parent_phone2 ILIKE $${params.length})`;
     }
     query += ` ORDER BY s.first_name, s.last_name`;
 
