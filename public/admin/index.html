@@ -3690,10 +3690,10 @@ button[style*="background:linear-gradient"]{
         <button onclick="setWARecipient('individual',this)" class="wa-recip-btn active" style="padding:8px 16px;background:var(--accent);border:1px solid var(--glass-border);border-radius:20px;color:#060D18;font-family:var(--font-head);font-size:12px;font-weight:700;cursor:pointer;">
           <i class="fas fa-user"></i> <span data-i18n="opt_individual">Individual Student</span>
         </button>
-        <button onclick="setWARecipient('class',this)" class="wa-recip-btn" style="padding:8px 16px;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;color:var(--text-mid);font-family:var(--font-head);font-size:12px;font-weight:700;cursor:pointer;">
+        <button onclick="waGroupSendOff()" title="" class="wa-recip-off" style="padding:8px 16px;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;color:var(--text-mid);font-family:var(--font-head);font-size:12px;font-weight:700;opacity:.45;cursor:not-allowed;">
           <i class="fas fa-users"></i> <span data-i18n="opt_entire_class">Entire Class</span>
         </button>
-        <button onclick="setWARecipient('absent',this)" class="wa-recip-btn" style="padding:8px 16px;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;color:var(--text-mid);font-family:var(--font-head);font-size:12px;font-weight:700;cursor:pointer;">
+        <button onclick="waGroupSendOff()" title="" class="wa-recip-off" style="padding:8px 16px;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;color:var(--text-mid);font-family:var(--font-head);font-size:12px;font-weight:700;opacity:.45;cursor:not-allowed;">
           <i class="fas fa-user-times"></i> <span data-i18n="opt_absent_today">Absent Today</span>
         </button>
         <button onclick="setWARecipient('custom',this)" class="wa-recip-btn" style="padding:8px 16px;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;color:var(--text-mid);font-family:var(--font-head);font-size:12px;font-weight:700;cursor:pointer;">
@@ -4800,6 +4800,8 @@ const LANG = {
     ph_type_message:'Type your message...',
     opt_individual:'Individual Student', opt_entire_class:'Entire Class',
     opt_select_student:'Select student…',
+    wa_group_off_title:'One student at a time, for now',
+    wa_group_off_msg:'Messages are sent from your own WhatsApp, and WhatsApp opens one chat at a time. Choose the student, check the message, and send — then the next one.',
     wa_opening_app:'WhatsApp is opening with the message ready — check it, then press Enter to send.',
     wa_open_web_instead:'Open WhatsApp Web instead',
     opt_absent_today:'Absent Today', opt_custom_number:'Custom Number',
@@ -5314,6 +5316,8 @@ const LANG = {
     ph_type_message:'خپل پیغام ولیکئ...',
     opt_individual:'یو زده کوونکی', opt_entire_class:'ټول ټولګی',
     opt_select_student:'زده‌کوونکی وټاکئ…',
+    wa_group_off_title:'اوس مهال یو یو زده‌کوونکی',
+    wa_group_off_msg:'پیغامونه ستاسو له خپل واټساپ څخه لېږل کیږي، او واټساپ په یو وخت کې یوه خبرې‌اترې پرانیزي. زده‌کوونکی وټاکئ، پیغام وګورئ او ولېږئ — بیا بل.',
     wa_opening_app:'واټساپ د چمتو پیغام سره پرانیستل کیږي — وګورئ يې، بیا Enter کېکاږئ.',
     wa_open_web_instead:'پرځای يې واټساپ وېب پرانیزئ',
     opt_absent_today:'نن غیر حاضر', opt_custom_number:'بله شمېره',
@@ -10980,6 +10984,18 @@ function openWACompose(templateId) {
 
 function closeWACompose() {
   document.getElementById('wa-compose-panel').style.display = 'none';
+}
+
+// Sending to a whole class means opening a WhatsApp window for every family
+// in it, one after another, which is not something to hand an office as a
+// single button. Until there is a way to do it properly, the group choices
+// say so instead of half-working.
+function waGroupSendOff() {
+  showAlert({
+    title:   t('wa_group_off_title') || 'One student at a time, for now',
+    message: t('wa_group_off_msg') || 'Messages are sent from your own WhatsApp, and WhatsApp opens one chat at a time. Choose the student, check the message, and send — then the next one.',
+    type:    'warning',
+  });
 }
 
 function setWARecipient(type, btn) {
