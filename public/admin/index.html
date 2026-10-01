@@ -10956,12 +10956,12 @@ function openWACompose(templateId) {
   document.getElementById('wa-compose-panel').style.display = 'block';
   document.getElementById('wa-compose-panel').scrollIntoView({ behavior:'smooth' });
 
-  // Reset recipient to individual (except absence)
-  if (templateId !== 'absence_alert') {
-    setWARecipient('individual', document.querySelector('.wa-recip-btn'));
-    // Clear student selection
-    document.getElementById('wa-student-sel').value = '';
-  }
+  // Every template opens on one student, including the absence alert: the
+  // group choices are off while sending goes through the office's own
+  // WhatsApp, one chat at a time.
+  setWARecipient('individual', document.querySelector('.wa-recip-btn'));
+  const _stuSel = document.getElementById('wa-student-sel');
+  if (_stuSel) _stuSel.value = '';
 
   // Set raw template with placeholders shown clearly
   const rawTemplate = waCurrentTemplate.template || '';
@@ -10975,11 +10975,6 @@ function openWACompose(templateId) {
     document.getElementById('wa-preview').textContent = rawTemplate || 'Type message above to preview';
   }
 
-  // Auto-load absent for absence template
-  if (templateId === 'absence_alert') {
-    setWARecipient('absent', document.querySelectorAll('.wa-recip-btn')[2]);
-    loadAbsentForWA();
-  }
 }
 
 function closeWACompose() {
@@ -11004,8 +10999,10 @@ function setWARecipient(type, btn) {
     b.style.background = 'var(--glass)';
     b.style.color      = 'var(--text-mid)';
   });
-  btn.style.background = 'var(--accent)';
-  btn.style.color      = '#060D18';
+  if (btn) {
+    btn.style.background = 'var(--accent)';
+    btn.style.color      = '#060D18';
+  }
 
   ['individual','class','custom','absent'].forEach(t => {
     const el = document.getElementById('wa-recip-' + t);
