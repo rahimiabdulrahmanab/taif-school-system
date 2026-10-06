@@ -257,6 +257,11 @@ router.post('/pay', async (req, res) => {
     } else {
       salaryRes = await pool.query(`SELECT monthly_salary FROM staff WHERE id=$1`, [person_id]);
     }
+    // No row means no such person. Without this the endpoint happily wrote a
+    // payroll record for an id that does not exist, at a salary of zero.
+    if (!salaryRes.rows.length) {
+      return res.status(404).json({ error: 'That teacher or staff member was not found.' });
+    }
     // In a holiday month no salary is earned, so the frozen record stores
     // 0 base salary and 0 tax — the payout is overtime only.
     const baseSalary = isHolidayMonth ? 0 : (parseFloat(salaryRes.rows[0]?.monthly_salary) || 0);

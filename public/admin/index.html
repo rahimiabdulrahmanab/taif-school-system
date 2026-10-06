@@ -4196,6 +4196,25 @@ button[style*="background:linear-gradient"]{
       opts.headers = Object.assign({}, opts.headers, { 'Authorization': 'Bearer ' + token });
     }
     return _fetch(url, opts).then(function(res) {
+      // A refused action is nearly always a stale session rather than a real
+      // lack of permission, and the office cannot be expected to work that
+      // out from the word "Forbidden". Offer the thing that fixes it.
+      if (res.status === 403) {
+        res.clone().json().then(function(d) {
+          showConfirm({
+            title:   t('alert_title_error') || 'Not allowed',
+            message: (d && d.error) || 'This account is not allowed to do that.',
+            confirmText: t('btn_login_again') || 'Log in again',
+            cancelText:  t('btn_close') || 'Close',
+            type: 'warning',
+            onConfirm: function() {
+              localStorage.removeItem('auth_token');
+              localStorage.removeItem('auth_user');
+              window.location.replace('/login');
+            },
+          });
+        }).catch(function() {});
+      }
       if (res.status === 401) {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('auth_user');
@@ -4702,6 +4721,7 @@ const LANG = {
     msg_remove_waiver:'the normal monthly fee applies to this month again.',
     btn_show_earlier_year:'Show an earlier year',
     btn_try_again:'Try again', msg_students_load_failed:'Could not load the students.',
+    btn_login_again:'Log in again',
     lbl_promote_to:'Move to',
     msg_student_has_no_class:'This student is not in any class, so there is no grade to move up from. Put them in a class first.',
     msg_no_class_in_next_grade:'There is no class in the grade above yet. Create one on the Classes screen first.',
@@ -5217,6 +5237,7 @@ const LANG = {
     msg_remove_waiver:'د دې میاشتې لپاره بیا عادي میاشتنی فیس تطبیقیږي.',
     btn_show_earlier_year:'پخوانی کال وښیه',
     btn_try_again:'بیا هڅه وکړئ', msg_students_load_failed:'زده‌کوونکي و نه بارېدل.',
+    btn_login_again:'بیا ننوتل',
     lbl_promote_to:'دې ته يې بوځه',
     msg_student_has_no_class:'دا زده‌کوونکی په هیڅ ټولګي کې نشته، نو د پورته تلو لپاره درجه نشته. لومړی يې ټولګي ته ورګډ کړئ.',
     msg_no_class_in_next_grade:'په پورتني ټولګي کې لا هیڅ صنف نشته. لومړی يې د ټولګیو له پاڼې جوړ کړئ.',

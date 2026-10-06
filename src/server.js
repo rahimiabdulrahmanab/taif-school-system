@@ -23,12 +23,27 @@ if (!process.env.JWT_SECRET && (process.env.RENDER || process.env.NODE_ENV === '
 
 // Role guard. Pass the roles that are allowed; admin is always allowed.
 // Usage: app.use('/api/foo', auth, allow('finance'), fooRoutes)
+// "Forbidden" told the office nothing and gave them nothing to do about it.
+// A session whose token was issued before roles existed, or by a different
+// account, lands here — and the cure is almost always to log in again. Say
+// so, and say which role the server actually saw, so a photographed error
+// message is enough to work with.
+function denied(res, role, needed) {
+  return res.status(403).json({
+    error: role
+      ? `This account (${role}) is not allowed to do that. It needs: ${needed}. If you are the administrator, log out and log in again — the session may be from an older version.`
+      : 'Your session does not say who you are. Log out and log in again.',
+    role: role || null,
+    needed,
+  });
+}
+
 function allow(...roles) {
   const ok = new Set(['admin', ...roles]);
   return (req, res, next) => {
     const role = req.user && req.user.role;
     if (role && ok.has(role)) return next();
-    return res.status(403).json({ error: 'Forbidden' });
+    return denied(res, role, [...ok].join(' or '));
   };
 }
 
@@ -41,7 +56,7 @@ function allowRead(...roles) {
     const role = req.user && req.user.role;
     if (role === 'admin') return next();
     if (role && ro.has(role) && (req.method === 'GET' || req.method === 'HEAD')) return next();
-    return res.status(403).json({ error: 'Forbidden' });
+    return denied(res, role, role && ro.has(role) ? 'admin (this is a change, not a look)' : 'admin');
   };
 }
 
@@ -277,7 +292,16 @@ app.use('/api/attendance', (req, res, next) => {
 // writes, backup/wipe) is admin-only — a finance or teacher token must
 // never be able to change school config, approve marks, or wipe data.
 app.use('/api/students',   auth, allowRead('finance'), studentRoutes);
-app.use('/api',            auth, allowRead('finance'), peopleRoutes);
+// peopleRoutes serves /teachers and /staff, but it is mounted at /api because
+// those paths live inside it. A guard placed here runs for EVERY /api request
+// that follows — which quietly made the finance officer read-only across the
+// whole system: they could open payroll but not pay it, open fees but not
+// take money. The guard now applies only to the paths this router answers.
+app.use('/api', auth, (req, res, next) =>
+  /^\/(teachers|staff)(\/|$)/.test(req.path)
+    ? allowRead('finance')(req, res, next)
+    : next(),
+  peopleRoutes);
 app.use('/api/classes',    auth, allowRead('finance'), classRoutes);
 app.use('/api/fees',       auth, allow('finance'),     feeRoutes);
 app.use('/api/payroll',    auth, allow('finance'),     payrollRoutes);
