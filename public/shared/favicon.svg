@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Taif High School">
+  <!-- The same badge the sidebar and the splash screen show: the school's
+       green, rounded, with its initials. Drawn rather than photographed so it
+       stays sharp at 16px in a browser tab and at any size on a phone. -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5DCAA5"/>
+      <stop offset="1" stop-color="#2e9e7a"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#g)"/>
+  <text x="32" y="33" text-anchor="middle" dominant-baseline="central"
+        font-family="Segoe UI, Arial, Helvetica, sans-serif"
+        font-size="30" font-weight="800" letter-spacing="-1.5" fill="#06221a">TS</text>
+</svg>
