@@ -14178,10 +14178,17 @@ async function openTaxReport() {
     const schoolPhone = window._cachedSchoolPhone || '';
     const printedAt   = shamsiDariFull(new Date());
 
+    // A rate charged on the WHOLE salary is not a bracket, and printing it
+    // in a bracket table would tell the tax office something untrue. Each row
+    // says which of the two it is.
+    const anyWhole = (data.brackets || []).some(b => b.whole);
     const bracketRows = (data.brackets || []).map((b, i) => {
       const prev = i === 0 ? 0 : data.brackets[i-1].upTo;
-      const range = b.upTo ? `${prev.toLocaleString()} – ${b.upTo.toLocaleString()}` : `${prev.toLocaleString()}+`;
-      return `<tr><td>${range} AFN</td><td style="text-align:right;">${(b.rate * 100).toFixed(0)}%</td></tr>`;
+      const range = b.upTo ? `${prev.toLocaleString()} – ${b.upTo.toLocaleString()}` : `${prev.toLocaleString()} and above`;
+      const basis = b.rate === 0
+        ? 'No tax'
+        : `${(b.rate * 100).toFixed(0)}% ${b.whole ? 'of the whole salary' : 'of the amount in this range'}`;
+      return `<tr><td>${range} AFN</td><td style="text-align:right;">${basis}</td></tr>`;
     }).join('');
 
     const rows = data.rows.map((r, i) => `<tr>
@@ -14267,10 +14274,12 @@ async function openTaxReport() {
       <div class="brackets-box">
         <h3>📋 Afghanistan Wage Tax Brackets (Reference)</h3>
         <table>
-          <thead><tr><th>Salary Range</th><th style="text-align:right;">Tax Rate</th></tr></thead>
+          <thead><tr><th>Monthly Salary</th><th style="text-align:right;">Tax</th></tr></thead>
           <tbody>${bracketRows}</tbody>
         </table>
-        <div style="font-size:10px;color:#94a3b8;margin-top:8px;">Progressive (marginal) tax — each portion of salary is taxed at its bracket's rate.</div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:8px;">${anyWhole
+          ? 'A salary above the tax-free limit is taxed in full, not only the amount above it.'
+          : 'Progressive (marginal) tax — each slice of salary is taxed at the rate for that range.'}</div>
       </div>
 
       <div class="sigs">

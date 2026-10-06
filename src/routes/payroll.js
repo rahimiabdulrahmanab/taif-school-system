@@ -535,7 +535,11 @@ router.get('/tax-report', async (req, res) => {
     res.json({
       period: { month: m, year: y },
       is_holiday_month: taxIsHoliday,
-      brackets: TAX_BRACKETS.map(b => ({ upTo: b.upTo === Infinity ? null : b.upTo, rate: b.rate })),
+      brackets: TAX_BRACKETS.map(b => ({
+        upTo: b.upTo === Infinity ? null : b.upTo,
+        rate: b.rate,
+        whole: !!b.whole,           // rate applies to the entire salary, not a slice
+      })),
       rows,
       totals: {
         employees:        rows.length,
