@@ -12948,39 +12948,94 @@ async function printFeeReport() {
   const month   = document.getElementById('rpt-fee-month').value;
   const year    = document.getElementById('rpt-fee-year').value;
   const classId = document.getElementById('rpt-fee-class').value;
+  const clsName = classId
+    ? (document.getElementById('rpt-fee-class').selectedOptions[0] || {}).textContent || ''
+    : '';
+
   let url = `/api/reports/fees?month=${month}&year=${year}`;
   if (classId) url += '&class_id=' + classId;
   const res  = await fetch(url);
   const data = await res.json();
+  if (!res.ok) {
+    return showAlert({ title: t('alert_title_error') || 'Error',
+                       message: data.error || 'Could not build the report', type: 'error' });
+  }
 
-  const paidRows = data.paid.map((p, i) =>
-    `<tr><td>${i+1}</td><td>${p.first_name} ${p.last_name}</td><td>${p.student_code}</td><td>${p.class_name||'—'}</td><td>${Number(p.amount).toLocaleString()} AFN</td><td>${p.payment_method||'cash'}</td></tr>`
-  ).join('');
+  const n = v => Math.round(v || 0).toLocaleString();
+  const STATUS = {
+    paid:    ['Paid',      '#178f4f'],
+    partial: ['Part paid', '#8b5a0e'],
+    unpaid:  ['Unpaid',    '#dc4f4c'],
+    holiday: ['Holiday',   '#6e3fdb'],
+    none:    ['No fee',    '#64748b'],
+  };
 
-  const unpaidRows = data.unpaid.map((s, i) => {
-    let fee = parseFloat(s.monthly_fee)||0;
-    if (s.discount_type==='fixed') fee = Math.max(0, fee-parseFloat(s.discount_value));
-    if (s.discount_type==='percent') fee = fee*(1-parseFloat(s.discount_value)/100);
-    return `<tr><td>${i+1}</td><td>${s.first_name} ${s.last_name}</td><td>${s.student_code}</td><td>${s.class_name||'—'}</td><td>${Math.round(fee).toLocaleString()} AFN</td></tr>`;
+  // Every student, one line each: what they are charged, what they paid this
+  // month, and what they still owe altogether.
+  const rows = data.students.map((s, i) => {
+    const disc = s.discount_type === 'percent' && s.discount_value > 0
+      ? s.discount_value + '%'
+      : s.discount_type === 'fixed' && s.discount_value > 0
+        ? '−' + n(s.discount_value)
+        : '—';
+    const [label, colour] = STATUS[s.month_status] || STATUS.none;
+    return `<tr>
+      <td>${i + 1}</td>
+      <td>${s.first_name} ${s.last_name}</td>
+      <td>${s.parent_name || '—'}</td>
+      <td>${s.class_name || '—'}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:10.5px;">${s.student_code}</td>
+      <td style="text-align:right;">${n(s.monthly_fee)}</td>
+      <td style="text-align:right;">${disc}</td>
+      <td style="text-align:right;">${n(s.month_due)}</td>
+      <td style="text-align:right;color:#178f4f;font-weight:700;">${n(s.month_paid)}</td>
+      <td style="text-align:center;color:${colour};font-weight:700;">${label}</td>
+      <td style="text-align:right;font-weight:800;color:${s.total_balance > 0 ? '#dc4f4c' : '#178f4f'};">${n(s.total_balance)}</td>
+    </tr>`;
   }).join('');
 
-  const content = reportHeader('Fee Collection Report', `${MONTHS_RPT[parseInt(month)]} ${year}`) + `
+  const tt = data.totals;
+  const content = reportHeader('Fee Collection Report',
+      `${MONTHS_RPT[parseInt(month)]} ${year}${clsName ? ' · ' + clsName : ''}`) + `
     <div class="summary">
-      <div class="summary-box"><div class="summary-num">${Number(data.total_collected).toLocaleString()} AFN</div><div class="summary-lbl">Total Collected</div></div>
-      <div class="summary-box"><div class="summary-num">${data.paid.length}</div><div class="summary-lbl">Paid</div></div>
-      <div class="summary-box"><div class="summary-num">${data.unpaid.length}</div><div class="summary-lbl">Unpaid</div></div>
+      <div class="summary-box"><div class="summary-num">${n(tt.collected)} AFN</div><div class="summary-lbl">Collected this month</div></div>
+      <div class="summary-box"><div class="summary-num">${n(tt.billed)} AFN</div><div class="summary-lbl">Charged this month</div></div>
+      <div class="summary-box"><div class="summary-num">${n(tt.outstanding)} AFN</div><div class="summary-lbl">Outstanding in total</div></div>
+      <div class="summary-box"><div class="summary-num">${tt.students}</div><div class="summary-lbl">Students</div></div>
     </div>
-    <div class="section-title">✅ Paid Students (${data.paid.length})</div>
-    <table><thead><tr><th>#</th><th>Name</th><th>Code</th><th>Class</th><th>Amount</th><th>Method</th></tr></thead>
-    <tbody>${paidRows||'<tr><td colspan="6" style="text-align:center;color:#888;">No payments recorded</td></tr>'}</tbody></table>
-    <div class="section-title" style="margin-top:24px;">⚠ Unpaid Students (${data.unpaid.length})</div>
-    <table><thead><tr><th>#</th><th>Name</th><th>Code</th><th>Class</th><th>Due Amount</th></tr></thead>
-    <tbody>${unpaidRows||'<tr><td colspan="5" style="text-align:center;color:#888;">All paid!</td></tr>'}</tbody></table>
+    <div style="font-size:11.5px;color:#64748b;margin-bottom:14px;">
+      This month: <b style="color:#178f4f;">${tt.fully_paid}</b> paid in full ·
+      <b style="color:#8b5a0e;">${tt.partly_paid}</b> part paid ·
+      <b style="color:#dc4f4c;">${tt.not_paid}</b> unpaid ·
+      <b>${tt.owing_anything}</b> owe something altogether
+    </div>
+    <table style="font-size:10.5px;">
+      <thead><tr>
+        <th>#</th><th>Student</th><th>Father</th><th>Class</th><th>Code</th>
+        <th style="text-align:right;">Fee</th>
+        <th style="text-align:right;">Discount</th>
+        <th style="text-align:right;">Due</th>
+        <th style="text-align:right;">Paid</th>
+        <th style="text-align:center;">Status</th>
+        <th style="text-align:right;">Owed</th>
+      </tr></thead>
+      <tbody>${rows || '<tr><td colspan="11" style="text-align:center;color:#888;">No students</td></tr>'}</tbody>
+      <tfoot><tr style="font-weight:800;background:#f4f8fd;">
+        <td colspan="7" style="text-align:right;">Total</td>
+        <td style="text-align:right;">${n(tt.billed)}</td>
+        <td style="text-align:right;color:#178f4f;">${n(tt.collected)}</td>
+        <td></td>
+        <td style="text-align:right;color:#dc4f4c;">${n(tt.outstanding)}</td>
+      </tr></tfoot>
+    </table>
+    <div style="font-size:10px;color:#94a3b8;margin-top:10px;">
+      "Due" and "Paid" are for ${MONTHS_RPT[parseInt(month)]} ${year}. "Owed" is everything the family
+      still owes, including earlier months and any opening balance. Waived months are charged nothing.
+    </div>
     <div class="footer">Taif High School Management System</div>`;
 
   openPrintWindow(content, 'Fee Collection Report');
 }
-
 // ── Payroll Report ────────────────────────────────────────────
 async function printPayrollReport() {
   const month = document.getElementById('rpt-pay-month').value;

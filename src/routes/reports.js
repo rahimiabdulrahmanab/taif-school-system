@@ -1,7 +1,10 @@
 const express = require('express');
 const pool    = require('../db.js');
-const { kabulTodayISO } = require('../shamsi.js');
+const { kabulTodayISO, todayShamsi } = require('../shamsi.js');
 const { calculateMonthlyTax } = require('../tax.js');
+// The one ledger every money screen reads, so a printed report cannot quote
+// a different figure from the one the office is looking at.
+const { computeBalances } = require('./fees.js');
 const { getHolidayMonths } = require('../holidays.js');
 const router  = express.Router();
 
@@ -60,45 +63,81 @@ router.get('/attendance', async (req, res) => {
 });
 
 // ── Fee Collection Report ─────────────────────────────────────
+// Every student, with their whole fee position for the chosen month — what
+// they are charged, what they paid, and what they still owe altogether.
+//
+// The figures come from computeBalances, the same running ledger the Fee
+// Collection screen reads, so a printed report and the screen can never
+// quote different numbers at a parent. The old version answered a narrower
+// question — who paid this month and who did not — and built the "unpaid"
+// list straight from the students table, which swept in graduates and
+// inactive students and billed them all a flat monthly fee.
 router.get('/fees', async (req, res) => {
   try {
     const { month, year, class_id } = req.query;
-    const m = parseInt(month) || new Date().getMonth() + 1;
-    const y = parseInt(year)  || new Date().getFullYear();
+    const cur = todayShamsi();
+    const m = parseInt(month) || cur.month;
+    const y = parseInt(year)  || cur.year;
 
-    let query = `
-      SELECT fp.*, s.first_name, s.last_name, s.student_code, s.monthly_fee,
-             c.name as class_name
-      FROM fee_payments fp
-      JOIN students s ON s.id = fp.student_id
-      LEFT JOIN classes c ON c.id = s.class_id
-      WHERE fp.payment_month = $1 AND fp.payment_year = $2
-    `;
-    const params = [m, y];
-    if (class_id) { params.push(class_id); query += ` AND s.class_id = $${params.length}`; }
-    query += ` ORDER BY c.name, s.first_name`;
-    const paid = await pool.query(query, params);
+    const params = [];
+    let where = 'WHERE s.is_active = TRUE AND COALESCE(s.graduated, FALSE) = FALSE';
+    if (class_id) { params.push(class_id); where += ` AND s.class_id = $${params.length}`; }
 
-    // Unpaid students
-    let unpaidQ = `
-      SELECT s.first_name, s.last_name, s.student_code, s.monthly_fee,
-             s.discount_type, s.discount_value, c.name as class_name
-      FROM students s
-      LEFT JOIN classes c ON c.id = s.class_id
-      WHERE s.id NOT IN (
-        SELECT student_id FROM fee_payments WHERE payment_month=$1 AND payment_year=$2
-      )
-    `;
-    const unpaidParams = [m, y];
-    if (class_id) { unpaidParams.push(class_id); unpaidQ += ` AND s.class_id = $${unpaidParams.length}`; }
-    unpaidQ += ` ORDER BY c.name, s.first_name`;
-    const unpaid = await pool.query(unpaidQ, unpaidParams);
+    const students = await pool.query(`
+      SELECT s.id, s.first_name, s.last_name, s.student_code, s.parent_name,
+             s.monthly_fee, s.discount_type, s.discount_value,
+             c.name AS class_name, c.grade_level, c.section
+        FROM students s
+        LEFT JOIN classes c ON c.id = s.class_id
+        ${where}`, params);
 
+    const ledger = new Map();
+    (await computeBalances({ periodYear: y, periodMonth: m }))
+      .forEach(b => ledger.set(b.student_id, b));
+
+    const rows = students.rows.map(s => {
+      const b = ledger.get(s.id) || {};
+      const paid = +(b.period_paid || 0);
+      const due  = +(b.period_due  || 0);
+      return {
+        student_id:   s.id,
+        first_name:   s.first_name,
+        last_name:    s.last_name || '',
+        parent_name:  s.parent_name || '',
+        student_code: s.student_code || '',
+        class_name:   s.class_name || '',
+        monthly_fee:    parseFloat(s.monthly_fee) || 0,
+        discount_type:  s.discount_type,
+        discount_value: parseFloat(s.discount_value) || 0,
+        month_due:    due,
+        month_paid:   paid,
+        month_status: b.period_holiday ? 'holiday'
+                    : (due <= 0 && paid <= 0) ? 'none'
+                    : paid <= 0 ? 'unpaid'
+                    : paid + 0.001 >= due ? 'paid' : 'partial',
+        total_balance: +(b.total_balance || 0),
+        unpaid_months: b.unpaid_months || 0,
+      };
+    }).sort((a, b) =>
+      (a.class_name || '').localeCompare(b.class_name || '', 'fa') ||
+      (a.first_name || '').localeCompare(b.first_name || '', 'fa'));
+
+    const sum = (f) => rows.reduce((t, r) => t + f(r), 0);
     res.json({
       month: m, year: y,
-      paid:   paid.rows,
-      unpaid: unpaid.rows,
-      total_collected: paid.rows.reduce((s, p) => s + parseFloat(p.amount), 0),
+      students: rows,
+      totals: {
+        students:        rows.length,
+        collected:       +sum(r => r.month_paid).toFixed(2),
+        billed:          +sum(r => r.month_due).toFixed(2),
+        outstanding:     +sum(r => r.total_balance).toFixed(2),
+        fully_paid:      rows.filter(r => r.month_status === 'paid').length,
+        partly_paid:     rows.filter(r => r.month_status === 'partial').length,
+        not_paid:        rows.filter(r => r.month_status === 'unpaid').length,
+        owing_anything:  rows.filter(r => r.total_balance > 0).length,
+      },
+      // Kept so anything still reading the old shape does not break.
+      total_collected: +sum(r => r.month_paid).toFixed(2),
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
