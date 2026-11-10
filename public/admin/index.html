@@ -4577,9 +4577,8 @@ const LANG = {
     hint_install_cutoff:"From this Shamsi month onward, every student is automatically billed their monthly fee. Earlier months still show in each student's statement for history, but with 0 due — unless you click \"Set Due\" on a specific old month a student actually didn't pay.",
     lbl_month_singular:'month',
     lbl_months_plural:'months',
-    lbl_should_be:'should be {fee}',
-    lbl_class_fee_ok:'class fee',
-    hint_should_be:'What this class costs according to the school fee table, after this student discount.',
+    lbl_original_fee:'original fee {fee}',
+    hint_original_fee:'The full fee for this class before any discount. A tick means the amount billed matches it once this student discount is taken off.',
     hint_class_fee:'{fee} AFN — the standard fee for this class. Change it if this family pays something else.',
     hint_period_untracked:"This month isn't tracked for this student — add it to Previously Unpaid Months, or change the install cutoff in Settings.",
     lbl_month_singular:'month unpaid',
@@ -5098,9 +5097,8 @@ const LANG = {
     hint_install_cutoff:'له دې شمسي میاشتې وروسته، هر زده‌کوونکی په اتومات ډول د خپل میاشتني فیس بیله ورکول کیږي. مخکینۍ میاشتې لاهم د تاریخچې لپاره ښکاري خو پور یې صفر دی — مګر دا چې تاسو د یوې ځانګړې پخوانۍ نه‌تادیه شوې میاشتې لپاره "تادیه وټاکئ" کلیک وکړئ.',
     lbl_month_singular:'میاشت',
     lbl_months_plural:'میاشتې',
-    lbl_should_be:'باید {fee} وي',
-    lbl_class_fee_ok:'د ټولګي فیس',
-    hint_should_be:'د مکتب د فیس له جدول سره سم د دې ټولګي فیس، د دې زده‌کوونکي له تخفیف وروسته.',
+    lbl_original_fee:'اصلي فیس {fee}',
+    hint_original_fee:'د دې ټولګي بشپړ فیس مخکې له دې چې تخفیف ورکړل شي. نښه دا معنا لري چې اخیستل شوی مقدار د دې زده‌کوونکي تخفیف وروسته سم دی.',
     hint_class_fee:'{fee} افغانۍ — د دې ټولګي معیاري فیس. که دا کورنۍ بل مقدار ورکوي، بدل یې کړئ.',
     hint_period_untracked:'دا میاشت د دې زده‌کوونکي لپاره نه ده څارل شوې — په پخوانیو نه‌تادیه شویو میاشتو کې یې اضافه کړئ، یا د سیسټم د نصب نېټه په تنظیماتو کې بدله کړئ.',
     lbl_month_singular:'میاشت نه تادیه',
@@ -10016,27 +10014,31 @@ function renderFeeList() {
     return 'unpaid';
   };
 
-  // ── What this student is supposed to be paying ───────────────
-  // Under the figure the school is actually billing, the figure its own fee
-  // table says that class costs — with this student's discount taken off it,
-  // so the two numbers can be read straight against each other. A row that
-  // agrees says so quietly; a row that does not says what it should be.
+  // ── The original fee for this class ─────────────────────────
+  // Under what the school is billing, the full price of that class before
+  // any discount. Every row shows it, so the office can always see both
+  // figures at once.
   //
-  // Nothing here changes a fee. It only shows the office where the fee box
-  // was never updated after a promotion, or where a discount was entered
-  // twice — once by lowering the fee and again in the discount field.
-  const shouldBe = (s, charged) => {
+  // The tick is the check: it compares the billed figure against the class
+  // price with THIS student's discount taken off. A child on 600 with 200
+  // off is billed 400 and is perfectly correct, so that row is ticked, not
+  // flagged — a discount is an arrangement the school made, not a mistake.
+  // The warning is for the two cases that are mistakes: a fee box never
+  // updated after a promotion, and a reduction entered twice, once by
+  // lowering the fee and again in the discount field.
+  //
+  // Nothing here changes a fee.
+  const originalFee = (s, charged) => {
     const band = _feeClassFee[s.class_id];
-    if (band == null) return '';                       // class has no grade
-    const should = feeOf({ ...s, monthly_fee: band });
-    const same   = Math.round(should) === Math.round(charged);
-    const title  = (t('hint_should_be') || '').replace(/"/g, '');
-    return same
+    if (band == null) return '';                       // class has no grade set
+    const agrees = Math.round(feeOf({ ...s, monthly_fee: band })) === Math.round(charged);
+    const label  = (t('lbl_original_fee') || '').replace('{fee}', Math.round(band).toLocaleString());
+    const title  = (t('hint_original_fee') || '').replace(/"/g, '');
+    return agrees
       ? `<div title="${title}" style="font-size:10.5px;margin-top:2px;color:#94a3b8;">
-           <i class="fas fa-check" style="font-size:9px;"></i> ${t('lbl_class_fee_ok')}</div>`
+           <i class="fas fa-check" style="font-size:9px;"></i> ${label}</div>`
       : `<div title="${title}" style="font-size:10.5px;margin-top:2px;color:#b45309;font-weight:700;">
-           <i class="fas fa-triangle-exclamation" style="font-size:9px;"></i>
-           ${(t('lbl_should_be') || '').replace('{fee}', Math.round(should).toLocaleString())}</div>`;
+           <i class="fas fa-triangle-exclamation" style="font-size:9px;"></i> ${label}</div>`;
   };
 
   let unpaidCount = 0, partialCount = 0, paidCount = 0;
@@ -10115,7 +10117,7 @@ function renderFeeList() {
         <div class="pcls">${s.parent_name ? s.parent_name + ' · ' : ''}${s.student_code}</div>
       </div></div></td>
       <td>${s.class_name ? `<span class="badge bg-t">${s.class_name}</span>` : '—'}</td>
-      <td><span style="font-family:var(--font-mono);font-size:12px;">${Math.round(fee).toLocaleString()} AFN</span>${shouldBe(s, fee)}</td>
+      <td><span style="font-family:var(--font-mono);font-size:12px;">${Math.round(fee).toLocaleString()} AFN</span>${originalFee(s, fee)}</td>
       <td>${statusBadge}</td>
       <td>${balanceCell}</td>
       <td style="text-align:center;">${actionBtn}</td>
