@@ -1,6 +1,6 @@
 // ── What a grade costs ────────────────────────────────────────
 // Taif charges by grade, not by student: everyone in آمادګي through دریم pays
-// the same monthly fee, everyone in څلورم through اووم pays the next one, and
+// the same monthly fee, everyone in څلورم through شپږم pays the next one, and
 // so on. A student's own discount is applied on top of this and is never
 // touched by a change of grade — a family on a 200 discount keeps it when the
 // child moves up; only the amount it comes off changes.
@@ -13,8 +13,8 @@ const { gradeIndex } = require('./grades.js');
 // upTo is an index into grades.js's GRADE_ORDER: آمادګي is 0, اول 1 … دولسم 12.
 const DEFAULT_BANDS = [
   { upTo: 3,  fee: 600 },    // آمادګي، اول، دوهم، دریم
-  { upTo: 7,  fee: 700 },    // څلورم، پنځم، شپږم، اووم
-  { upTo: 9,  fee: 950 },    // اتم، نهم
+  { upTo: 6,  fee: 700 },    // څلورم، پنځم، شپږم
+  { upTo: 9,  fee: 950 },    // اووم، اتم، نهم
   { upTo: 12, fee: 1100 },   // لسم، یوولسم، دولسم
 ];
 

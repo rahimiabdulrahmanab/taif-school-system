@@ -287,11 +287,14 @@ router.put('/:id', upload.single('photo'), async (req, res) => {
       is_active, enrolled_at, previous_debt,
     } = req.body;
 
-    // Get existing student to handle old photo
-    const existing = await pool.query('SELECT photo FROM students WHERE id = $1', [req.params.id]);
+    // Get existing student to handle old photo — and to see whether this edit
+    // moves the child into another class, which moves the fee with it.
+    const existing = await pool.query(
+      'SELECT photo, class_id, monthly_fee FROM students WHERE id = $1', [req.params.id]);
     if (!existing.rows.length) return res.status(404).json({ error: 'Not found' });
+    const prev = existing.rows[0];
 
-    let photo = existing.rows[0].photo;
+    let photo = prev.photo;
     if (req.file) {
       // Delete old photo
       if (photo) {
@@ -299,6 +302,37 @@ router.put('/:id', upload.single('photo'), async (req, res) => {
         if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
       }
       photo = req.file.filename;
+    }
+
+    // ── The fee follows the class ───────────────────────────────
+    // Moving a child into another class puts them on that grade's fee, so
+    // the office never has to remember the table or retype it. Two things
+    // are deliberately left alone:
+    //
+    //   • a figure the office typed itself. If the fee in the form is not
+    //     the fee the student was already on, it is a decision about this
+    //     family and it is saved exactly as typed.
+    //   • a student on 0. A fee of nothing is also a decision — usually an
+    //     orphan or a teacher's child — not a blank waiting to be filled.
+    //
+    // The student's discount is a separate column and is never touched; it
+    // simply comes off the new figure instead of the old one.
+    const newClassId   = class_id ? parseInt(class_id, 10) : null;
+    const prevClassId  = prev.class_id == null ? null : parseInt(prev.class_id, 10);
+    const prevFee      = parseFloat(prev.monthly_fee);
+    const typedFee     = parseFloat(monthly_fee);
+    let   feeToSave    = Number.isFinite(typedFee) ? typedFee : 0;
+    let   bandFee      = null;     // set only when the class move re-priced them
+    let   bandGrade    = '';
+
+    if (newClassId && newClassId !== prevClassId &&
+        Number.isFinite(prevFee) && prevFee > 0 && feeToSave === prevFee) {
+      const g = await pool.query('SELECT grade_level FROM classes WHERE id = $1', [newClassId]);
+      const grade = g.rows.length ? g.rows[0].grade_level : null;
+      const band  = feeForGrade(grade, await getBands());
+      if (band != null && band !== prevFee) {
+        feeToSave = band; bandFee = band; bandGrade = grade || '';
+      }
     }
 
     const result = await pool.query(`
@@ -321,7 +355,7 @@ router.put('/:id', upload.single('photo'), async (req, res) => {
       class_id || null, parent_name || null,
       parent_phone || null, parent_phone2 || null,
       address || null, photo,
-      parseFloat(monthly_fee) || 0,
+      feeToSave,
       discount_type || 'none',
       parseFloat(discount_value) || 0,
       discount_note || null,
@@ -331,7 +365,35 @@ router.put('/:id', upload.single('photo'), async (req, res) => {
       req.params.id,
     ]);
 
-    res.json(result.rows[0]);
+    // Stamp the new price with the month it starts from, so the months this
+    // child has already been billed keep the price they were billed at —
+    // last year's دریم months must not re-price themselves at the څلورم fee.
+    // Only an automatic change is stamped. A fee the office types by hand is
+    // a correction and still applies to every month, as it always has.
+    if (bandFee != null) {
+      try {
+        const have = await pool.query(`SELECT to_regclass('public.student_fee_history') AS t`);
+        if (have.rows[0].t) {
+          const nowS = todayShamsi();
+          const has  = await pool.query(
+            'SELECT 1 FROM student_fee_history WHERE student_id = $1 LIMIT 1', [req.params.id]);
+          if (!has.rows.length) {
+            await pool.query(
+              `INSERT INTO student_fee_history
+                 (student_id, from_year, from_month, monthly_fee, reason)
+               VALUES ($1, 0, 1, $2, 'fee before the class was changed')`,
+              [req.params.id, prevFee]);
+          }
+          await pool.query(
+            `INSERT INTO student_fee_history
+               (student_id, from_year, from_month, monthly_fee, reason)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [req.params.id, nowS.year, nowS.month, bandFee, 'moved to ' + bandGrade]);
+        }
+      } catch (_) { /* no history table yet → the new fee simply stands */ }
+    }
+
+    res.json({ ...result.rows[0], fee_changed_to: bandFee });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

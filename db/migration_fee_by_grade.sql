@@ -1,8 +1,8 @@
 -- ═══════════════════════════════════════════════════════════════
 --  Fee follows the grade, and old months keep their old price
 --  ------------------------------------------------------------
---  Taif charges by grade: آمادګي–دریم 600, څلورم–اووم 700,
---  اتم–نهم 950, لسم–دولسم 1100. Until now a promotion moved the
+--  Taif charges by grade: آمادګي–دریم 600, څلورم–شپږم 700,
+--  اووم–نهم 950, لسم–دولسم 1100. Until now a promotion moved the
 --  student but left the fee behind, so a child in څلورم was still
 --  being billed the دریم price.
 --
@@ -42,5 +42,5 @@ ALTER TABLE student_class_history
 -- اول is 1 … دولسم is 12.
 INSERT INTO settings (key, value)
 VALUES ('grade_fees',
-        '[{"upTo":3,"fee":600},{"upTo":7,"fee":700},{"upTo":9,"fee":950},{"upTo":12,"fee":1100}]')
+        '[{"upTo":3,"fee":600},{"upTo":6,"fee":700},{"upTo":9,"fee":950},{"upTo":12,"fee":1100}]')
 ON CONFLICT (key) DO NOTHING;

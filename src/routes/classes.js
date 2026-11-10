@@ -1,6 +1,7 @@
 const express = require('express');
 const pool    = require('../db.js');
 const { compareClasses, withGradeMeta, normalize } = require('../grades.js');
+const { getBands, feeForGrade } = require('../fee-bands.js');
 const router  = express.Router();
 
 // GET all classes with student count and teachers list
@@ -28,6 +29,9 @@ router.get('/', async (req, res) => {
       if (!/student_class_history/.test(e.message || '')) throw e;
     }
 
+    // The fee table, read once for the whole list.
+    const bands = await getBands();
+
     const enriched = await Promise.all(classes.map(async (c) => {
       const countRes = await pool.query(
         `SELECT COUNT(*)::integer AS cnt FROM students WHERE class_id = $1`, [c.id]
@@ -54,6 +58,10 @@ router.get('/', async (req, res) => {
         student_count:     countRes.rows[0].cnt,
         teachers:          teachersRes.rows,
         undoable_students: undoMap[c.id] || 0,
+        // What this grade costs, before any discount. The student form fills
+        // the fee box from it when a class is picked, so a fee is never typed
+        // from memory. null where the class has no grade to charge by.
+        standard_fee:      feeForGrade(c.grade_level, bands),
       };
     }));
 

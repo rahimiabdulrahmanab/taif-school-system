@@ -1742,7 +1742,7 @@ button[style*="background:linear-gradient"]{
       <!-- Class -->
       <div>
         <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;" data-i18n="lbl_class_sel">Class</label>
-        <select id="sf-class" style="width:100%;padding:10px 13px;background:rgba(255,255,255,.85);border:1px solid rgba(26,74,92,.12);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;transition:var(--transition);">
+        <select id="sf-class" onchange="sfClassPicked()" style="width:100%;padding:10px 13px;background:rgba(255,255,255,.85);border:1px solid rgba(26,74,92,.12);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;transition:var(--transition);">
           <option value="" data-i18n="lbl_no_class" style="background:#0C1526;color:#E8EDF5;">No class assigned</option>
         </select>
       </div>
@@ -1785,6 +1785,7 @@ button[style*="background:linear-gradient"]{
       <div>
         <label style="font-size:11px;font-weight:700;color:var(--text-dim);font-family:var(--font-head);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;" data-i18n="lbl_monthly_fee_afn">Monthly Fee (AFN)</label>
         <input id="sf-fee" type="text" inputmode="numeric" style="width:100%;padding:10px 13px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;transition:var(--transition);" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'" placeholder="0" oninput="this.value=toWesternDigits(this.value).replace(/[^0-9]/g,'')">
+        <div id="sf-fee-hint" style="font-size:11px;color:var(--text-dim);margin-top:5px;min-height:14px;"></div>
       </div>
 
       <!-- Discount type + value -->
@@ -4576,6 +4577,7 @@ const LANG = {
     hint_install_cutoff:"From this Shamsi month onward, every student is automatically billed their monthly fee. Earlier months still show in each student's statement for history, but with 0 due — unless you click \"Set Due\" on a specific old month a student actually didn't pay.",
     lbl_month_singular:'month',
     lbl_months_plural:'months',
+    hint_class_fee:'{fee} AFN — the standard fee for this class. Change it if this family pays something else.',
     hint_period_untracked:"This month isn't tracked for this student — add it to Previously Unpaid Months, or change the install cutoff in Settings.",
     lbl_month_singular:'month unpaid',
     lbl_months_plural:'months unpaid',
@@ -5093,6 +5095,7 @@ const LANG = {
     hint_install_cutoff:'له دې شمسي میاشتې وروسته، هر زده‌کوونکی په اتومات ډول د خپل میاشتني فیس بیله ورکول کیږي. مخکینۍ میاشتې لاهم د تاریخچې لپاره ښکاري خو پور یې صفر دی — مګر دا چې تاسو د یوې ځانګړې پخوانۍ نه‌تادیه شوې میاشتې لپاره "تادیه وټاکئ" کلیک وکړئ.',
     lbl_month_singular:'میاشت',
     lbl_months_plural:'میاشتې',
+    hint_class_fee:'{fee} افغانۍ — د دې ټولګي معیاري فیس. که دا کورنۍ بل مقدار ورکوي، بدل یې کړئ.',
     hint_period_untracked:'دا میاشت د دې زده‌کوونکي لپاره نه ده څارل شوې — په پخوانیو نه‌تادیه شویو میاشتو کې یې اضافه کړئ، یا د سیسټم د نصب نېټه په تنظیماتو کې بدله کړئ.',
     lbl_month_singular:'میاشت نه تادیه',
     lbl_months_plural:'میاشتې نه تادیه',
@@ -6296,9 +6299,11 @@ async function loadStudents() {
     const sf  = document.getElementById('sf-class');
     cf.innerHTML  = `<option value="">${t('opt_all_classes')}</option>`;
     sf.innerHTML  = `<option value="">${t('lbl_no_class')}</option>`;
+    // data-fee carries what each grade costs, so picking a class can fill the
+    // fee box without another trip to the server.
     (Array.isArray(classes) ? classes : []).forEach(c => {
       cf.innerHTML += `<option value="${c.id}">${c.name}</option>`;
-      sf.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+      sf.innerHTML += `<option value="${c.id}" data-fee="${c.standard_fee == null ? '' : c.standard_fee}">${c.name}</option>`;
     });
 
     _stuLoaded = true;
@@ -6532,6 +6537,7 @@ function clearStudentForm() {
   document.getElementById('sf-gender').value = '';
   document.getElementById('sf-class').value  = '';
   document.getElementById('sf-fee').value    = '';
+  const _fh = document.getElementById('sf-fee-hint'); if (_fh) _fh.textContent = '';
   document.getElementById('sf-dtype').value  = 'none';
   document.getElementById('sf-dvalue').value = '';
   document.getElementById('sf-dnote').value  = '';
@@ -6598,6 +6604,26 @@ function toggleDiscount() {
   document.getElementById('dval-wrap').style.display  = t !== 'none' ? 'block' : 'none';
   document.getElementById('dnote-wrap').style.display = t !== 'none' ? 'block' : 'none';
   document.getElementById('dval-label').textContent   = t === 'percent' ? (LANG[_lang]||LANG.en).opt_percentage||'Percentage (%)' : (LANG[_lang]||LANG.en).lbl_discount_amount||'Amount (AFN)';
+}
+
+// ── The fee follows the class ─────────────────────────────────
+// Picking a class fills in what that grade costs, so a fee is never typed
+// from memory. It stays an ordinary box afterwards: a family with its own
+// arrangement gets whatever figure is typed over it, and the discount below
+// comes off on top either way.
+//
+// Only choosing a class does this. Opening a student to correct their phone
+// number leaves the fee exactly where it was.
+function sfClassPicked() {
+  const sel  = document.getElementById('sf-class');
+  const hint = document.getElementById('sf-fee-hint');
+  if (hint) hint.textContent = '';
+  const opt = sel.selectedOptions[0];
+  const fee = opt ? opt.getAttribute('data-fee') : '';
+  if (!fee) return;                      // no grade on that class — leave it alone
+  document.getElementById('sf-fee').value = fee;
+  if (hint) hint.textContent = (t('hint_class_fee') || '')
+    .replace('{fee}', Number(fee).toLocaleString());
 }
 
 async function saveStudent() {
@@ -8448,6 +8474,24 @@ function showPromotePlan({ title, plan, refresh, onConfirm }) {
           + '<b style="font-family:var(--font-mono);">' + m.count + '</b></div>').join('')
       : '<div style="font-size:12.5px;color:#6a7c93;">No class-to-class moves.</div>';
 
+    // What the run does to fees, grouped — "45 students 600 → 700" — so the
+    // office sees every re-pricing before a single row is written. A student
+    // on a figure the school typed by hand is re-priced too, which is the
+    // whole point of charging by grade, but it should never be a surprise.
+    const money = (v) => Math.round(v).toLocaleString();
+    const feeRows = (p.fee_changes || []).length
+      ? '<div style="font-family:var(--font-head);font-size:12px;font-weight:800;color:#0f2845;text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;">Monthly fees that change</div>'
+        + p.fee_changes.map(f =>
+            '<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 10px;border-radius:7px;background:#f5f9fc;margin-bottom:4px;font-size:12.5px;">'
+            + '<span style="font-family:var(--font-mono);">' + money(f.from) + ' → '
+            + '<b style="color:' + (f.to > f.from ? '#b45309' : '#178f4f') + ';">' + money(f.to) + '</b> AFN</span>'
+            + '<b style="font-family:var(--font-mono);">' + f.count + '</b></div>').join('')
+        + '<div style="font-size:11.5px;color:#6a7c93;margin-top:6px;">Every student keeps their own discount — it simply comes off the new figure. Months already billed keep the price they were billed at.</div>'
+      : (p.fee_tracking
+          ? '<div style="margin-top:14px;font-size:12px;color:#6a7c93;">No monthly fee changes.</div>'
+          : '<div style="margin-top:14px;padding:10px 12px;border-radius:9px;background:rgba(255,170,61,.12);font-size:12px;color:#8b5a0e;">'
+            + '<i class="fas fa-triangle-exclamation"></i> Fees will stay as they are: the fee-by-grade update is not installed on this database yet.</div>');
+
     const decisionRows = decisionsNeeded.map(d => {
       const opts = (d.options || []).map(o =>
         '<option value="' + esc(o.value) + '"' + (o.value === d.chosen ? ' selected' : '') + '>'
@@ -8477,7 +8521,7 @@ function showPromotePlan({ title, plan, refresh, onConfirm }) {
             ? '<div style="font-family:var(--font-head);font-size:12px;font-weight:800;color:#d97706;text-transform:uppercase;letter-spacing:.05em;margin-bottom:9px;">Needs a decision</div>' + decisionRows
             : '')
       +   '<div style="font-family:var(--font-head);font-size:12px;font-weight:800;color:#0f2845;text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;">'
-      +     p.promoted + ' students move up one grade</div>' + moveRows
+      +     p.promoted + ' students move up one grade</div>' + moveRows + feeRows
       +   (p.graduated ? '<div style="margin-top:12px;padding:10px 12px;border-radius:9px;background:rgba(34,197,113,.10);border:1px solid rgba(34,197,113,.25);font-size:12.5px;color:#12603a;"><b>' + p.graduated + '</b> students in the final grade will be ARCHIVED as graduates and will leave the active lists.</div>' : '')
       +   ((p.missing_destinations || []).length ? '<div style="margin-top:10px;padding:10px 12px;border-radius:9px;background:#f5f9fc;font-size:12px;color:#475569;">Staying put: ' + p.missing_destinations.map(m => esc(m.label) + ' (' + m.count + ')').join(', ') + '</div>' : '')
       +   (p.skipped_untracked ? '<div style="margin-top:8px;font-size:12px;color:#6a7c93;">' + p.skipped_untracked + ' students are in a class with no grade level set and will not move.</div>' : '')
